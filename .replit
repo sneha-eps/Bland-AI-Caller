@@ -8,7 +8,7 @@ deploymentTarget = "cloudrun"
 channel = "stable-25_05"
 
 [workflows]
-runButton = "Run FastAPI App"
+runButton = "Install and Run"
 
 [[workflows.workflow]]
 name = "Run Flask App"
@@ -23,6 +23,19 @@ args = "python main.py"
 name = "Run FastAPI App"
 author = 41523520
 mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "uvicorn main:app --host 0.0.0.0 --port 5000 --reload"
+
+[[workflows.workflow]]
+name = "Install and Run"
+author = 41523520
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pip install -r requirements.txt"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
