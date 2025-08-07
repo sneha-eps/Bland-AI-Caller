@@ -111,7 +111,9 @@ BEHAVIORAL GUARANTEES
 • Understand and act on the entire meaning of the patient's sentence (not just keywords).
 • Never treat conditional, hypothetical, or tentative language as confirmation.
 • Use the provided clinic details exactly as written when stating contact information.
-• End the call only after a final confirmation, reschedule arrangement, or cancellation acknowledgment."""
+• End the call only after a final confirmation, reschedule arrangement, or cancellation acknowledgment.
+• If there is no response from the patient for 3-4 seconds after asking a question, politely say "I didn't hear a response. Thank you for your time, and have a good day" and end the call.
+• If the patient gives a very brief acknowledgment (like "okay", "thanks", "got it") after receiving information, respond with "You're welcome. Have a great day!" and immediately end the call."""
 
 class CallRequest(BaseModel):
     phone_number: str
