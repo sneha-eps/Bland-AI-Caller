@@ -1,6 +1,5 @@
-run = "cowsay Configure me!"
-entrypoint = "README.md"
+run = "python main.py"
+modules = ["python-3.11"]
 
-[nix]
-channel = "stable-24_05"
-packages = ["cowsay"]
+[deployment]
+deploymentTarget = "cloudrun"
