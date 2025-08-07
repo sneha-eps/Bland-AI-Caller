@@ -178,10 +178,8 @@ async def make_call(call_request: CallRequest):
         response = bland_client.call(
             phone_number=call_request.phone_number,
             task=get_call_prompt(),
-            voice_id=6,
-            request_data=call_data,
-            max_duration=300,
-            silence_threshold=3000
+            voice_id=11,
+            request_data=call_data
         )
         
         return {
