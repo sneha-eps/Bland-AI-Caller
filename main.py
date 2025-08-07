@@ -30,6 +30,20 @@ def get_api_key():
     except KeyError:
         return None
 
+def get_voice_id(voice_name: str = "female_professional") -> int:
+    """Map friendly voice names to Bland AI voice IDs"""
+    voice_mapping = {
+        "male_professional": 0,
+        "female_professional": 11,
+        "female_warm": 4,
+        "female_clear": 6,
+        "female_friendly": 8,
+        "male_casual": 1,
+        "male_warm": 2,
+        "male_clear": 3
+    }
+    return voice_mapping.get(voice_name, 11)  # Default to female_professional
+
 def get_call_prompt():
     """Return the call prompt"""
     return """
@@ -178,7 +192,7 @@ async def make_call(call_request: CallRequest):
         response = bland_client.call(
             phone_number=call_request.phone_number,
             task=get_call_prompt(),
-            voice_id=4,
+            voice_id=get_voice_id("female_professional"),
             request_data=call_data
         )
         
