@@ -1,7 +1,12 @@
 
 import os
 import sys
-from flask import Flask, render_template, request, jsonify
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
+from typing import Optional
 
 # Try to import from the 'blandai' package
 try:
@@ -13,7 +18,8 @@ except ImportError:
     print("---")
     sys.exit(1)
 
-app = Flask(__name__)
+app = FastAPI(title="Bland AI Call Center", description="Make automated calls using Bland AI")
+templates = Jinja2Templates(directory="templates")
 
 # --- Configuration ---
 
@@ -102,49 +108,59 @@ BEHAVIORAL GUARANTEES
 • Use the provided clinic details exactly as written when stating contact information.
 • End the call only after a final confirmation, reschedule arrangement, or cancellation acknowledgment."""
 
-@app.route('/')
-def index():
+class CallRequest(BaseModel):
+    phone_number: str
+    patient_name: str
+    clinic_name: str
+    address: Optional[str] = ""
+    office_location: Optional[str] = ""
+    provider_name: str
+    appointment_date: str
+    appointment_time: str
+
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
     """Main page with the calling interface"""
     api_key = get_api_key()
-    return render_template('index.html', has_api_key=bool(api_key))
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "has_api_key": bool(api_key)
+    })
 
-@app.route('/make_call', methods=['POST'])
-def make_call():
+@app.post("/make_call")
+async def make_call(call_request: CallRequest):
     """Handle the call request from the frontend"""
     api_key = get_api_key()
     
     if not api_key:
-        return jsonify({
-            'success': False,
-            'error': 'BLAND_API_KEY not found in Secrets. Please add your API key.'
-        })
-    
-    # Get form data
-    phone_number = request.json.get('phone_number')
-    patient_name = request.json.get('patient_name')
-    clinic_name = request.json.get('clinic_name')
-    address = request.json.get('address')
-    office_location = request.json.get('office_location')
-    provider_name = request.json.get('provider_name')
-    appointment_date = request.json.get('appointment_date')
-    appointment_time = request.json.get('appointment_time')
+        raise HTTPException(
+            status_code=400,
+            detail="BLAND_API_KEY not found in Secrets. Please add your API key."
+        )
     
     # Validate required fields
-    if not all([phone_number, patient_name, clinic_name, provider_name, appointment_date, appointment_time]):
-        return jsonify({
-            'success': False,
-            'error': 'Please fill in all required fields.'
-        })
+    if not all([
+        call_request.phone_number,
+        call_request.patient_name,
+        call_request.clinic_name,
+        call_request.provider_name,
+        call_request.appointment_date,
+        call_request.appointment_time
+    ]):
+        raise HTTPException(
+            status_code=400,
+            detail="Please fill in all required fields."
+        )
     
     # Prepare call data
     call_data = {
-        "patient name": patient_name,
-        "clinic name": clinic_name,
-        "address": address,
-        "office location": office_location,
-        "provider name": provider_name,
-        "date": appointment_date,
-        "time": appointment_time
+        "patient name": call_request.patient_name,
+        "clinic name": call_request.clinic_name,
+        "address": call_request.address,
+        "office location": call_request.office_location,
+        "provider name": call_request.provider_name,
+        "date": call_request.appointment_date,
+        "time": call_request.appointment_time
     }
     
     try:
@@ -153,24 +169,30 @@ def make_call():
         
         # Make the call
         response = bland_client.call(
-            phone_number=phone_number,
+            phone_number=call_request.phone_number,
             task=get_call_prompt(),
             voice_id=2,
             request_data=call_data
         )
         
-        return jsonify({
-            'success': True,
-            'call_id': response.get('call_id', 'N/A'),
-            'status': response.get('status', 'N/A'),
-            'message': response.get('message', 'N/A')
-        })
+        return {
+            "success": True,
+            "call_id": response.get("call_id", "N/A"),
+            "status": response.get("status", "N/A"),
+            "message": response.get("message", "N/A")
+        }
         
     except Exception as e:
-        return jsonify({
-            'success': False,
-            'error': f'An error occurred while making the call: {str(e)}'
-        })
+        raise HTTPException(
+            status_code=500,
+            detail=f"An error occurred while making the call: {str(e)}"
+        )
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+@app.get("/docs")
+async def get_docs():
+    """Access FastAPI automatic documentation"""
+    return {"message": "Visit /docs for interactive API documentation"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=5000)
