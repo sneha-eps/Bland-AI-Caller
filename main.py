@@ -109,13 +109,13 @@ RESPONSE FLOW BY INTENT
 • IF UNSURE:
   Say: "Thanks for letting me know. Would you like to reschedule this appointment for a different time, or would you prefer to cancel it?"
   Wait.
-  – If they say reschedule → "Great. Our scheduling agent will call you shortly to find a new time. Is that okay?" Wait, then end after acknowledgment.
+  – If they say reschedule → "Perfect! Our scheduling agent will call you shortly to find a new time that works better for you. Is that okay?" Wait for acknowledgment, then say "Great. Someone will be in touch soon. Have a great day!" and end the call.
   – If they say cancel → "Okay, I will cancel this appointment for you. Please feel free to contact us anytime you're ready to schedule a new one." Wait, then end after acknowledgment.
   – If they now give an explicit, unconditional confirmation → switch to CONFIRM flow.
 
-• IF RESCHEDULE:
-  Say: "Great. Our scheduling agent will call you shortly to find a new time. Is that okay?" 
-  Wait, then end after acknowledgment.
+• IF RESCHEDULE (when patient explicitly requests to reschedule):
+  Say: "Of course! Our scheduling agent will call you shortly to find a new time that works better for you. Is that okay?" 
+  Wait for acknowledgment, then say "Perfect. Someone will be in touch soon. Have a great day!" and end the call.
 
 • IF OFF-TOPIC / NON-RESPONSIVE:
   Briefly address any concern if needed, then repeat the last question clearly and wait.
@@ -192,7 +192,7 @@ async def make_call(call_request: CallRequest):
         response = bland_client.call(
             phone_number=call_request.phone_number,
             task=get_call_prompt(),
-            voice_id=get_voice_id("female_professional"),
+            voice="nova",  # Using named voice instead of ID
             request_data=call_data
         )
         
