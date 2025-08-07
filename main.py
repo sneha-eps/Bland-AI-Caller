@@ -1,5 +1,7 @@
+
 import os
 import sys
+from flask import Flask, render_template, request, jsonify
 
 # Try to import from the 'blandai' package
 try:
@@ -9,38 +11,24 @@ except ImportError:
     print("🔴 Error: The 'blandai' library is not installed correctly.")
     print("Please use the 'Shell' to run: pip install blandai")
     print("---")
-    sys.exit(1) # Stop the script if the library is missing
+    sys.exit(1)
+
+app = Flask(__name__)
 
 # --- Configuration ---
 
-# 1. Retrieve the API key from Replit Secrets
-try:
-    API_KEY = os.environ['BLAND_API_KEY']
-except KeyError:
-    print("---")
-    print("🔴 Error: BLAND_API_KEY not found in Secrets.")
-    print("Please click the lock icon on the left and add your Bland AI API key.")
-    print("---")
-    sys.exit(1)
+def get_api_key():
+    """Retrieve the API key from Replit Secrets"""
+    try:
+        return os.environ['BLAND_API_KEY']
+    except KeyError:
+        return None
 
-# 2. Set the phone number to call.
-#    ⚠️ IMPORTANT: Replace this with a real phone number in E.164 format.
-TARGET_PHONE_NUMBER = "+13466555567"
-CALL_DATA = { 
-    "patient name": "Sneha",
-    "clinic name": "Hillside Primary Care",
-    "address": "12881 I-35, Live Oak, TX 78233, United States",
-    "office location": "Live Oak Office",
-    "provider name": "Dr. Smith",
-    "date": "2025-08-19",
-    "time": "10:00 AM"
-}
-
-
-# 3. Write the prompt for the AI agent.
-CALL_PROMPT = """
+def get_call_prompt():
+    """Return the call prompt"""
+    return """
 ROLE & PERSONA
-You are an AI voice agent calling from [clinic name]. You are professional, polite, and empathetic. Speak in complete, natural sentences and combine related thoughts smoothly. Always wait for the patient’s full response before continuing or ending the call. Do not skip or reorder steps.
+You are an AI voice agent calling from [clinic name]. You are professional, polite, and empathetic. Speak in complete, natural sentences and combine related thoughts smoothly. Always wait for the patient's full response before continuing or ending the call. Do not skip or reorder steps.
 
 CLINIC DETAILS (USE AS-IS WHEN NEEDED)
 • Website: w w w dot hill side primary care dot com
@@ -70,7 +58,7 @@ CONVERSATION FLOW (STRICT ORDER)
    Then stop and wait.
 
 INTENT INTERPRETATION (WHOLE-SENTENCE UNDERSTANDING)
-Determine intent based on the complete meaning of the patient’s sentence:
+Determine intent based on the complete meaning of the patient's sentence:
 
 A) CONFIRM — Explicit, unconditional commitment to attend. No conditions, no uncertainty, no conflicting phrases.
 B) CANNOT ATTEND — Clear refusal or inability to attend as scheduled.
@@ -78,10 +66,10 @@ C) UNSURE — Any conditional, hypothetical, tentative, or ambiguous response.
 D) OFF-TOPIC / NON-RESPONSIVE — Does not answer the question.
 
 CONFIRMATION CHECKLIST (MUST PASS ALL TO CONFIRM)
-1. Is the answer an explicit, unconditional “yes”?
+1. Is the answer an explicit, unconditional "yes"?
 2. No conditions, uncertainty, or future-decision wording?
 3. No mixed intent?
-If any answer is “no,” do not confirm — treat as UNSURE.
+If any answer is "no," do not confirm — treat as UNSURE.
 
 RESPONSE FLOW BY INTENT
 
@@ -108,51 +96,81 @@ RESPONSE FLOW BY INTENT
   Briefly address any concern if needed, then repeat the last question clearly and wait.
 
 BEHAVIORAL GUARANTEES
-• Always wait for the patient’s response before continuing or ending the call.
-• Understand and act on the entire meaning of the patient’s sentence (not just keywords).
+• Always wait for the patient's response before continuing or ending the call.
+• Understand and act on the entire meaning of the patient's sentence (not just keywords).
 • Never treat conditional, hypothetical, or tentative language as confirmation.
 • Use the provided clinic details exactly as written when stating contact information.
 • End the call only after a final confirmation, reschedule arrangement, or cancellation acknowledgment."""
 
-# --- Main Script Logic ---
+@app.route('/')
+def index():
+    """Main page with the calling interface"""
+    api_key = get_api_key()
+    return render_template('index.html', has_api_key=bool(api_key))
 
-def make_outbound_call():
-    """
-    Initializes the Bland client and sends the outbound call.
-    """
-    if TARGET_PHONE_NUMBER == "+1XXXXXXXXXX":
-        print("---")
-        print("🔴 Error: Please update the TARGET_PHONE_NUMBER in the script.")
-        print("---")
-        return
-
-    print("✅ Configuration loaded.")
-    print(f"📞 Attempting to call {TARGET_PHONE_NUMBER}...")
-
+@app.route('/make_call', methods=['POST'])
+def make_call():
+    """Handle the call request from the frontend"""
+    api_key = get_api_key()
+    
+    if not api_key:
+        return jsonify({
+            'success': False,
+            'error': 'BLAND_API_KEY not found in Secrets. Please add your API key.'
+        })
+    
+    # Get form data
+    phone_number = request.json.get('phone_number')
+    patient_name = request.json.get('patient_name')
+    clinic_name = request.json.get('clinic_name')
+    address = request.json.get('address')
+    office_location = request.json.get('office_location')
+    provider_name = request.json.get('provider_name')
+    appointment_date = request.json.get('appointment_date')
+    appointment_time = request.json.get('appointment_time')
+    
+    # Validate required fields
+    if not all([phone_number, patient_name, clinic_name, provider_name, appointment_date, appointment_time]):
+        return jsonify({
+            'success': False,
+            'error': 'Please fill in all required fields.'
+        })
+    
+    # Prepare call data
+    call_data = {
+        "patient name": patient_name,
+        "clinic name": clinic_name,
+        "address": address,
+        "office location": office_location,
+        "provider name": provider_name,
+        "date": appointment_date,
+        "time": appointment_time
+    }
+    
     try:
-        # Initialize the Bland AI client with your API key
-        bland_client = BlandAI(api_key=API_KEY)
-
-        # Send the call using the simpler structure for the 'blandai' package
+        # Initialize the Bland AI client
+        bland_client = BlandAI(api_key=api_key)
+        
+        # Make the call
         response = bland_client.call(
-            phone_number=TARGET_PHONE_NUMBER,
-            task=CALL_PROMPT,
+            phone_number=phone_number,
+            task=get_call_prompt(),
             voice_id=2,
-            request_data= CALL_DATA
+            request_data=call_data
         )
-
-        print("\n✅ Call initiated successfully!")
-        print("-------------------------------")
-        # The response from this library is a dictionary
-        print(f"Call ID: {response.get('call_id', 'N/A')}")
-        print(f"Status: {response.get('status', 'N/A')}")
-        print(f"Message: {response.get('message', 'N/A')}")
-        print("-------------------------------")
-
+        
+        return jsonify({
+            'success': True,
+            'call_id': response.get('call_id', 'N/A'),
+            'status': response.get('status', 'N/A'),
+            'message': response.get('message', 'N/A')
+        })
+        
     except Exception as e:
-        print("\n---")
-        print(f"🔴 An error occurred while trying to make the call: {e}")
-        print("---")
+        return jsonify({
+            'success': False,
+            'error': f'An error occurred while making the call: {str(e)}'
+        })
 
-if __name__ == "__main__":
-    make_outbound_call()
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)

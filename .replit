@@ -3,3 +3,18 @@ modules = ["python-3.11"]
 
 [deployment]
 deploymentTarget = "cloudrun"
+
+[nix]
+channel = "stable-25_05"
+
+[workflows]
+runButton = "Run Flask App"
+
+[[workflows.workflow]]
+name = "Run Flask App"
+author = 41523520
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python main.py"
