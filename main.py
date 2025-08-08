@@ -182,7 +182,8 @@ async def make_call(call_request: CallRequest):
         "office location": call_request.office_location,
         "provider name": call_request.provider_name,
         "date": call_request.appointment_date,
-        "time": call_request.appointment_time
+        "time": call_request.appointment_time,
+        "voice": "maya"  # Add voice to request data
     }
     
     try:
@@ -193,7 +194,7 @@ async def make_call(call_request: CallRequest):
         response = bland_client.call(
             phone_number=call_request.phone_number,
             task=get_call_prompt(),
-            voice="maya",
+            voice_id="maya",  # Use voice_id parameter instead of voice
             request_data=call_data
         )
         
