@@ -194,7 +194,7 @@ async def make_call(call_request: CallRequest):
         response = bland_client.call(
             phone_number=call_request.phone_number,
             task=get_call_prompt(),
-            voice_id="maya",  # Use voice_id parameter instead of voice
+            voice_id=get_voice_id("female_professional"),  # Use voice_id parameter with integer ID
             request_data=call_data
         )
         
