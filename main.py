@@ -91,6 +91,7 @@ CONFIRMATION CHECKLIST (MUST PASS ALL TO CONFIRM)
 2. No conditions, uncertainty, or future-decision wording?
 3. No mixed intent?
 If any answer is "no," do not confirm — treat as UNSURE.
+If the user asks for a reschedule, treat as RESCHEDULE.
 
 RESPONSE FLOW BY INTENT
 
@@ -192,7 +193,7 @@ async def make_call(call_request: CallRequest):
         response = bland_client.call(
             phone_number=call_request.phone_number,
             task=get_call_prompt(),
-            voice_id="2f9fdbc7-4bf2-4792-8a18-21ce3c93978f",
+            voice_id=11,
             request_data=call_data
         )
         
