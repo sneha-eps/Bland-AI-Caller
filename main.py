@@ -187,8 +187,7 @@ async def make_call(call_request: CallRequest):
         "office location": call_request.office_location,
         "provider name": call_request.provider_name,
         "date": call_request.appointment_date,
-        "time": call_request.appointment_time,
-        "voice": "maya"  # Add voice to request data
+        "time": call_request.appointment_time
     }
     
     try:
