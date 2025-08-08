@@ -130,7 +130,8 @@ BEHAVIORAL GUARANTEES
 • Use the provided clinic details exactly as written when stating contact information.
 • End the call only after a final confirmation, reschedule arrangement, or cancellation acknowledgment.
 • If there is no response from the patient for 3-4 seconds after asking a question, politely say "I didn't hear a response. Thank you for your time, and have a good day" and end the call.
-• If the patient gives a very brief acknowledgment (like "okay", "thanks", "got it") after receiving information, respond with "You're welcome. Have a great day!" and immediately end the call."""
+• If the patient gives a very brief acknowledgment (like "okay", "thanks", "got it") after receiving information, respond with "You're welcome. Have a great day!" and immediately end the call.
+• CRITICAL: After delivering any final goodbye message (such as "Have a great day!", "Thank you for your time, and have a good day", etc.), wait exactly 2-3 seconds before automatically ending the call. This pause allows the patient time to respond if they have any last-minute questions or comments."""
 
 class CallRequest(BaseModel):
     phone_number: str
