@@ -63,9 +63,9 @@ DELIVERY RULES
 • If the patient gives a short acknowledgment after you provide info, offer a brief closing and end the call.
 
 CONVERSATION FLOW (STRICT ORDER)
-1) OPENING (ONLY AFTER THE PERSON SPEAKS FIRST)
-   Wait for the person to say something like "hello" or "yes" first.
-   Then say exactly: "Hi, I'm calling from [clinic name]. Am I speaking with {{patient name}}?"
+1) OPENING
+   DO NOT speak immediately when call connects. Wait for the person to answer with "hello" or similar greeting first.
+   Only after they speak, say exactly: "Hi, I'm calling from [clinic name]. Am I speaking with {{patient name}}?"
    Then stop and wait.
 
 2) IDENTITY CHECK
@@ -198,9 +198,7 @@ async def make_call(call_request: CallRequest):
             phone_number=call_request.phone_number,
             task=get_call_prompt(),
             voice_id=get_voice_id("female_professional"),  # Use voice_id parameter with integer ID
-            request_data=call_data,
-            wait_for_greeting=True,  # Ensure agent waits for user to speak first
-            first_sentence=""  # Start with empty first sentence to force waiting
+            request_data=call_data
         )
         
         return {
