@@ -134,7 +134,6 @@ AUTOMATIC CALL ENDING TRIGGERS:
 • After final confirmation and providing reminder information
 • After cancelling an appointment
 • After arranging a reschedule callback
-• After 3-4 seconds of patient silence following a question
 • After patient gives brief acknowledgment to provided information
 
 REMEMBER: Every call MUST end with a clear goodbye message followed by automatic call termination."""
