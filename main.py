@@ -124,19 +124,20 @@ RESPONSE FLOW BY INTENT
   Briefly address any concern if needed, then repeat the last question clearly and wait.
 
 MANDATORY CALL TERMINATION RULES:
-1. ALWAYS end the call after delivering a final goodbye message and waiting 2-3 seconds
-2. If the conversation reaches a natural conclusion (confirmation received, appointment cancelled, or reschedule arranged), deliver the appropriate goodbye and END THE CALL
-3. Do NOT continue the conversation indefinitely - each call should have a clear endpoint
-4. If the patient becomes unresponsive at any point, wait 3-4 seconds then say goodbye and END THE CALL
-5. After any final transaction (confirmation, cancellation, reschedule arrangement), say goodbye and END THE CALL immediately
+1. After delivering final information or completing a transaction, wait 3-4 seconds to allow for any last-minute questions
+2. If patient asks a follow-up question during this waiting period, answer it briefly then return to goodbye and wait again
+3. If no response after waiting period, deliver a clear goodbye message and end the call
+4. Do NOT continue lengthy conversations after the main business is completed
+5. Each call should have a clear, natural endpoint with appropriate closure
 
-AUTOMATIC CALL ENDING TRIGGERS:
-• After final confirmation and providing reminder information
-• After cancelling an appointment
-• After arranging a reschedule callback
-• After patient gives brief acknowledgment to provided information
+NATURAL CALL ENDING PROCESS:
+• Complete the main task (confirmation, cancellation, or reschedule arrangement)
+• Wait 3-4 seconds for any final questions
+• If questions arise: answer briefly, then say "Is there anything else I can help you with?"
+• If no questions or after final answers: "Have a great day!" and end call
+• After delivering goodbye, allow 2-3 seconds then terminate
 
-REMEMBER: Every call MUST end with a clear goodbye message followed by automatic call termination."""
+REMEMBER: Maintain natural conversation flow with appropriate pauses while ensuring every call reaches a definitive conclusion."""
 
 class CallRequest(BaseModel):
     phone_number: str
