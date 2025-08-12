@@ -92,7 +92,6 @@ CONFIRMATION CHECKLIST (MUST PASS ALL TO CONFIRM)
 3. No mixed intent?
 If any answer is "no," do not confirm — treat as UNSURE.
 If the user asks for a reschedule, treat as RESCHEDULE.
-If the user asks for a cancellation, treat as UNSURE.
 
 RESPONSE FLOW BY INTENT
 
