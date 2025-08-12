@@ -28,19 +28,20 @@ def get_api_key():
     except KeyError:
         return None
 
-def get_voice_id(voice_name: str = "female_professional") -> int:
-    """Map friendly voice names to Bland AI voice IDs"""
-    voice_mapping = {
-        "male_professional": 0,
-        "female_professional": 11,
-        "female_warm": 4,
-        "female_clear": 6,
-        "female_friendly": 8,
-        "male_casual": 1,
-        "male_warm": 2,
-        "male_clear": 3
+    VOICE_MAP = {
+        "male_professional": "61507da3-4abd-49b6-983f-9ce659fd9e91",
+        "female_professional": "1d054475-3908-4f64-9158-9d3911fe9597",
+        "female_warm": "2f9fdbc7-4bf2-4792-8a18-21ce3c93978f",
+        "female_clear": "17e8f694-d230-4b64-b040-6108088d9e6c",
+        "female_friendly": "bbeabae6-ec8d-444f-92ad-c8e620d3de8d",
+        "male_casual": "a3d43393-dacb-43d3-91d7-b4cb913a5908",
+        "male_warm": "90295ec4-f0fe-4783-ab33-8b997ddc3ae4",
+        "male_clear": "37b3f1c8-a01e-4d70-b251-294733f08371"
     }
-    return voice_mapping.get(voice_name, 11)  # Default to female_professional
+
+def get_voice_id(name = "female_professional") -> str:
+    """Get the voice ID for the given voice name"""
+    return VOICE_MAP.get(name, VOICE_MAP["female_professional"])  # Default to female_professional
 
 def get_call_prompt():
     """Return the call prompt"""
@@ -124,18 +125,20 @@ RESPONSE FLOW BY INTENT
   Briefly address any concern if needed, then repeat the last question clearly and wait.
 
 MANDATORY CALL TERMINATION RULES:
-1. After delivering final information or completing a transaction, wait 10-15 seconds to allow for any last-minute questions
+1. After delivering final information or completing a transaction, wait 10-15 seconds to allow for any last-minute questions.
 2. If patient asks a follow-up question during this waiting period, answer it briefly then ask "Is there anything else I can help you with?"
-3. If patient gives brief acknowledgment like "thanks", "okay", "great" - respond with "You're welcome! Have a great day!" then wait 2-3 seconds before ending call
-4. If no response after the 10-15 second waiting period, deliver a clear goodbye message and end the call
-5. Do NOT continue lengthy conversations after the main business is completed
+3. If patient gives brief acknowledgment like "thanks", "okay", "great" - respond with "You're welcome! Have a great day!" then wait 2-3 seconds before ending call.
+4. If no response after the 10-15 second waiting period, deliver a clear goodbye message and end the call.
+5. Do NOT continue lengthy conversations after the main business is completed.
 
 NATURAL CALL ENDING PROCESS:
-• Complete the main task (confirmation, cancellation, or reschedule arrangement)
+• Complete the main task (confirmation, cancellation, or reschedule arrangement).
 • Wait 10-15 seconds to allow for final questions
-• If questions arise: answer briefly, then ask "Is there anything else I can help you with?" and wait another 10-15 seconds
-• If brief acknowledgment: "You're welcome! Have a great day!" then wait 2-3 seconds before ending call
-• If silence after 10-15 second wait: "Alright, have a great day!" and end call
+• If questions arise: answer briefly, then ask "Is there anything else I can help you with?" and wait another 10-15 seconds.
+• If brief acknowledgment: "You're welcome! Have a great day!" then wait 2-3 seconds before ending call.
+• If silence after 10-15 second wait: "Alright, have a great day!" and end call.
+• If no response after 2-3 second wait: end call.
+• If silence after 10-15 second wait: end call.
 
 REMEMBER: Maintain natural conversation flow with appropriate pauses. Let patients naturally end with acknowledgments while ensuring calls don't continue indefinitely."""
 
@@ -162,13 +165,14 @@ async def index(request: Request):
 async def make_call(call_request: CallRequest):
     """Handle the call request from the frontend"""
     api_key = get_api_key()
+    print(f"API Key: {api_key}")
 
     if not api_key:
         raise HTTPException(
             status_code=400,
             detail="BLAND_API_KEY not found in Secrets. Please add your API key."
         )
-
+    print("hl")
     # Validate required fields
     if not all([
         call_request.phone_number,
@@ -182,7 +186,7 @@ async def make_call(call_request: CallRequest):
             status_code=400,
             detail="Please fill in all required fields."
         )
-
+    print("hlss")
     # Prepare call data
     call_data = {
         "patient name": call_request.patient_name,
@@ -193,7 +197,7 @@ async def make_call(call_request: CallRequest):
         "date": call_request.appointment_date,
         "time": call_request.appointment_time
     }
-
+    print("hl")
     try:
         # Initialize the Bland AI client
         bland_client = BlandAI(api_key=api_key)
@@ -202,10 +206,10 @@ async def make_call(call_request: CallRequest):
         response = bland_client.call(
             phone_number=call_request.phone_number,
             task=get_call_prompt(),
-            voice_id=get_voice_id("female_professional"),  # Use voice_id parameter with integer ID
+            voice_id=get_voice_id("female_professional"),
             request_data=call_data
         )
-
+        print("hl")
         return {
             "success": True,
             "call_id": response.get("call_id", "N/A"),
