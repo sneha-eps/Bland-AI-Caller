@@ -1,4 +1,3 @@
-
 import os
 import sys
 from fastapi import FastAPI, HTTPException, Request
@@ -124,15 +123,21 @@ RESPONSE FLOW BY INTENT
 • IF OFF-TOPIC / NON-RESPONSIVE:
   Briefly address any concern if needed, then repeat the last question clearly and wait.
 
-BEHAVIORAL GUARANTEES
-• Always wait for the patient's response before continuing or ending the call.
-• Understand and act on the entire meaning of the patient's sentence (not just keywords).
-• Never treat conditional, hypothetical, or tentative language as confirmation.
-• Use the provided clinic details exactly as written when stating contact information.
-• End the call only after a final confirmation, reschedule arrangement, or cancellation acknowledgment.
-• If there is no response from the patient for 3-4 seconds after asking a question, politely say "I didn't hear a response. Thank you for your time, and have a good day" and end the call.
-• If the patient gives a very brief acknowledgment (like "okay", "thanks", "got it") after receiving information, respond with "You're welcome. Have a great day!" and immediately end the call.
-• CRITICAL: After delivering any final goodbye message (such as "Have a great day!", "Thank you for your time, and have a good day", etc.), wait exactly 2-3 seconds before automatically ending the call. This pause allows the patient time to respond if they have any last-minute questions or comments."""
+MANDATORY CALL TERMINATION RULES:
+1. ALWAYS end the call after delivering a final goodbye message and waiting 2-3 seconds
+2. If the conversation reaches a natural conclusion (confirmation received, appointment cancelled, or reschedule arranged), deliver the appropriate goodbye and END THE CALL
+3. Do NOT continue the conversation indefinitely - each call should have a clear endpoint
+4. If the patient becomes unresponsive at any point, wait 3-4 seconds then say goodbye and END THE CALL
+5. After any final transaction (confirmation, cancellation, reschedule arrangement), say goodbye and END THE CALL immediately
+
+AUTOMATIC CALL ENDING TRIGGERS:
+• After final confirmation and providing reminder information
+• After cancelling an appointment
+• After arranging a reschedule callback
+• After 3-4 seconds of patient silence following a question
+• After patient gives brief acknowledgment to provided information
+
+REMEMBER: Every call MUST end with a clear goodbye message followed by automatic call termination."""
 
 class CallRequest(BaseModel):
     phone_number: str
@@ -157,13 +162,13 @@ async def index(request: Request):
 async def make_call(call_request: CallRequest):
     """Handle the call request from the frontend"""
     api_key = get_api_key()
-    
+
     if not api_key:
         raise HTTPException(
             status_code=400,
             detail="BLAND_API_KEY not found in Secrets. Please add your API key."
         )
-    
+
     # Validate required fields
     if not all([
         call_request.phone_number,
@@ -177,7 +182,7 @@ async def make_call(call_request: CallRequest):
             status_code=400,
             detail="Please fill in all required fields."
         )
-    
+
     # Prepare call data
     call_data = {
         "patient name": call_request.patient_name,
@@ -188,11 +193,11 @@ async def make_call(call_request: CallRequest):
         "date": call_request.appointment_date,
         "time": call_request.appointment_time
     }
-    
+
     try:
         # Initialize the Bland AI client
         bland_client = BlandAI(api_key=api_key)
-        
+
         # Make the call
         response = bland_client.call(
             phone_number=call_request.phone_number,
@@ -200,14 +205,14 @@ async def make_call(call_request: CallRequest):
             voice_id=get_voice_id("female_professional"),  # Use voice_id parameter with integer ID
             request_data=call_data
         )
-        
+
         return {
             "success": True,
             "call_id": response.get("call_id", "N/A"),
             "status": response.get("status", "N/A"),
             "message": response.get("message", "N/A")
         }
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=500,
