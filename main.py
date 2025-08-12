@@ -81,19 +81,22 @@ INTENT INTERPRETATION (WHOLE-SENTENCE UNDERSTANDING)
 Determine intent based on the complete meaning of the patient's sentence:
 
 A) CONFIRM — Explicit, unconditional commitment to attend. No conditions, no uncertainty, no conflicting phrases.
-B) CANNOT ATTEND — Clear refusal or inability to attend as scheduled WITHOUT mentioning cancellation.
-C) UNSURE — Any conditional, hypothetical, tentative, or ambiguous response. ALSO includes any mention of "cancel", "cancellation", or similar terms.
+B) CANNOT ATTEND — Clear refusal or inability to attend as scheduled (e.g., "I can't make it", "I won't be available") WITHOUT any mention of cancellation, cancel, or canceling.
+C) UNSURE — Any conditional, hypothetical, tentative, or ambiguous response. ALSO includes ANY mention of "cancel", "cancellation", "canceling", or similar terms regardless of context.
 D) OFF-TOPIC / NON-RESPONSIVE — Does not answer the question.
-E) RESCHEDULE — Explicit request to reschedule.
+E) RESCHEDULE — Explicit request to reschedule WITHOUT mentioning cancellation.
+
+CANCELLATION DETECTION (HIGHEST PRIORITY)
+If the patient's response contains ANY of these words or phrases: "cancel", "cancellation", "canceling", "cancelled", "cancel it", "cancel this", "cancel my appointment", IMMEDIATELY classify as UNSURE regardless of any other content.
 
 CONFIRMATION CHECKLIST (MUST PASS ALL TO CONFIRM)
 1. Is the answer an explicit, unconditional "yes"?
 2. No conditions, uncertainty, or future-decision wording?
 3. No mixed intent?
-4. No mention of "cancel" or "cancellation"?
+4. No mention of "cancel" or "cancellation" or related terms?
 If any answer is "no," do not confirm — treat as UNSURE.
-If the user asks for a reschedule, treat as RESCHEDULE.
-If the user mentions cancellation, treat as UNSURE.
+If the user asks for a reschedule WITHOUT mentioning cancellation, treat as RESCHEDULE.
+If the user mentions ANY form of cancellation, treat as UNSURE.
 
 RESPONSE FLOW BY INTENT
 
