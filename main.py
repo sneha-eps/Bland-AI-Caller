@@ -224,7 +224,8 @@ async def make_call(call_request: CallRequest):
             "task": get_call_prompt(),
             "voice": selected_voice,
             "request_data": call_data
-        })
+        }
+        )
 
         print(f"API Response Status Code: {response.status_code}")
         print(f"API Response Text: {response.text}")
