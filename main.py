@@ -154,9 +154,6 @@ REMEMBER: Maintain natural conversation flow with appropriate pauses. Let patien
 class CallRequest(BaseModel):
     phone_number: str
     patient_name: str
-    clinic_name: str
-    address: Optional[str] = ""
-    office_location: Optional[str] = ""
     provider_name: str
     appointment_date: str
     appointment_time: str
@@ -165,6 +162,8 @@ class CallResult(BaseModel):
     success: bool
     call_id: Optional[str] = None
     status: Optional[str] = None
+    call_status: Optional[str] = None  # confirmed, rescheduled, cancelled, voicemail, busy
+    transcript: Optional[str] = None
     message: Optional[str] = None
     error: Optional[str] = None
     patient_name: str
@@ -174,9 +173,6 @@ def make_single_call(call_request: CallRequest, api_key: str) -> CallResult:
     """Make a single call and return the result"""
     call_data = {
         "patient name": call_request.patient_name,
-        "clinic name": call_request.clinic_name,
-        "address": call_request.address,
-        "office location": call_request.office_location,
         "provider name": call_request.provider_name,
         "date": call_request.appointment_date,
         "time": call_request.appointment_time
@@ -262,7 +258,7 @@ async def process_csv(file: UploadFile = File(...)):
         # Process each row in the CSV
         for row in csv_reader:
             # Validate required fields
-            required_fields = ['phone_number', 'patient_name', 'clinic_name', 'provider_name', 'appointment_date', 'appointment_time']
+            required_fields = ['phone_number', 'patient_name', 'date', 'time', 'provider_name']
             missing_fields = [field for field in required_fields if not row.get(field, '').strip()]
             
             if missing_fields:
@@ -278,12 +274,9 @@ async def process_csv(file: UploadFile = File(...)):
             call_request = CallRequest(
                 phone_number=row['phone_number'].strip(),
                 patient_name=row['patient_name'].strip(),
-                clinic_name=row['clinic_name'].strip(),
-                address=row.get('address', '').strip(),
-                office_location=row.get('office_location', '').strip(),
                 provider_name=row['provider_name'].strip(),
-                appointment_date=row['appointment_date'].strip(),
-                appointment_time=row['appointment_time'].strip()
+                appointment_date=row['date'].strip(),
+                appointment_time=row['time'].strip()
             )
             
             # Make the call
@@ -306,6 +299,65 @@ async def process_csv(file: UploadFile = File(...)):
         raise HTTPException(
             status_code=500,
             detail=f"Error processing CSV: {str(e)}"
+        )
+
+@app.get("/call_details/{call_id}")
+async def get_call_details(call_id: str):
+    """Get detailed call information including transcript"""
+    api_key = get_api_key()
+    
+    if not api_key:
+        raise HTTPException(
+            status_code=400,
+            detail="BLAND_API_KEY not found in Secrets."
+        )
+    
+    try:
+        response = requests.get(
+            f"https://api.bland.ai/v1/calls/{call_id}",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+            }
+        )
+        
+        if response.status_code == 200:
+            call_data = response.json()
+            
+            # Determine call status based on transcript analysis
+            transcript = call_data.get("transcript", "")
+            call_status = "unknown"
+            
+            if transcript:
+                transcript_lower = transcript.lower()
+                if any(word in transcript_lower for word in ["confirm", "yes", "see you then", "i'll be there"]):
+                    call_status = "confirmed"
+                elif any(word in transcript_lower for word in ["reschedule", "different time", "change"]):
+                    call_status = "rescheduled"
+                elif any(word in transcript_lower for word in ["cancel", "can't make it", "won't be available"]):
+                    call_status = "cancelled"
+                elif "voicemail" in transcript_lower or "leave a message" in transcript_lower:
+                    call_status = "voicemail"
+                elif any(word in transcript_lower for word in ["busy", "hang up", "ended call"]):
+                    call_status = "busy"
+            
+            return {
+                "call_id": call_id,
+                "status": call_data.get("status", "unknown"),
+                "call_status": call_status,
+                "transcript": transcript,
+                "duration": call_data.get("duration", 0),
+                "created_at": call_data.get("created_at", ""),
+                "phone_number": call_data.get("phone_number", ""),
+            }
+        else:
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"Failed to get call details: {response.text}"
+            )
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error fetching call details: {str(e)}"
         )
 
 @app.get("/docs")

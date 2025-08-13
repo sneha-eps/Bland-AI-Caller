@@ -193,17 +193,18 @@
         
         <div class="csv-format">
             <h3>📋 CSV File Format</h3>
-            <p>Your CSV file should include the following columns (required fields marked with *):</p>
+            <p>Your CSV file should include the following columns (all required):</p>
             <ul>
-                <li><code>phone_number</code>* - Phone number in E.164 format (e.g., +1234567890)</li>
-                <li><code>patient_name</code>* - Patient's full name</li>
-                <li><code>clinic_name</code>* - Name of the clinic</li>
-                <li><code>provider_name</code>* - Doctor or provider name</li>
-                <li><code>appointment_date</code>* - Date in YYYY-MM-DD format</li>
-                <li><code>appointment_time</code>* - Time in HH:MM format (24-hour)</li>
-                <li><code>address</code> - Clinic address (optional)</li>
-                <li><code>office_location</code> - Office location (optional)</li>
+                <li><code>phone_number</code> - Phone number in E.164 format (e.g., +1234567890)</li>
+                <li><code>patient_name</code> - Patient's full name</li>
+                <li><code>date</code> - Appointment date in YYYY-MM-DD format</li>
+                <li><code>time</code> - Appointment time in HH:MM format (24-hour)</li>
+                <li><code>provider_name</code> - Doctor or provider name</li>
             </ul>
+            <p><strong>Example CSV:</strong></p>
+            <code>phone_number,patient_name,date,time,provider_name<br>
+            +1234567890,John Smith,2024-01-15,14:30,Dr. Johnson<br>
+            +0987654321,Jane Doe,2024-01-16,10:00,Dr. Wilson</code>
         </div>
         
         <form id="csvForm" enctype="multipart/form-data">
@@ -229,13 +230,28 @@
                     <tr>
                         <th>Patient Name</th>
                         <th>Phone Number</th>
-                        <th>Status</th>
+                        <th>Call Status</th>
                         <th>Call ID</th>
                         <th>Details</th>
+                        <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody id="resultsBody"></tbody>
             </table>
+        </div>
+    </div>
+
+    <!-- Transcript Modal -->
+    <div id="transcriptModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
+        <div style="background-color: white; margin: 5% auto; padding: 20px; border-radius: 10px; width: 80%; max-width: 800px; max-height: 80%; overflow-y: auto;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h3 id="modalTitle">Call Transcript</h3>
+                <button onclick="closeModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+            </div>
+            <div id="modalContent">
+                <div id="callDetails"></div>
+                <div id="transcriptContent"></div>
+            </div>
         </div>
     </div>
 
@@ -291,14 +307,30 @@
                     
                     result.results.forEach(call => {
                         const row = tbody.insertRow();
+                        const callStatusText = call.success ? 
+                            (call.call_status ? call.call_status.charAt(0).toUpperCase() + call.call_status.slice(1) : 'In Progress') : 
+                            'Failed';
+                        
+                        const statusIcon = call.success ? 
+                            (call.call_status === 'confirmed' ? '✅' : 
+                             call.call_status === 'rescheduled' ? '📅' : 
+                             call.call_status === 'cancelled' ? '❌' : 
+                             call.call_status === 'voicemail' ? '📧' : 
+                             call.call_status === 'busy' ? '📞' : '⏳') : '❌';
+                        
                         row.innerHTML = `
                             <td>${call.patient_name}</td>
                             <td>${call.phone_number}</td>
                             <td class="${call.success ? 'status-success' : 'status-error'}">
-                                ${call.success ? '✅ Success' : '❌ Failed'}
+                                ${statusIcon} ${callStatusText}
                             </td>
                             <td>${call.call_id || 'N/A'}</td>
                             <td>${call.success ? (call.message || call.status) : call.error}</td>
+                            <td>
+                                ${call.success && call.call_id ? 
+                                    `<button onclick="viewTranscript('${call.call_id}', '${call.patient_name}')" style="background: #3498db; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">View Details</button>` : 
+                                    'N/A'}
+                            </td>
                         `;
                     });
                 } else {
@@ -329,6 +361,75 @@
             
             submitBtn.disabled = false;
         });
+
+        async function viewTranscript(callId, patientName) {
+            const modal = document.getElementById('transcriptModal');
+            const modalTitle = document.getElementById('modalTitle');
+            const callDetails = document.getElementById('callDetails');
+            const transcriptContent = document.getElementById('transcriptContent');
+            
+            modalTitle.textContent = `Call Details - ${patientName}`;
+            callDetails.innerHTML = '<div class="spinner"></div> Loading call details...';
+            transcriptContent.innerHTML = '';
+            modal.style.display = 'block';
+            
+            try {
+                const response = await fetch(`/call_details/${callId}`);
+                const data = await response.json();
+                
+                if (response.ok) {
+                    const statusIcon = data.call_status === 'confirmed' ? '✅' : 
+                                     data.call_status === 'rescheduled' ? '📅' : 
+                                     data.call_status === 'cancelled' ? '❌' : 
+                                     data.call_status === 'voicemail' ? '📧' : 
+                                     data.call_status === 'busy' ? '📞' : '⏳';
+                    
+                    callDetails.innerHTML = `
+                        <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
+                            <h4>Call Information</h4>
+                            <p><strong>Call ID:</strong> ${data.call_id}</p>
+                            <p><strong>Phone Number:</strong> ${data.phone_number}</p>
+                            <p><strong>Status:</strong> ${statusIcon} ${data.call_status}</p>
+                            <p><strong>Duration:</strong> ${data.duration} seconds</p>
+                            <p><strong>Created:</strong> ${new Date(data.created_at).toLocaleString()}</p>
+                        </div>
+                    `;
+                    
+                    transcriptContent.innerHTML = `
+                        <div>
+                            <h4>Transcript</h4>
+                            <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; white-space: pre-wrap; font-family: monospace;">
+                                ${data.transcript || 'Transcript not available yet. Call may still be in progress.'}
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    callDetails.innerHTML = `
+                        <div class="alert alert-error">
+                            Failed to load call details: ${data.detail}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                callDetails.innerHTML = `
+                    <div class="alert alert-error">
+                        Error loading call details: ${error.message}
+                    </div>
+                `;
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('transcriptModal').style.display = 'none';
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('transcriptModal');
+            if (event.target === modal) {
+                closeModal();
+            }
+        }
     </script>
 </body>
 </html>
