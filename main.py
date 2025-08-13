@@ -225,6 +225,17 @@ async def make_call(call_request: CallRequest):
             "voice": selected_voice,
             "request_data": call_data
         })
+
+        print(f"API Response Status Code: {response.status_code}")
+        print(f"API Response Text: {response.text}")
+
+        # Check if response is successful
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=response.status_code,
+                detail=f"Bland AI API error: {response.text}"
+            )
+            
         resp_json = response.json()
         return {
             "success": True,
