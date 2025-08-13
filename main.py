@@ -8,7 +8,7 @@ from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional
 import importlib.util
 
 # Try to import from the 'blandai' package
