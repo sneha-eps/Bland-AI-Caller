@@ -228,9 +228,9 @@ async def make_call(call_request: CallRequest):
         resp_json = response.json()
         return {
             "success": True,
-            "call_id": resp_json("call_id", "N/A"),
-            "status": resp_json("status", "N/A"),
-            "message": resp_json("message", "N/A")
+            "call_id": resp_json.get("call_id", "N/A"),
+            "status": resp_json.get("status", "N/A"),
+            "message": resp_json.get("message", "N/A")
         }
 
     except Exception as e:
