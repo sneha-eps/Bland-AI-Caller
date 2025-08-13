@@ -241,7 +241,7 @@ async def process_csv(file: UploadFile = File(...)):
         )
     
     # Check if file is CSV
-    if not file.filename.endswith('.csv'):
+    if not file.filename or not file.filename.endswith('.csv'):
         raise HTTPException(
             status_code=400,
             detail="Please upload a CSV file."
