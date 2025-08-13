@@ -4,114 +4,298 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bland AI Call Center - CSV Upload</title>
+    <title>Bland AI Call Center - Professional Dashboard</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 20px;
-            background-color: #f5f5f5;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
             color: #333;
+            line-height: 1.6;
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem 0;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #4f46e5;
+        }
+        
+        .logo i {
+            font-size: 2rem;
+        }
+        
+        .status-badge {
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .status-connected {
+            background: linear-gradient(45deg, #10b981, #059669);
+            color: white;
+        }
+        
+        .status-error {
+            background: linear-gradient(45deg, #ef4444, #dc2626);
+            color: white;
         }
         
         .container {
-            background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 20px;
         }
         
-        h1 {
-            color: #2c3e50;
+        .main-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .card-header {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            padding: 2rem;
             text-align: center;
-            margin-bottom: 30px;
+        }
+        
+        .card-header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+        
+        .card-header p {
+            font-size: 1.125rem;
+            opacity: 0.9;
+        }
+        
+        .card-body {
+            padding: 2rem;
         }
         
         .alert {
-            padding: 15px;
-            margin-bottom: 20px;
-            border-radius: 5px;
-            font-weight: bold;
+            padding: 1rem 1.5rem;
+            margin-bottom: 1.5rem;
+            border-radius: 12px;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .alert i {
+            font-size: 1.25rem;
         }
         
         .alert-error {
-            background-color: #f8d7da;
-            color: #721c24;
-            border: 1px solid #f5c6cb;
+            background: linear-gradient(45deg, #fef2f2, #fee2e2);
+            color: #991b1b;
+            border-left: 4px solid #dc2626;
         }
         
-        .alert-success {
-            background-color: #d4edda;
-            color: #155724;
-            border: 1px solid #c3e6cb;
+        .csv-format {
+            background: linear-gradient(45deg, #f8fafc, #f1f5f9);
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
+            border-left: 4px solid #4f46e5;
         }
         
-        .alert-info {
-            background-color: #d1ecf1;
-            color: #0c5460;
-            border: 1px solid #bee5eb;
+        .csv-format h3 {
+            color: #4f46e5;
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .csv-format ul {
+            list-style: none;
+            padding-left: 0;
+        }
+        
+        .csv-format li {
+            padding: 0.5rem 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .csv-format li::before {
+            content: "✓";
+            color: #10b981;
+            font-weight: bold;
+        }
+        
+        .csv-format code {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1rem;
+            border-radius: 8px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 0.875rem;
+            line-height: 1.4;
+            display: block;
+            margin-top: 1rem;
+            overflow-x: auto;
+        }
+        
+        .form-section {
+            background: #f8fafc;
+            padding: 2rem;
+            border-radius: 12px;
+            margin-bottom: 2rem;
         }
         
         .form-group {
-            margin-bottom: 20px;
+            margin-bottom: 1.5rem;
         }
         
         label {
             display: block;
-            margin-bottom: 5px;
+            margin-bottom: 0.5rem;
             font-weight: 600;
-            color: #555;
+            color: #374151;
+            font-size: 1rem;
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            width: 100%;
         }
         
         input[type="file"] {
+            position: absolute;
+            opacity: 0;
             width: 100%;
-            padding: 12px;
-            border: 2px dashed #ddd;
-            border-radius: 5px;
-            font-size: 16px;
-            box-sizing: border-box;
+            height: 100%;
             cursor: pointer;
         }
         
-        input[type="file"]:hover {
-            border-color: #3498db;
-            background-color: #f8f9fa;
+        .file-input-display {
+            background: white;
+            border: 2px dashed #d1d5db;
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .file-input-display:hover {
+            border-color: #4f46e5;
+            background: #f8fafc;
+        }
+        
+        .file-input-display.dragover {
+            border-color: #4f46e5;
+            background: #eff6ff;
+        }
+        
+        .file-input-display i {
+            font-size: 3rem;
+            color: #9ca3af;
+            margin-bottom: 1rem;
+        }
+        
+        .file-input-display.has-file {
+            border-color: #10b981;
+            background: #f0fdf4;
+        }
+        
+        .file-input-display.has-file i {
+            color: #10b981;
         }
         
         .btn {
-            background-color: #3498db;
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
             color: white;
-            padding: 15px 30px;
+            padding: 1rem 2rem;
             border: none;
-            border-radius: 5px;
-            font-size: 18px;
+            border-radius: 12px;
+            font-size: 1.125rem;
+            font-weight: 600;
             cursor: pointer;
             width: 100%;
-            transition: background-color 0.3s;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
         }
         
-        .btn:hover {
-            background-color: #2980b9;
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(79, 70, 229, 0.3);
         }
         
         .btn:disabled {
-            background-color: #bdc3c7;
+            background: #9ca3af;
             cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
         }
         
         .loading {
             display: none;
             text-align: center;
-            padding: 20px;
+            padding: 2rem;
+            background: #f8fafc;
+            border-radius: 12px;
+            margin: 2rem 0;
+        }
+        
+        .loading-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 1rem;
         }
         
         .spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid #3498db;
+            width: 40px;
+            height: 40px;
+            border: 4px solid #e5e7eb;
+            border-top: 4px solid #4f46e5;
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -123,132 +307,363 @@
         
         .results {
             display: none;
-            margin-top: 30px;
+            margin-top: 2rem;
         }
         
         .results-summary {
-            background-color: #f8f9fa;
-            padding: 20px;
-            border-radius: 5px;
-            margin-bottom: 20px;
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 1.5rem;
+            border-left: 4px solid #0ea5e9;
+        }
+        
+        .results-summary h3 {
+            color: #0c4a6e;
+            font-size: 1.25rem;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .stat-item {
+            background: white;
+            padding: 1rem;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        
+        .stat-number {
+            font-size: 1.75rem;
+            font-weight: bold;
+            margin-bottom: 0.25rem;
+        }
+        
+        .stat-label {
+            color: #64748b;
+            font-size: 0.875rem;
         }
         
         .results-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 15px;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
         }
         
         .results-table th,
         .results-table td {
-            padding: 12px;
+            padding: 1rem;
             text-align: left;
-            border-bottom: 1px solid #ddd;
+            border-bottom: 1px solid #e5e7eb;
         }
         
         .results-table th {
-            background-color: #f8f9fa;
+            background: #f8fafc;
             font-weight: 600;
+            color: #374151;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .results-table tbody tr:hover {
+            background: #f9fafb;
+        }
+        
+        .status-badge-table {
+            padding: 0.375rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
         }
         
         .status-success {
-            color: #28a745;
-            font-weight: bold;
+            background: #dcfce7;
+            color: #166534;
         }
         
         .status-error {
-            color: #dc3545;
-            font-weight: bold;
+            background: #fee2e2;
+            color: #991b1b;
         }
         
-        .csv-format {
-            background-color: #f8f9fa;
-            padding: 15px;
-            border-radius: 5px;
-            margin-bottom: 20px;
+        .btn-small {
+            background: #4f46e5;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: background-color 0.2s;
         }
         
-        .csv-format h3 {
-            margin-top: 0;
-            color: #495057;
+        .btn-small:hover {
+            background: #4338ca;
         }
         
-        .csv-format code {
-            background-color: #e9ecef;
-            padding: 2px 4px;
-            border-radius: 3px;
-            font-family: monospace;
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+        }
+        
+        .modal-content {
+            background: white;
+            margin: 2% auto;
+            padding: 0;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 900px;
+            max-height: 90vh;
+            overflow: hidden;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.25);
+        }
+        
+        .modal-header {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            padding: 1.5rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .modal-header h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+        
+        .modal-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            opacity: 0.8;
+            transition: opacity 0.2s;
+        }
+        
+        .modal-close:hover {
+            opacity: 1;
+        }
+        
+        .modal-body {
+            padding: 2rem;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+        
+        .call-details-card {
+            background: #f8fafc;
+            padding: 1.5rem;
+            border-radius: 12px;
+            margin-bottom: 1.5rem;
+        }
+        
+        .detail-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+        
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .detail-label {
+            font-size: 0.75rem;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.25rem;
+        }
+        
+        .detail-value {
+            font-weight: 600;
+            color: #1e293b;
+        }
+        
+        .transcript-card {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 1.5rem;
+            border-radius: 12px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            white-space: pre-wrap;
+            line-height: 1.6;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+            
+            .container {
+                padding: 0 1rem;
+            }
+            
+            .card-header h1 {
+                font-size: 2rem;
+            }
+            
+            .card-body {
+                padding: 1.5rem;
+            }
+            
+            .results-table {
+                font-size: 0.875rem;
+            }
+            
+            .results-table th,
+            .results-table td {
+                padding: 0.75rem 0.5rem;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>📞 Bland AI Call Center - CSV Upload</h1>
-        
-        {% if not has_api_key %}
-        <div class="alert alert-error">
-            <strong>⚠️ Configuration Required:</strong> Please add your BLAND_API_KEY to Replit Secrets. Click the lock icon (🔒) on the left sidebar and add your API key.
-        </div>
-        {% endif %}
-        
-        <div class="csv-format">
-            <h3>📋 CSV File Format</h3>
-            <p>Your CSV file should include the following columns (all required):</p>
-            <ul>
-                <li><code>phone_number</code> - Phone number in E.164 format (e.g., +1234567890)</li>
-                <li><code>patient_name</code> - Patient's full name</li>
-                <li><code>date</code> - Appointment date in YYYY-MM-DD format</li>
-                <li><code>time</code> - Appointment time in HH:MM format (24-hour)</li>
-                <li><code>provider_name</code> - Doctor or provider name</li>
-            </ul>
-            <p><strong>Example CSV:</strong></p>
-            <code>phone_number,patient_name,date,time,provider_name<br>
-            +1234567890,John Smith,2024-01-15,14:30,Dr. Johnson<br>
-            +0987654321,Jane Doe,2024-01-16,10:00,Dr. Wilson</code>
-        </div>
-        
-        <form id="csvForm" enctype="multipart/form-data">
-            <div class="form-group">
-                <label for="csvFile">📁 Select CSV File</label>
-                <input type="file" id="csvFile" name="file" accept=".csv" required {% if not has_api_key %}disabled{% endif %}>
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">
+                <i class="fas fa-phone-alt"></i>
+                <span>Bland AI Call Center</span>
             </div>
-            
-            <button type="submit" class="btn" {% if not has_api_key %}disabled{% endif %}>
-                📞 Process CSV and Make Calls
-            </button>
-        </form>
-        
-        <div class="loading" id="loading">
-            <div class="spinner"></div>
-            <p>Processing CSV and making calls...</p>
-        </div>
-        
-        <div class="results" id="results">
-            <div class="results-summary" id="resultsSummary"></div>
-            <table class="results-table" id="resultsTable">
-                <thead>
-                    <tr>
-                        <th>Patient Name</th>
-                        <th>Phone Number</th>
-                        <th>Call Status</th>
-                        <th>Call ID</th>
-                        <th>Details</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody id="resultsBody"></tbody>
-            </table>
+            <div class="status-badge {% if has_api_key %}status-connected{% else %}status-error{% endif %}">
+                <i class="fas {% if has_api_key %}fa-check-circle{% else %}fa-exclamation-triangle{% endif %}"></i>
+                {% if has_api_key %}API Connected{% else %}API Not Configured{% endif %}
+            </div>
         </div>
     </div>
 
-    <!-- Transcript Modal -->
-    <div id="transcriptModal" style="display: none; position: fixed; z-index: 1000; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5);">
-        <div style="background-color: white; margin: 5% auto; padding: 20px; border-radius: 10px; width: 80%; max-width: 800px; max-height: 80%; overflow-y: auto;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                <h3 id="modalTitle">Call Transcript</h3>
-                <button onclick="closeModal()" style="background: none; border: none; font-size: 24px; cursor: pointer;">&times;</button>
+    <div class="container">
+        <div class="main-card">
+            <div class="card-header">
+                <h1>Professional Call Management</h1>
+                <p>Automated appointment confirmation system powered by AI</p>
             </div>
-            <div id="modalContent">
+            
+            <div class="card-body">
+                {% if not has_api_key %}
+                <div class="alert alert-error">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    <div>
+                        <strong>API Configuration Required</strong><br>
+                        Please add your BLAND_API_KEY to Replit Secrets. Click the lock icon (🔒) in the sidebar to configure your environment variables.
+                    </div>
+                </div>
+                {% endif %}
+                
+                <div class="csv-format">
+                    <h3>
+                        <i class="fas fa-file-csv"></i>
+                        CSV File Format Requirements
+                    </h3>
+                    <p>Upload a CSV file with the following required columns:</p>
+                    <ul>
+                        <li><code>phone_number</code> - Phone number in E.164 format (e.g., +1234567890)</li>
+                        <li><code>patient_name</code> - Patient's full name</li>
+                        <li><code>date</code> - Appointment date (YYYY-MM-DD format)</li>
+                        <li><code>time</code> - Appointment time (HH:MM 24-hour format)</li>
+                        <li><code>provider_name</code> - Doctor or provider name</li>
+                    </ul>
+                    
+                    <strong style="margin-top: 1rem; display: block;">Sample CSV Format:</strong>
+                    <code>phone_number,patient_name,date,time,provider_name
++1234567890,John Smith,2024-01-15,14:30,Dr. Johnson
++0987654321,Jane Doe,2024-01-16,10:00,Dr. Wilson</code>
+                </div>
+                
+                <div class="form-section">
+                    <form id="csvForm" enctype="multipart/form-data">
+                        <div class="form-group">
+                            <label for="csvFile">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                Upload CSV File
+                            </label>
+                            <div class="file-input-wrapper">
+                                <input type="file" id="csvFile" name="file" accept=".csv" required {% if not has_api_key %}disabled{% endif %}>
+                                <div class="file-input-display" id="fileDisplay">
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                    <div>
+                                        <strong>Click to select CSV file</strong><br>
+                                        <span>or drag and drop your file here</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <button type="submit" class="btn" {% if not has_api_key %}disabled{% endif %}>
+                            <i class="fas fa-phone"></i>
+                            Process CSV & Initiate Calls
+                        </button>
+                    </form>
+                </div>
+                
+                <div class="loading" id="loading">
+                    <div class="loading-content">
+                        <div class="spinner"></div>
+                        <h3>Processing Your Request</h3>
+                        <p>Analyzing CSV file and initiating automated calls...</p>
+                    </div>
+                </div>
+                
+                <div class="results" id="results">
+                    <div class="results-summary" id="resultsSummary"></div>
+                    <table class="results-table" id="resultsTable">
+                        <thead>
+                            <tr>
+                                <th>Patient</th>
+                                <th>Phone Number</th>
+                                <th>Status</th>
+                                <th>Call ID</th>
+                                <th>Details</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="resultsBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Enhanced Modal -->
+    <div id="transcriptModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="modalTitle">Call Details</h3>
+                <button class="modal-close" onclick="closeModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
                 <div id="callDetails"></div>
                 <div id="transcriptContent"></div>
             </div>
@@ -256,6 +671,45 @@
     </div>
 
     <script>
+        // Enhanced file upload with drag and drop
+        const fileInput = document.getElementById('csvFile');
+        const fileDisplay = document.getElementById('fileDisplay');
+
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                fileDisplay.classList.add('has-file');
+                fileDisplay.innerHTML = `
+                    <i class="fas fa-file-csv"></i>
+                    <div>
+                        <strong>${file.name}</strong><br>
+                        <span>Ready to process (${(file.size / 1024).toFixed(1)} KB)</span>
+                    </div>
+                `;
+            }
+        });
+
+        // Drag and drop functionality
+        fileDisplay.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            fileDisplay.classList.add('dragover');
+        });
+
+        fileDisplay.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            fileDisplay.classList.remove('dragover');
+        });
+
+        fileDisplay.addEventListener('drop', function(e) {
+            e.preventDefault();
+            fileDisplay.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                fileInput.dispatchEvent(new Event('change'));
+            }
+        });
+
         document.getElementById('csvForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
@@ -265,14 +719,11 @@
             const resultsDiv = document.getElementById('results');
             const submitBtn = form.querySelector('button[type="submit"]');
             
-            // Check if file is selected
-            const fileInput = document.getElementById('csvFile');
             if (!fileInput.files.length) {
                 alert('Please select a CSV file');
                 return;
             }
             
-            // Show loading state
             loadingDiv.style.display = 'block';
             resultsDiv.style.display = 'none';
             submitBtn.disabled = true;
@@ -284,24 +735,34 @@
                 });
                 
                 const result = await response.json();
-                
-                // Hide loading state
                 loadingDiv.style.display = 'none';
                 
                 if (result.success) {
-                    // Show results
                     resultsDiv.style.display = 'block';
                     
-                    // Update summary
                     const summaryDiv = document.getElementById('resultsSummary');
                     summaryDiv.innerHTML = `
-                        <h3>📊 Call Results Summary</h3>
-                        <p><strong>Total Calls:</strong> ${result.total_calls}</p>
-                        <p><strong>Successful:</strong> <span class="status-success">${result.successful_calls}</span></p>
-                        <p><strong>Failed:</strong> <span class="status-error">${result.failed_calls}</span></p>
+                        <h3><i class="fas fa-chart-bar"></i> Call Results Summary</h3>
+                        <div class="stats-grid">
+                            <div class="stat-item">
+                                <div class="stat-number">${result.total_calls}</div>
+                                <div class="stat-label">Total Calls</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number" style="color: #10b981;">${result.successful_calls}</div>
+                                <div class="stat-label">Successful</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number" style="color: #ef4444;">${result.failed_calls}</div>
+                                <div class="stat-label">Failed</div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-number">${((result.successful_calls / result.total_calls) * 100).toFixed(1)}%</div>
+                                <div class="stat-label">Success Rate</div>
+                            </div>
+                        </div>
                     `;
                     
-                    // Update results table
                     const tbody = document.getElementById('resultsBody');
                     tbody.innerHTML = '';
                     
@@ -319,28 +780,34 @@
                              call.call_status === 'busy' ? '📞' : '⏳') : '❌';
                         
                         row.innerHTML = `
-                            <td>${call.patient_name}</td>
+                            <td><strong>${call.patient_name}</strong></td>
                             <td>${call.phone_number}</td>
-                            <td class="${call.success ? 'status-success' : 'status-error'}">
-                                ${statusIcon} ${callStatusText}
+                            <td>
+                                <span class="status-badge-table ${call.success ? 'status-success' : 'status-error'}">
+                                    ${statusIcon} ${callStatusText}
+                                </span>
                             </td>
-                            <td>${call.call_id || 'N/A'}</td>
+                            <td><code>${call.call_id || 'N/A'}</code></td>
                             <td>${call.success ? (call.message || call.status) : call.error}</td>
                             <td>
                                 ${call.success && call.call_id ? 
-                                    `<button onclick="viewTranscript('${call.call_id}', '${call.patient_name}')" style="background: #3498db; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">View Details</button>` : 
-                                    'N/A'}
+                                    `<button class="btn-small" onclick="viewTranscript('${call.call_id}', '${call.patient_name}')">
+                                        <i class="fas fa-eye"></i> View Details
+                                     </button>` : 
+                                    '<span style="color: #9ca3af;">N/A</span>'}
                             </td>
                         `;
                     });
                 } else {
-                    // Show error
                     resultsDiv.style.display = 'block';
                     const summaryDiv = document.getElementById('resultsSummary');
                     summaryDiv.innerHTML = `
                         <div class="alert alert-error">
-                            <strong>❌ Processing Failed</strong><br>
-                            ${result.detail || 'Unknown error occurred'}
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <div>
+                                <strong>Processing Failed</strong><br>
+                                ${result.detail || 'Unknown error occurred'}
+                            </div>
                         </div>
                     `;
                     document.getElementById('resultsTable').style.display = 'none';
@@ -352,8 +819,11 @@
                 const summaryDiv = document.getElementById('resultsSummary');
                 summaryDiv.innerHTML = `
                     <div class="alert alert-error">
-                        <strong>❌ Network Error</strong><br>
-                        Failed to connect to the server. Please try again.
+                        <i class="fas fa-wifi"></i>
+                        <div>
+                            <strong>Connection Error</strong><br>
+                            Failed to connect to the server. Please check your connection and try again.
+                        </div>
                     </div>
                 `;
                 document.getElementById('resultsTable').style.display = 'none';
@@ -368,8 +838,8 @@
             const callDetails = document.getElementById('callDetails');
             const transcriptContent = document.getElementById('transcriptContent');
             
-            modalTitle.textContent = `Call Details - ${patientName}`;
-            callDetails.innerHTML = '<div class="spinner"></div> Loading call details...';
+            modalTitle.innerHTML = `<i class="fas fa-phone"></i> Call Details - ${patientName}`;
+            callDetails.innerHTML = '<div style="text-align: center; padding: 2rem;"><div class="spinner"></div><p>Loading call details...</p></div>';
             transcriptContent.innerHTML = '';
             modal.style.display = 'block';
             
@@ -385,27 +855,45 @@
                                      data.call_status === 'busy' ? '📞' : '⏳';
                     
                     callDetails.innerHTML = `
-                        <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
-                            <h4>Call Information</h4>
-                            <p><strong>Call ID:</strong> ${data.call_id}</p>
-                            <p><strong>Phone Number:</strong> ${data.phone_number}</p>
-                            <p><strong>Status:</strong> ${statusIcon} ${data.call_status}</p>
-                            <p><strong>Duration:</strong> ${data.duration} seconds</p>
-                            <p><strong>Created:</strong> ${new Date(data.created_at).toLocaleString()}</p>
+                        <div class="call-details-card">
+                            <h4 style="margin-bottom: 1rem; color: #4f46e5;"><i class="fas fa-info-circle"></i> Call Information</h4>
+                            <div class="detail-grid">
+                                <div class="detail-item">
+                                    <div class="detail-label">Call ID</div>
+                                    <div class="detail-value"><code>${data.call_id}</code></div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Phone Number</div>
+                                    <div class="detail-value">${data.phone_number}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Call Status</div>
+                                    <div class="detail-value">${statusIcon} ${data.call_status}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Duration</div>
+                                    <div class="detail-value">${Math.floor(data.duration / 60)}:${(data.duration % 60).toString().padStart(2, '0')}</div>
+                                </div>
+                                <div class="detail-item">
+                                    <div class="detail-label">Created</div>
+                                    <div class="detail-value">${new Date(data.created_at).toLocaleString()}</div>
+                                </div>
+                            </div>
                         </div>
                     `;
                     
                     transcriptContent.innerHTML = `
                         <div>
-                            <h4>Transcript</h4>
-                            <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; white-space: pre-wrap; font-family: monospace;">
-                                ${data.transcript || 'Transcript not available yet. Call may still be in progress.'}
+                            <h4 style="margin-bottom: 1rem; color: #4f46e5;"><i class="fas fa-comments"></i> Call Transcript</h4>
+                            <div class="transcript-card">
+${data.transcript || 'Transcript not available yet. Call may still be in progress or completed without recording.'}
                             </div>
                         </div>
                     `;
                 } else {
                     callDetails.innerHTML = `
                         <div class="alert alert-error">
+                            <i class="fas fa-exclamation-triangle"></i>
                             Failed to load call details: ${data.detail}
                         </div>
                     `;
@@ -413,6 +901,7 @@
             } catch (error) {
                 callDetails.innerHTML = `
                     <div class="alert alert-error">
+                        <i class="fas fa-wifi"></i>
                         Error loading call details: ${error.message}
                     </div>
                 `;
@@ -423,7 +912,6 @@
             document.getElementById('transcriptModal').style.display = 'none';
         }
 
-        // Close modal when clicking outside
         window.onclick = function(event) {
             const modal = document.getElementById('transcriptModal');
             if (event.target === modal) {
