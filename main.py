@@ -14,13 +14,14 @@ import importlib.util
 # Try to import from the 'blandai' package
 try:
     if importlib.util.find_spec("blandai") is not None:
-        import blandai
+        print("---")
+        print("🔴 Error: The 'blandai' library is not installed correctly.")
+        print("Please use the 'Shell' to run: pip install blandai")
+        print("---")
+        sys.exit(1)
 except ImportError:
     print("---")
     print("🔴 Error: The 'blandai' library is not installed correctly.")
-    print("Please use the 'Shell' to run: pip install blandai")
-    print("---")
-    sys.exit(1)
 
 app = FastAPI(title="Bland AI Call Center", description="Make automated calls using Bland AI")
 templates = Jinja2Templates(directory="templates")
