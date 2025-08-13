@@ -214,17 +214,17 @@ async def make_call(call_request: CallRequest):
         selected_voice = VOICE_MAP.get("female_professional", "default_voice_id")
 
         response = requests.post(
-            "https://api.bland.ai/v1/call",
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json"
-        },
-        json={
-            "phone_number": call_request.phone_number,
-            "task": get_call_prompt(),
-            "voice": selected_voice,
-            "request_data": call_data
-        }
+            "https://api.bland.ai/v1/calls",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "phone_number": call_request.phone_number,
+                "task": get_call_prompt(),
+                "voice": selected_voice,
+                "request_data": call_data
+            }
         )
 
         print(f"API Response Status Code: {response.status_code}")
