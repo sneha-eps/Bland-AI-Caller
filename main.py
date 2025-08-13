@@ -1,4 +1,3 @@
-
 import os
 import sys
 import requests
@@ -11,9 +10,9 @@ from pydantic import BaseModel
 from typing import Optional
 import importlib.util
 
-# Try to import from the 'blandai' package
+# Check if 'blandai' package is available
 try:
-    if importlib.util.find_spec("blandai") is not None:
+    if importlib.util.find_spec("blandai") is None:
         print("---")
         print("🔴 Error: The 'blandai' library is not installed correctly.")
         print("Please use the 'Shell' to run: pip install blandai")
@@ -22,6 +21,9 @@ try:
 except ImportError:
     print("---")
     print("🔴 Error: The 'blandai' library is not installed correctly.")
+    print("Please use the 'Shell' to run: pip install blandai")
+    print("---")
+    sys.exit(1)
 
 app = FastAPI(title="Bland AI Call Center", description="Make automated calls using Bland AI")
 templates = Jinja2Templates(directory="templates")
@@ -178,10 +180,10 @@ def make_single_call(call_request: CallRequest, api_key: str) -> CallResult:
         "date": call_request.appointment_date,
         "time": call_request.appointment_time
     }
-    
+
     try:
         selected_voice = VOICE_MAP.get("female_professional", "default_voice_id")
-        
+
         response = requests.post(
             "https://api.bland.ai/v1/calls",
             headers={
@@ -195,7 +197,7 @@ def make_single_call(call_request: CallRequest, api_key: str) -> CallResult:
                 "request_data": call_data
             }
         )
-        
+
         if response.status_code == 200:
             resp_json = response.json()
             return CallResult(
@@ -240,28 +242,28 @@ async def process_csv(file: UploadFile = File(...)):
             status_code=400,
             detail="BLAND_API_KEY not found in Secrets. Please add your API key."
         )
-    
+
     # Check if file is CSV
     if not file.filename or not file.filename.endswith('.csv'):
         raise HTTPException(
             status_code=400,
             detail="Please upload a CSV file."
         )
-    
+
     try:
         # Read CSV content
         content = await file.read()
         csv_string = content.decode('utf-8')
         csv_reader = csv.DictReader(io.StringIO(csv_string))
-        
+
         results = []
-        
+
         # Process each row in the CSV
         for row in csv_reader:
             # Validate required fields
             required_fields = ['phone_number', 'patient_name', 'date', 'time', 'provider_name']
             missing_fields = [field for field in required_fields if not row.get(field, '').strip()]
-            
+
             if missing_fields:
                 results.append(CallResult(
                     success=False,
@@ -270,7 +272,7 @@ async def process_csv(file: UploadFile = File(...)):
                     phone_number=row.get('phone_number', 'Unknown')
                 ))
                 continue
-            
+
             # Create call request
             call_request = CallRequest(
                 phone_number=row['phone_number'].strip(),
@@ -279,15 +281,15 @@ async def process_csv(file: UploadFile = File(...)):
                 appointment_date=row['date'].strip(),
                 appointment_time=row['time'].strip()
             )
-            
+
             # Make the call
             result = make_single_call(call_request, api_key)
             results.append(result)
-        
+
         # Calculate summary
         successful_calls = sum(1 for r in results if r.success)
         failed_calls = len(results) - successful_calls
-        
+
         return {
             "success": True,
             "total_calls": len(results),
@@ -295,7 +297,7 @@ async def process_csv(file: UploadFile = File(...)):
             "failed_calls": failed_calls,
             "results": [result.dict() for result in results]
         }
-        
+
     except Exception as e:
         raise HTTPException(
             status_code=500,
@@ -306,13 +308,13 @@ async def process_csv(file: UploadFile = File(...)):
 async def get_call_details(call_id: str):
     """Get detailed call information including transcript"""
     api_key = get_api_key()
-    
+
     if not api_key:
         raise HTTPException(
             status_code=400,
             detail="BLAND_API_KEY not found in Secrets."
         )
-    
+
     try:
         response = requests.get(
             f"https://api.bland.ai/v1/calls/{call_id}",
@@ -320,14 +322,14 @@ async def get_call_details(call_id: str):
                 "Authorization": f"Bearer {api_key}",
             }
         )
-        
+
         if response.status_code == 200:
             call_data = response.json()
-            
+
             # Determine call status based on transcript analysis
             transcript = call_data.get("transcript", "")
             call_status = "unknown"
-            
+
             if transcript:
                 transcript_lower = transcript.lower()
                 if any(word in transcript_lower for word in ["confirm", "yes", "see you then", "i'll be there"]):
@@ -340,7 +342,7 @@ async def get_call_details(call_id: str):
                     call_status = "voicemail"
                 elif any(word in transcript_lower for word in ["busy", "hang up", "ended call"]):
                     call_status = "busy"
-            
+
             return {
                 "call_id": call_id,
                 "status": call_data.get("status", "unknown"),
