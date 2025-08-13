@@ -4,11 +4,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bland AI Call Center</title>
+    <title>Bland AI Call Center - CSV Upload</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            max-width: 800px;
+            max-width: 900px;
             margin: 0 auto;
             padding: 20px;
             background-color: #f5f5f5;
@@ -47,6 +47,12 @@
             border: 1px solid #c3e6cb;
         }
         
+        .alert-info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
         .form-group {
             margin-bottom: 20px;
         }
@@ -58,23 +64,19 @@
             color: #555;
         }
         
-        .required {
-            color: #e74c3c;
-        }
-        
-        input[type="text"], input[type="tel"], input[type="date"], input[type="time"], textarea {
+        input[type="file"] {
             width: 100%;
             padding: 12px;
-            border: 1px solid #ddd;
+            border: 2px dashed #ddd;
             border-radius: 5px;
             font-size: 16px;
             box-sizing: border-box;
+            cursor: pointer;
         }
         
-        input:focus, textarea:focus {
-            outline: none;
+        input[type="file"]:hover {
             border-color: #3498db;
-            box-shadow: 0 0 5px rgba(52, 152, 219, 0.3);
+            background-color: #f8f9fa;
         }
         
         .btn {
@@ -119,29 +121,69 @@
             100% { transform: rotate(360deg); }
         }
         
-        .result {
+        .results {
             display: none;
-            margin-top: 20px;
+            margin-top: 30px;
+        }
+        
+        .results-summary {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        
+        .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        
+        .results-table th,
+        .results-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+        
+        .results-table th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+        
+        .status-success {
+            color: #28a745;
+            font-weight: bold;
+        }
+        
+        .status-error {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        
+        .csv-format {
+            background-color: #f8f9fa;
             padding: 15px;
             border-radius: 5px;
+            margin-bottom: 20px;
         }
         
-        .grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
+        .csv-format h3 {
+            margin-top: 0;
+            color: #495057;
         }
         
-        @media (max-width: 600px) {
-            .grid {
-                grid-template-columns: 1fr;
-            }
+        .csv-format code {
+            background-color: #e9ecef;
+            padding: 2px 4px;
+            border-radius: 3px;
+            font-family: monospace;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>🔊 Bland AI Call Center</h1>
+        <h1>📞 Bland AI Call Center - CSV Upload</h1>
         
         {% if not has_api_key %}
         <div class="alert alert-error">
@@ -149,94 +191,80 @@
         </div>
         {% endif %}
         
-        <form id="callForm">
+        <div class="csv-format">
+            <h3>📋 CSV File Format</h3>
+            <p>Your CSV file should include the following columns (required fields marked with *):</p>
+            <ul>
+                <li><code>phone_number</code>* - Phone number in E.164 format (e.g., +1234567890)</li>
+                <li><code>patient_name</code>* - Patient's full name</li>
+                <li><code>clinic_name</code>* - Name of the clinic</li>
+                <li><code>provider_name</code>* - Doctor or provider name</li>
+                <li><code>appointment_date</code>* - Date in YYYY-MM-DD format</li>
+                <li><code>appointment_time</code>* - Time in HH:MM format (24-hour)</li>
+                <li><code>address</code> - Clinic address (optional)</li>
+                <li><code>office_location</code> - Office location (optional)</li>
+            </ul>
+        </div>
+        
+        <form id="csvForm" enctype="multipart/form-data">
             <div class="form-group">
-                <label for="phone_number">📞 Phone Number <span class="required">*</span></label>
-                <input type="tel" id="phone_number" name="phone_number" placeholder="+1234567890" required>
-                <small>Enter phone number in E.164 format (e.g., +1234567890)</small>
-            </div>
-            
-            <div class="grid">
-                <div class="form-group">
-                    <label for="patient_name">👤 Patient Name <span class="required">*</span></label>
-                    <input type="text" id="patient_name" name="patient_name" placeholder="John Doe" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="clinic_name">🏥 Clinic Name <span class="required">*</span></label>
-                    <input type="text" id="clinic_name" name="clinic_name" value="Hillside Primary Care" required>
-                </div>
-            </div>
-            
-            <div class="form-group">
-                <label for="address">📍 Clinic Address</label>
-                <input type="text" id="address" name="address" value="12881 I-35, Live Oak, TX 78233, United States">
-            </div>
-            
-            <div class="grid">
-                <div class="form-group">
-                    <label for="office_location">🏢 Office Location</label>
-                    <input type="text" id="office_location" name="office_location" value="Live Oak Office">
-                </div>
-                
-                <div class="form-group">
-                    <label for="provider_name">👨‍⚕️ Provider Name <span class="required">*</span></label>
-                    <input type="text" id="provider_name" name="provider_name" placeholder="Dr. Smith" required>
-                </div>
-            </div>
-            
-            <div class="grid">
-                <div class="form-group">
-                    <label for="appointment_date">📅 Appointment Date <span class="required">*</span></label>
-                    <input type="date" id="appointment_date" name="appointment_date" required>
-                </div>
-                
-                <div class="form-group">
-                    <label for="appointment_time">🕐 Appointment Time <span class="required">*</span></label>
-                    <input type="time" id="appointment_time" name="appointment_time" required>
-                </div>
+                <label for="csvFile">📁 Select CSV File</label>
+                <input type="file" id="csvFile" name="file" accept=".csv" required {% if not has_api_key %}disabled{% endif %}>
             </div>
             
             <button type="submit" class="btn" {% if not has_api_key %}disabled{% endif %}>
-                📞 Make Call
+                📞 Process CSV and Make Calls
             </button>
         </form>
         
         <div class="loading" id="loading">
             <div class="spinner"></div>
-            <p>Making call...</p>
+            <p>Processing CSV and making calls...</p>
         </div>
         
-        <div class="result" id="result"></div>
+        <div class="results" id="results">
+            <div class="results-summary" id="resultsSummary"></div>
+            <table class="results-table" id="resultsTable">
+                <thead>
+                    <tr>
+                        <th>Patient Name</th>
+                        <th>Phone Number</th>
+                        <th>Status</th>
+                        <th>Call ID</th>
+                        <th>Details</th>
+                    </tr>
+                </thead>
+                <tbody id="resultsBody"></tbody>
+            </table>
+        </div>
     </div>
 
     <script>
-        document.getElementById('callForm').addEventListener('submit', async function(e) {
+        document.getElementById('csvForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const form = e.target;
             const formData = new FormData(form);
             const loadingDiv = document.getElementById('loading');
-            const resultDiv = document.getElementById('result');
+            const resultsDiv = document.getElementById('results');
             const submitBtn = form.querySelector('button[type="submit"]');
+            
+            // Check if file is selected
+            const fileInput = document.getElementById('csvFile');
+            if (!fileInput.files.length) {
+                alert('Please select a CSV file');
+                return;
+            }
             
             // Show loading state
             loadingDiv.style.display = 'block';
-            resultDiv.style.display = 'none';
+            resultsDiv.style.display = 'none';
             submitBtn.disabled = true;
             
             try {
-                const data = {};
-                for (let [key, value] of formData.entries()) {
-                    data[key] = value;
-                }
-                
-                const response = await fetch('/make_call', {
+                const response = await fetch('/process_csv', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(data)
+                    body: formData
                 });
                 
                 const result = await response.json();
@@ -244,45 +272,63 @@
                 // Hide loading state
                 loadingDiv.style.display = 'none';
                 
-                // Show result
-                resultDiv.style.display = 'block';
-                
                 if (result.success) {
-                    resultDiv.className = 'result alert alert-success';
-                    resultDiv.innerHTML = `
-                        <strong>✅ Call Initiated Successfully!</strong><br>
-                        <strong>Call ID:</strong> ${result.call_id}<br>
-                        <strong>Status:</strong> ${result.status}<br>
-                        <strong>Message:</strong> ${result.message}
+                    // Show results
+                    resultsDiv.style.display = 'block';
+                    
+                    // Update summary
+                    const summaryDiv = document.getElementById('resultsSummary');
+                    summaryDiv.innerHTML = `
+                        <h3>📊 Call Results Summary</h3>
+                        <p><strong>Total Calls:</strong> ${result.total_calls}</p>
+                        <p><strong>Successful:</strong> <span class="status-success">${result.successful_calls}</span></p>
+                        <p><strong>Failed:</strong> <span class="status-error">${result.failed_calls}</span></p>
                     `;
+                    
+                    // Update results table
+                    const tbody = document.getElementById('resultsBody');
+                    tbody.innerHTML = '';
+                    
+                    result.results.forEach(call => {
+                        const row = tbody.insertRow();
+                        row.innerHTML = `
+                            <td>${call.patient_name}</td>
+                            <td>${call.phone_number}</td>
+                            <td class="${call.success ? 'status-success' : 'status-error'}">
+                                ${call.success ? '✅ Success' : '❌ Failed'}
+                            </td>
+                            <td>${call.call_id || 'N/A'}</td>
+                            <td>${call.success ? (call.message || call.status) : call.error}</td>
+                        `;
+                    });
                 } else {
-                    resultDiv.className = 'result alert alert-error';
-                    resultDiv.innerHTML = `
-                        <strong>❌ Call Failed</strong><br>
-                        ${result.error}
+                    // Show error
+                    resultsDiv.style.display = 'block';
+                    const summaryDiv = document.getElementById('resultsSummary');
+                    summaryDiv.innerHTML = `
+                        <div class="alert alert-error">
+                            <strong>❌ Processing Failed</strong><br>
+                            ${result.detail || 'Unknown error occurred'}
+                        </div>
                     `;
+                    document.getElementById('resultsTable').style.display = 'none';
                 }
                 
             } catch (error) {
                 loadingDiv.style.display = 'none';
-                resultDiv.style.display = 'block';
-                resultDiv.className = 'result alert alert-error';
-                resultDiv.innerHTML = `
-                    <strong>❌ Network Error</strong><br>
-                    Failed to connect to the server. Please try again.
+                resultsDiv.style.display = 'block';
+                const summaryDiv = document.getElementById('resultsSummary');
+                summaryDiv.innerHTML = `
+                    <div class="alert alert-error">
+                        <strong>❌ Network Error</strong><br>
+                        Failed to connect to the server. Please try again.
+                    </div>
                 `;
+                document.getElementById('resultsTable').style.display = 'none';
             }
             
             submitBtn.disabled = false;
         });
-        
-        // Set default date to tomorrow
-        const tomorrow = new Date();
-        tomorrow.setDate(tomorrow.getDate() + 1);
-        document.getElementById('appointment_date').value = tomorrow.toISOString().split('T')[0];
-        
-        // Set default time to 10:00 AM
-        document.getElementById('appointment_time').value = '10:00';
     </script>
 </body>
 </html>

@@ -1,11 +1,14 @@
+
 import os
 import sys
 import requests
-from fastapi import FastAPI, HTTPException, Request
+import csv
+import io
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 import importlib.util
 
 # Try to import from the 'blandai' package
@@ -158,39 +161,17 @@ class CallRequest(BaseModel):
     appointment_date: str
     appointment_time: str
 
-@app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
-    """Main page with the calling interface"""
-    api_key = get_api_key()
-    return templates.TemplateResponse("index.html", {
-        "request": request,
-        "has_api_key": bool(api_key)
-    })
+class CallResult(BaseModel):
+    success: bool
+    call_id: Optional[str] = None
+    status: Optional[str] = None
+    message: Optional[str] = None
+    error: Optional[str] = None
+    patient_name: str
+    phone_number: str
 
-@app.post("/make_call")
-async def make_call(call_request: CallRequest):
-    """Handle the call request from the frontend"""
-    api_key = get_api_key()
-
-    if not api_key:
-        raise HTTPException(
-            status_code=400,
-            detail="BLAND_API_KEY not found in Secrets. Please add your API key."
-        )
-    # Validate required fields
-    if not all([
-        call_request.phone_number,
-        call_request.patient_name,
-        call_request.clinic_name,
-        call_request.provider_name,
-        call_request.appointment_date,
-        call_request.appointment_time
-    ]):
-        raise HTTPException(
-            status_code=400,
-            detail="Please fill in all required fields."
-        )
-    # Prepare call data
+def make_single_call(call_request: CallRequest, api_key: str) -> CallResult:
+    """Make a single call and return the result"""
     call_data = {
         "patient name": call_request.patient_name,
         "clinic name": call_request.clinic_name,
@@ -200,19 +181,10 @@ async def make_call(call_request: CallRequest):
         "date": call_request.appointment_date,
         "time": call_request.appointment_time
     }
+    
     try:
-        # Initialize the Bland AI client
-        # bland_client = BlandAI(api_key=api_key)
-
-        # Make the call
-        # response = bland_client.call(
-        #     phone_number=call_request.phone_number,
-        #     task=get_call_prompt(),
-        #     voice=get_voice_id("female_professional"),
-        #     request_data=call_data
-        # )
         selected_voice = VOICE_MAP.get("female_professional", "default_voice_id")
-
+        
         response = requests.post(
             "https://api.bland.ai/v1/calls",
             headers={
@@ -226,29 +198,114 @@ async def make_call(call_request: CallRequest):
                 "request_data": call_data
             }
         )
+        
+        if response.status_code == 200:
+            resp_json = response.json()
+            return CallResult(
+                success=True,
+                call_id=resp_json.get("call_id", "N/A"),
+                status=resp_json.get("status", "N/A"),
+                message=resp_json.get("message", "N/A"),
+                patient_name=call_request.patient_name,
+                phone_number=call_request.phone_number
+            )
+        else:
+            return CallResult(
+                success=False,
+                error=f"API error: {response.text}",
+                patient_name=call_request.patient_name,
+                phone_number=call_request.phone_number
+            )
+    except Exception as e:
+        return CallResult(
+            success=False,
+            error=str(e),
+            patient_name=call_request.patient_name,
+            phone_number=call_request.phone_number
+        )
 
-        print(f"API Response Status Code: {response.status_code}")
-        print(f"API Response Text: {response.text}")
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    """Main page with the CSV upload interface"""
+    api_key = get_api_key()
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "has_api_key": bool(api_key)
+    })
 
-        # Check if response is successful
-        if response.status_code != 200:
-            raise HTTPException(
-                status_code=response.status_code,
-                detail=f"Bland AI API error: {response.text}"
+@app.post("/process_csv")
+async def process_csv(file: UploadFile = File(...)):
+    """Process CSV file and make calls for all rows"""
+    api_key = get_api_key()
+
+    if not api_key:
+        raise HTTPException(
+            status_code=400,
+            detail="BLAND_API_KEY not found in Secrets. Please add your API key."
+        )
+    
+    # Check if file is CSV
+    if not file.filename.endswith('.csv'):
+        raise HTTPException(
+            status_code=400,
+            detail="Please upload a CSV file."
+        )
+    
+    try:
+        # Read CSV content
+        content = await file.read()
+        csv_string = content.decode('utf-8')
+        csv_reader = csv.DictReader(io.StringIO(csv_string))
+        
+        results = []
+        
+        # Process each row in the CSV
+        for row in csv_reader:
+            # Validate required fields
+            required_fields = ['phone_number', 'patient_name', 'clinic_name', 'provider_name', 'appointment_date', 'appointment_time']
+            missing_fields = [field for field in required_fields if not row.get(field, '').strip()]
+            
+            if missing_fields:
+                results.append(CallResult(
+                    success=False,
+                    error=f"Missing required fields: {', '.join(missing_fields)}",
+                    patient_name=row.get('patient_name', 'Unknown'),
+                    phone_number=row.get('phone_number', 'Unknown')
+                ))
+                continue
+            
+            # Create call request
+            call_request = CallRequest(
+                phone_number=row['phone_number'].strip(),
+                patient_name=row['patient_name'].strip(),
+                clinic_name=row['clinic_name'].strip(),
+                address=row.get('address', '').strip(),
+                office_location=row.get('office_location', '').strip(),
+                provider_name=row['provider_name'].strip(),
+                appointment_date=row['appointment_date'].strip(),
+                appointment_time=row['appointment_time'].strip()
             )
             
-        resp_json = response.json()
+            # Make the call
+            result = make_single_call(call_request, api_key)
+            results.append(result)
+        
+        # Calculate summary
+        successful_calls = sum(1 for r in results if r.success)
+        failed_calls = len(results) - successful_calls
+        
         return {
             "success": True,
-            "call_id": resp_json.get("call_id", "N/A"),
-            "status": resp_json.get("status", "N/A"),
-            "message": resp_json.get("message", "N/A")
+            "total_calls": len(results),
+            "successful_calls": successful_calls,
+            "failed_calls": failed_calls,
+            "results": [result.dict() for result in results]
         }
-
+        
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail= str(e)
+            detail=f"Error processing CSV: {str(e)}"
         )
 
 @app.get("/docs")
