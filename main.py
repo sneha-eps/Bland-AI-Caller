@@ -1,14 +1,17 @@
 import os
 import sys
+import requests
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from typing import Optional
+import importlib.util
 
 # Try to import from the 'blandai' package
 try:
-    from blandai import BlandAI
+    if importlib.util.find_spec("blandai") is not None:
+        import blandai
 except ImportError:
     print("---")
     print("🔴 Error: The 'blandai' library is not installed correctly.")
@@ -28,9 +31,9 @@ def get_api_key():
     except KeyError:
         return None
 
-    VOICE_MAP = {
+VOICE_MAP = {
         "male_professional": "61507da3-4abd-49b6-983f-9ce659fd9e91",
-        "female_professional": "1d054475-3908-4f64-9158-9d3911fe9597",
+        "female_professional": "70f05206-71ab-4b39-b238-ed1bf17b365a",
         "female_warm": "2f9fdbc7-4bf2-4792-8a18-21ce3c93978f",
         "female_clear": "17e8f694-d230-4b64-b040-6108088d9e6c",
         "female_friendly": "bbeabae6-ec8d-444f-92ad-c8e620d3de8d",
@@ -61,6 +64,8 @@ DELIVERY RULES
 • Provide only the details the patient asks for; be concise and precise.
 • Do not ask for personal information unless the patient requests changes or clarification.
 • If the patient gives a short acknowledgment after you provide info, offer a brief closing and end the call.
+• If the patient says a greeting such as "hello", "hi", "hey", etc. **after** the call has already started, treat it as a normal acknowledgment and continue from the current step — do **not** restart the conversation from the opening.
+
 
 CONVERSATION FLOW (STRICT ORDER)
 1) OPENING
@@ -125,20 +130,21 @@ RESPONSE FLOW BY INTENT
   Briefly address any concern if needed, then repeat the last question clearly and wait.
 
 MANDATORY CALL TERMINATION RULES:
-1. After delivering final information or completing a transaction, wait 10-15 seconds to allow for any last-minute questions.
-2. If patient asks a follow-up question during this waiting period, answer it briefly then ask "Is there anything else I can help you with?"
-3. If patient gives brief acknowledgment like "thanks", "okay", "great" - respond with "You're welcome! Have a great day!" then wait 2-3 seconds before ending call.
-4. If no response after the 10-15 second waiting period, deliver a clear goodbye message and end the call.
-5. Do NOT continue lengthy conversations after the main business is completed.
+1. After delivering final information or completing a transaction, wait 10–15 seconds to allow for any last-minute questions.
+2. If the patient asks a follow-up question during this waiting period, answer it briefly and then ask, "Is there anything else I can help you with?"
+3. If the patient gives a brief acknowledgment such as "thanks", "thank you", "okay", "great", or "alright" (or any similar short closing phrase), respond politely (e.g., "You're welcome! Have a great day!") and then wait 3–4 seconds before ending the call. If they speak again during this wait, continue the conversation.
+4. If no response is received after the 10–15 second waiting period, deliver a clear goodbye message and end the call.
+5. If silence persists for 10 seconds or more at any point after the main business is completed, end the call automatically without requiring repeated acknowledgments.
+6. Ensure that only one short waiting period is used for ending phrases. Do not stack multiple timers or prolong the closing unnecessarily.
 
 NATURAL CALL ENDING PROCESS:
 • Complete the main task (confirmation, cancellation, or reschedule arrangement).
 • Wait 10-15 seconds to allow for final questions
 • If questions arise: answer briefly, then ask "Is there anything else I can help you with?" and wait another 10-15 seconds.
-• If brief acknowledgment: "You're welcome! Have a great day!" then wait 2-3 seconds before ending call.
+• If brief acknowledgment: "You're welcome! Have a great day!" then wait 3-4 seconds before ending call.
 • If silence after 10-15 second wait: "Alright, have a great day!" and end call.
-• If no response after 2-3 second wait: end call.
-• If silence after 10-15 second wait: end call.
+• If no response after 3-4 second wait: end call.
+• If silence after 10 seconds at any point after the main task is done: end call automatically.
 
 REMEMBER: Maintain natural conversation flow with appropriate pauses. Let patients naturally end with acknowledgments while ensuring calls don't continue indefinitely."""
 
@@ -165,14 +171,12 @@ async def index(request: Request):
 async def make_call(call_request: CallRequest):
     """Handle the call request from the frontend"""
     api_key = get_api_key()
-    print(f"API Key: {api_key}")
 
     if not api_key:
         raise HTTPException(
             status_code=400,
             detail="BLAND_API_KEY not found in Secrets. Please add your API key."
         )
-    print("hl")
     # Validate required fields
     if not all([
         call_request.phone_number,
@@ -186,7 +190,6 @@ async def make_call(call_request: CallRequest):
             status_code=400,
             detail="Please fill in all required fields."
         )
-    print("hlss")
     # Prepare call data
     call_data = {
         "patient name": call_request.patient_name,
@@ -197,30 +200,43 @@ async def make_call(call_request: CallRequest):
         "date": call_request.appointment_date,
         "time": call_request.appointment_time
     }
-    print("hl")
     try:
         # Initialize the Bland AI client
-        bland_client = BlandAI(api_key=api_key)
+        # bland_client = BlandAI(api_key=api_key)
 
         # Make the call
-        response = bland_client.call(
-            phone_number=call_request.phone_number,
-            task=get_call_prompt(),
-            voice_id=get_voice_id("female_professional"),
-            request_data=call_data
-        )
-        print("hl")
+        # response = bland_client.call(
+        #     phone_number=call_request.phone_number,
+        #     task=get_call_prompt(),
+        #     voice=get_voice_id("female_professional"),
+        #     request_data=call_data
+        # )
+        selected_voice = VOICE_MAP.get("female_professional", "default_voice_id")
+
+        response = requests.post(
+            "https://api.bland.ai/v1/call",
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json"
+        },
+        json={
+            "phone_number": call_request.phone_number,
+            "task": get_call_prompt(),
+            "voice": selected_voice,
+            "request_data": call_data
+        })
+        resp_json = response.json()
         return {
             "success": True,
-            "call_id": response.get("call_id", "N/A"),
-            "status": response.get("status", "N/A"),
-            "message": response.get("message", "N/A")
+            "call_id": resp_json("call_id", "N/A"),
+            "status": resp_json("status", "N/A"),
+            "message": resp_json("message", "N/A")
         }
 
     except Exception as e:
         raise HTTPException(
             status_code=500,
-            detail=f"An error occurred while making the call: {str(e)}"
+            detail= str(e)
         )
 
 @app.get("/docs")
