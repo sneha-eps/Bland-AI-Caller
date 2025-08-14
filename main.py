@@ -175,7 +175,7 @@ def format_phone_number(phone_number: str, country_code: str) -> str:
     # Add the selected country code
     return f"{country_code}{cleaned}"
 
-def make_single_call(call_request: CallRequest, api_key: str, country_code: str) -> CallResult:
+def make_single_call(call_request: CallRequest, api_key: str) -> CallResult:
     """Make a single call and return the result"""
     call_data = {
         "patient name": call_request.patient_name,
@@ -238,6 +238,44 @@ def make_single_call(call_request: CallRequest, api_key: str, country_code: str)
             phone_number=call_request.phone_number
         )
 
+@app.post("/make-call")
+async def make_call(call_request: CallRequest, country_code: str = "+1"):
+    """Make a single call"""
+    api_key = get_api_key()
+    
+    if not api_key:
+        raise HTTPException(
+            status_code=400,
+            detail="BLAND_API_KEY not found in Secrets. Please add your API key."
+        )
+    
+    try:
+        # Format phone number with country code
+        formatted_phone = format_phone_number(call_request.phone_number, country_code)
+        print(f"📞 Original: {call_request.phone_number} -> Formatted: {formatted_phone} (Country Code: {country_code})")
+        
+        # Update the call request with formatted phone number
+        call_request.phone_number = formatted_phone
+        
+        # Make the call
+        result = make_single_call(call_request, api_key)
+        
+        return {
+            "success": result.success,
+            "call_id": result.call_id,
+            "status": result.status,
+            "message": result.message,
+            "error": result.error,
+            "patient_name": result.patient_name,
+            "phone_number": result.phone_number
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error making call: {str(e)}"
+        )
+
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     """Main page with the CSV upload interface"""
@@ -290,6 +328,7 @@ async def process_csv(file: UploadFile = File(...), country_code: str = "+1"): #
 
             # Format phone number with selected country code
             formatted_phone = format_phone_number(row['phone_number'].strip(), country_code)
+            print(f"📞 CSV Row: {row['phone_number'].strip()} -> Formatted: {formatted_phone} (Country Code: {country_code})")
 
             # Create call request
             call_request = CallRequest(
@@ -301,7 +340,7 @@ async def process_csv(file: UploadFile = File(...), country_code: str = "+1"): #
             )
 
             # Make the call
-            result = make_single_call(call_request, api_key, country_code)
+            result = make_single_call(call_request, api_key)
             results.append(result)
 
         # Calculate summary
