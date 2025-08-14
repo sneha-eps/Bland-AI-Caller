@@ -4,11 +4,13 @@ import requests
 import csv
 import io
 import time  # Add time import for delays
+import asyncio
+import aiohttp
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List
 import importlib
 import re # Import the re module for regular expressions
 
@@ -176,6 +178,92 @@ def format_phone_number(phone_number: str, country_code: str) -> str:
     # Add the selected country code
     return f"{country_code}{cleaned}"
 
+async def make_single_call_async(call_request: CallRequest, api_key: str, semaphore: asyncio.Semaphore) -> CallResult:
+    """Make a single call asynchronously with concurrency control"""
+    async with semaphore:  # Limit concurrent calls to 10
+        call_data = {
+            "patient name": call_request.patient_name,
+            "provider name": call_request.provider_name,
+            "date": call_request.appointment_date,
+            "time": call_request.appointment_time
+        }
+
+        try:
+            selected_voice = VOICE_MAP.get("female_professional", "default_voice_id")
+
+            payload = {
+                "phone_number": call_request.phone_number,
+                "task": get_call_prompt(),
+                "voice": selected_voice,
+                "request_data": call_data
+            }
+
+            print(f"🔄 Initiating call to {call_request.phone_number} for {call_request.patient_name}")
+            print(f"📞 API Payload keys: {list(payload.keys())}")  # Don't log full payload for security
+
+            async with aiohttp.ClientSession() as session:
+                async with session.post(
+                    "https://api.bland.ai/v1/calls",
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json"
+                    },
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=60)
+                ) as response:
+                    
+                    response_text = await response.text()
+                    print(f"📊 API Response Status: {response.status}")
+                    print(f"📄 API Response: {response_text}")
+
+                    if response.status == 200:
+                        resp_json = await response.json()
+                        print(f"✅ Call initiated successfully for {call_request.patient_name}")
+                        return CallResult(
+                            success=True,
+                            call_id=resp_json.get("call_id", "N/A"),
+                            status=resp_json.get("status", "N/A"),
+                            message=resp_json.get("message", "Call successfully queued."),
+                            patient_name=call_request.patient_name,
+                            phone_number=call_request.phone_number
+                        )
+                    elif response.status == 429:
+                        print(f"⏳ Rate limit hit for {call_request.patient_name}")
+                        return CallResult(
+                            success=False,
+                            error="Rate limit exceeded - please try again later",
+                            patient_name=call_request.patient_name,
+                            phone_number=call_request.phone_number
+                        )
+                    else:
+                        error_msg = f"API error (Status {response.status})"
+                        try:
+                            error_json = await response.json()
+                            if 'message' in error_json:
+                                error_msg += f": {error_json['message']}"
+                            elif 'detail' in error_json:
+                                error_msg += f": {error_json['detail']}"
+                            else:
+                                error_msg += f": {response_text}"
+                        except:
+                            error_msg += f": {response_text}"
+                        
+                        print(f"❌ API Error for {call_request.patient_name}: {error_msg}")
+                        return CallResult(
+                            success=False,
+                            error=error_msg,
+                            patient_name=call_request.patient_name,
+                            phone_number=call_request.phone_number
+                        )
+        except Exception as e:
+            print(f"💥 Exception during call initiation: {str(e)}")
+            return CallResult(
+                success=False,
+                error=str(e),
+                patient_name=call_request.patient_name,
+                phone_number=call_request.phone_number
+            )
+
 def make_single_call(call_request: CallRequest, api_key: str) -> CallResult:
     """Make a single call and return the result"""
     call_data = {
@@ -334,7 +422,8 @@ async def process_csv(file: UploadFile = File(...), country_code: str = Form("+1
         results = []
         row_count = 0
 
-        # Process each row in the CSV
+        # Prepare all call requests
+        call_requests = []
         for row in csv_reader:
             row_count += 1
             # Validate required fields
@@ -362,19 +451,24 @@ async def process_csv(file: UploadFile = File(...), country_code: str = Form("+1
                 appointment_date=row['date'].strip(),
                 appointment_time=row['time'].strip()
             )
+            call_requests.append(call_request)
 
-            # Make the call
-            result = make_single_call(call_request, api_key)
-            results.append(result)
+        # Process all valid calls concurrently (max 10 at a time)
+        if call_requests:
+            print(f"🚀 Processing {len(call_requests)} calls concurrently (max 10 simultaneous)")
             
-            # Add 2-second delay between calls to prevent rate limiting (except for the last call)
-            # Always add delay regardless of success/failure, and check if there are more rows
-            csv_file_copy = io.StringIO(csv_string)
-            total_rows = sum(1 for _ in csv.DictReader(csv_file_copy))
+            # Create semaphore to limit concurrent calls to 10
+            semaphore = asyncio.Semaphore(10)
             
-            if row_count < total_rows:
-                print(f"⏱️ Waiting 2 seconds before next call... (Call {row_count}/{total_rows})")
-                time.sleep(2)
+            # Create tasks for all calls
+            tasks = [
+                make_single_call_async(call_request, api_key, semaphore) 
+                for call_request in call_requests
+            ]
+            
+            # Run all tasks concurrently
+            concurrent_results = await asyncio.gather(*tasks)
+            results.extend(concurrent_results)
 
         # Calculate summary
         successful_calls = sum(1 for r in results if r.success)
