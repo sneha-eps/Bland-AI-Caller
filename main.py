@@ -3,6 +3,7 @@ import sys
 import requests
 import csv
 import io
+import time  # Add time import for delays
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
@@ -310,9 +311,11 @@ async def process_csv(file: UploadFile = File(...), country_code: str = Form("+1
         csv_reader = csv.DictReader(io.StringIO(csv_string))
 
         results = []
+        row_count = 0
 
         # Process each row in the CSV
         for row in csv_reader:
+            row_count += 1
             # Validate required fields
             required_fields = ['phone_number', 'patient_name', 'date', 'time', 'provider_name']
             missing_fields = [field for field in required_fields if not row.get(field, '').strip()]
@@ -342,6 +345,11 @@ async def process_csv(file: UploadFile = File(...), country_code: str = Form("+1
             # Make the call
             result = make_single_call(call_request, api_key)
             results.append(result)
+            
+            # Add 1-second delay between calls to prevent rate limiting (except for the last call)
+            if row_count > 1 and result.success:
+                print(f"⏱️ Waiting 1 second before next call...")
+                time.sleep(1)
 
         # Calculate summary
         successful_calls = sum(1 for r in results if r.success)
