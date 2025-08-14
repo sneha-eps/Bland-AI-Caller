@@ -10,20 +10,14 @@ from pydantic import BaseModel
 from typing import Optional
 import importlib.util
 
-# Check if 'blandai' package is available
+# Check if 'blandai' package is available (optional since we're using requests directly)
 try:
-    if importlib.util.find_spec("blandai") is None:
-        print("---")
-        print("🔴 Error: The 'blandai' library is not installed correctly.")
-        print("Please use the 'Shell' to run: pip install blandai")
-        print("---")
-        sys.exit(1)
+    if importlib.util.find_spec("blandai") is not None:
+        print("✅ blandai library is available")
+    else:
+        print("⚠️ blandai library not found, but continuing with direct API calls")
 except ImportError:
-    print("---")
-    print("🔴 Error: The 'blandai' library is not installed correctly.")
-    print("Please use the 'Shell' to run: pip install blandai")
-    print("---")
-    sys.exit(1)
+    print("⚠️ blandai library check failed, but continuing with direct API calls")
 
 app = FastAPI(title="Bland AI Call Center", description="Make automated calls using Bland AI")
 templates = Jinja2Templates(directory="templates")
@@ -184,22 +178,32 @@ def make_single_call(call_request: CallRequest, api_key: str) -> CallResult:
     try:
         selected_voice = VOICE_MAP.get("female_professional", "default_voice_id")
 
+        payload = {
+            "phone_number": call_request.phone_number,
+            "task": get_call_prompt(),
+            "voice": selected_voice,
+            "request_data": call_data
+        }
+
+        print(f"🔄 Initiating call to {call_request.phone_number} for {call_request.patient_name}")
+        print(f"📞 API Payload: {payload}")
+
         response = requests.post(
             "https://api.bland.ai/v1/calls",
             headers={
                 "Authorization": f"Bearer {api_key}",
                 "Content-Type": "application/json"
             },
-            json={
-                "phone_number": call_request.phone_number,
-                "task": get_call_prompt(),
-                "voice": selected_voice,
-                "request_data": call_data
-            }
+            json=payload,
+            timeout=30
         )
+
+        print(f"📊 API Response Status: {response.status_code}")
+        print(f"📄 API Response: {response.text}")
 
         if response.status_code == 200:
             resp_json = response.json()
+            print(f"✅ Call initiated successfully: {resp_json}")
             return CallResult(
                 success=True,
                 call_id=resp_json.get("call_id", "N/A"),
@@ -209,13 +213,15 @@ def make_single_call(call_request: CallRequest, api_key: str) -> CallResult:
                 phone_number=call_request.phone_number
             )
         else:
+            print(f"❌ API Error: Status {response.status_code}, Response: {response.text}")
             return CallResult(
                 success=False,
-                error=f"API error: {response.text}",
+                error=f"API error (Status {response.status_code}): {response.text}",
                 patient_name=call_request.patient_name,
                 phone_number=call_request.phone_number
             )
     except Exception as e:
+        print(f"💥 Exception during call initiation: {str(e)}")
         return CallResult(
             success=False,
             error=str(e),
