@@ -790,6 +790,10 @@
                 alert('Please select a country code');
                 return;
             }
+            
+            // Add country code to form data
+            formData.append('country_code', countryCode);
+            
             const loadingDiv = document.getElementById('loading');
             const resultsDiv = document.getElementById('results');
             const submitBtn = form.querySelector('button[type="submit"]');

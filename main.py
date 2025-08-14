@@ -3,7 +3,7 @@ import sys
 import requests
 import csv
 import io
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -286,7 +286,7 @@ async def index(request: Request):
     })
 
 @app.post("/process_csv")
-async def process_csv(file: UploadFile = File(...), country_code: str = "+1"): # Added country_code parameter
+async def process_csv(file: UploadFile = File(...), country_code: str = Form("+1")):
     """Process CSV file and make calls for all rows"""
     api_key = get_api_key()
 
