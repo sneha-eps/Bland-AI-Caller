@@ -417,6 +417,29 @@
             background: #4338ca;
         }
         
+        select {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 2px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 1rem;
+            background: white;
+            color: #374151;
+            transition: border-color 0.2s;
+        }
+        
+        select:focus {
+            outline: none;
+            border-color: #4f46e5;
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+        
+        select:disabled {
+            background: #f3f4f6;
+            color: #9ca3af;
+            cursor: not-allowed;
+        }
+        
         .modal {
             display: none;
             position: fixed;
@@ -587,7 +610,7 @@
                     </h3>
                     <p>Upload a CSV file with the following required columns:</p>
                     <ul>
-                        <li><code>phone_number</code> - Phone number in E.164 format (e.g., +1234567890)</li>
+                        <li><code>phone_number</code> - Phone number without country code (e.g., 1234567890)</li>
                         <li><code>patient_name</code> - Patient's full name</li>
                         <li><code>date</code> - Appointment date (YYYY-MM-DD format)</li>
                         <li><code>time</code> - Appointment time (HH:MM 24-hour format)</li>
@@ -596,12 +619,58 @@
                     
                     <strong style="margin-top: 1rem; display: block;">Sample CSV Format:</strong>
                     <code>phone_number,patient_name,date,time,provider_name
-+1234567890,John Smith,2024-01-15,14:30,Dr. Johnson
-+0987654321,Jane Doe,2024-01-16,10:00,Dr. Wilson</code>
+1234567890,John Smith,2024-01-15,14:30,Dr. Johnson
+0987654321,Jane Doe,2024-01-16,10:00,Dr. Wilson</code>
                 </div>
                 
                 <div class="form-section">
                     <form id="csvForm" enctype="multipart/form-data">
+                        <div class="form-group">
+                            <label for="countryCode">
+                                <i class="fas fa-globe"></i>
+                                Select Country Code
+                            </label>
+                            <select id="countryCode" name="country_code" required {% if not has_api_key %}disabled{% endif %}>
+                                <option value="">Choose country code...</option>
+                                <option value="+1">🇺🇸 United States (+1)</option>
+                                <option value="+1">🇨🇦 Canada (+1)</option>
+                                <option value="+91" selected>🇮🇳 India (+91)</option>
+                                <option value="+44">🇬🇧 United Kingdom (+44)</option>
+                                <option value="+61">🇦🇺 Australia (+61)</option>
+                                <option value="+81">🇯🇵 Japan (+81)</option>
+                                <option value="+49">🇩🇪 Germany (+49)</option>
+                                <option value="+33">🇫🇷 France (+33)</option>
+                                <option value="+86">🇨🇳 China (+86)</option>
+                                <option value="+55">🇧🇷 Brazil (+55)</option>
+                                <option value="+52">🇲🇽 Mexico (+52)</option>
+                                <option value="+7">🇷🇺 Russia (+7)</option>
+                                <option value="+82">🇰🇷 South Korea (+82)</option>
+                                <option value="+39">🇮🇹 Italy (+39)</option>
+                                <option value="+34">🇪🇸 Spain (+34)</option>
+                                <option value="+31">🇳🇱 Netherlands (+31)</option>
+                                <option value="+46">🇸🇪 Sweden (+46)</option>
+                                <option value="+47">🇳🇴 Norway (+47)</option>
+                                <option value="+45">🇩🇰 Denmark (+45)</option>
+                                <option value="+41">🇨🇭 Switzerland (+41)</option>
+                                <option value="+43">🇦🇹 Austria (+43)</option>
+                                <option value="+32">🇧🇪 Belgium (+32)</option>
+                                <option value="+48">🇵🇱 Poland (+48)</option>
+                                <option value="+351">🇵🇹 Portugal (+351)</option>
+                                <option value="+30">🇬🇷 Greece (+30)</option>
+                                <option value="+90">🇹🇷 Turkey (+90)</option>
+                                <option value="+27">🇿🇦 South Africa (+27)</option>
+                                <option value="+20">🇪🇬 Egypt (+20)</option>
+                                <option value="+971">🇦🇪 UAE (+971)</option>
+                                <option value="+966">🇸🇦 Saudi Arabia (+966)</option>
+                                <option value="+65">🇸🇬 Singapore (+65)</option>
+                                <option value="+60">🇲🇾 Malaysia (+60)</option>
+                                <option value="+66">🇹🇭 Thailand (+66)</option>
+                                <option value="+84">🇻🇳 Vietnam (+84)</option>
+                                <option value="+63">🇵🇭 Philippines (+63)</option>
+                                <option value="+62">🇮🇩 Indonesia (+62)</option>
+                            </select>
+                        </div>
+                        
                         <div class="form-group">
                             <label for="csvFile">
                                 <i class="fas fa-cloud-upload-alt"></i>
@@ -715,6 +784,12 @@
             
             const form = e.target;
             const formData = new FormData(form);
+            const countryCode = document.getElementById('countryCode').value;
+            
+            if (!countryCode) {
+                alert('Please select a country code');
+                return;
+            }
             const loadingDiv = document.getElementById('loading');
             const resultsDiv = document.getElementById('results');
             const submitBtn = form.querySelector('button[type="submit"]');

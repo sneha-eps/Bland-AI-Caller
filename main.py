@@ -8,7 +8,8 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from typing import Optional
-import importlib.util
+import importlib
+import re # Import the re module for regular expressions
 
 # Check if 'blandai' package is available (optional since we're using requests directly)
 try:
@@ -94,7 +95,7 @@ IF YOU FIND ANY OF THESE WORDS:
 ONLY if NO cancellation words exist, then classify the response:
 
 A) CONFIRM — Explicit "yes" with no conditions or uncertainty
-B) CANNOT ATTEND — Clear refusal (e.g., "I can't make it", "I won't be available")  
+B) CANNOT ATTEND — Clear refusal (e.g., "I can't make it", "I won't be available")
 C) UNSURE — Conditional, tentative, or ambiguous responses
 D) OFF-TOPIC — Does not address the appointment question
 E) RESCHEDULE — Explicit request to reschedule
@@ -166,7 +167,15 @@ class CallResult(BaseModel):
     patient_name: str
     phone_number: str
 
-def make_single_call(call_request: CallRequest, api_key: str) -> CallResult:
+def format_phone_number(phone_number: str, country_code: str) -> str:
+    """Format phone number with the selected country code"""
+    # Remove all non-digit characters
+    cleaned = re.sub(r'[^\d]', '', phone_number.strip())
+
+    # Add the selected country code
+    return f"{country_code}{cleaned}"
+
+def make_single_call(call_request: CallRequest, api_key: str, country_code: str) -> CallResult:
     """Make a single call and return the result"""
     call_data = {
         "patient name": call_request.patient_name,
@@ -239,7 +248,7 @@ async def index(request: Request):
     })
 
 @app.post("/process_csv")
-async def process_csv(file: UploadFile = File(...)):
+async def process_csv(file: UploadFile = File(...), country_code: str = "+1"): # Added country_code parameter
     """Process CSV file and make calls for all rows"""
     api_key = get_api_key()
 
@@ -279,9 +288,12 @@ async def process_csv(file: UploadFile = File(...)):
                 ))
                 continue
 
+            # Format phone number with selected country code
+            formatted_phone = format_phone_number(row['phone_number'].strip(), country_code)
+
             # Create call request
             call_request = CallRequest(
-                phone_number=row['phone_number'].strip(),
+                phone_number=formatted_phone,
                 patient_name=row['patient_name'].strip(),
                 provider_name=row['provider_name'].strip(),
                 appointment_date=row['date'].strip(),
@@ -289,7 +301,7 @@ async def process_csv(file: UploadFile = File(...)):
             )
 
             # Make the call
-            result = make_single_call(call_request, api_key)
+            result = make_single_call(call_request, api_key, country_code)
             results.append(result)
 
         # Calculate summary
