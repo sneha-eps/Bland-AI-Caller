@@ -196,7 +196,7 @@ def make_single_call(call_request: CallRequest, api_key: str) -> CallResult:
         }
 
         print(f"🔄 Initiating call to {call_request.phone_number} for {call_request.patient_name}")
-        print(f"📞 API Payload: {payload}")
+        print(f"📞 API Payload keys: {list(payload.keys())}")  # Don't log full payload for security
 
         response = requests.post(
             "https://api.bland.ai/v1/calls",
@@ -205,7 +205,7 @@ def make_single_call(call_request: CallRequest, api_key: str) -> CallResult:
                 "Content-Type": "application/json"
             },
             json=payload,
-            timeout=30
+            timeout=60  # Increased timeout
         )
 
         print(f"📊 API Response Status: {response.status_code}")
@@ -213,20 +213,41 @@ def make_single_call(call_request: CallRequest, api_key: str) -> CallResult:
 
         if response.status_code == 200:
             resp_json = response.json()
-            print(f"✅ Call initiated successfully: {resp_json}")
+            print(f"✅ Call initiated successfully for {call_request.patient_name}")
             return CallResult(
                 success=True,
                 call_id=resp_json.get("call_id", "N/A"),
                 status=resp_json.get("status", "N/A"),
-                message=resp_json.get("message", "N/A"),
+                message=resp_json.get("message", "Call initiated successfully"),
+                patient_name=call_request.patient_name,
+                phone_number=call_request.phone_number
+            )
+        elif response.status_code == 429:
+            print(f"⏳ Rate limit hit for {call_request.patient_name}, waiting 5 seconds...")
+            time.sleep(5)
+            return CallResult(
+                success=False,
+                error=f"Rate limit exceeded - please try again later",
                 patient_name=call_request.patient_name,
                 phone_number=call_request.phone_number
             )
         else:
-            print(f"❌ API Error: Status {response.status_code}, Response: {response.text}")
+            error_msg = f"API error (Status {response.status_code})"
+            try:
+                error_json = response.json()
+                if 'message' in error_json:
+                    error_msg += f": {error_json['message']}"
+                elif 'detail' in error_json:
+                    error_msg += f": {error_json['detail']}"
+                else:
+                    error_msg += f": {response.text}"
+            except:
+                error_msg += f": {response.text}"
+            
+            print(f"❌ API Error for {call_request.patient_name}: {error_msg}")
             return CallResult(
                 success=False,
-                error=f"API error (Status {response.status_code}): {response.text}",
+                error=error_msg,
                 patient_name=call_request.patient_name,
                 phone_number=call_request.phone_number
             )
@@ -346,10 +367,14 @@ async def process_csv(file: UploadFile = File(...), country_code: str = Form("+1
             result = make_single_call(call_request, api_key)
             results.append(result)
             
-            # Add 1-second delay between calls to prevent rate limiting (except for the last call)
-            if row_count > 1 and result.success:
-                print(f"⏱️ Waiting 1 second before next call...")
-                time.sleep(1)
+            # Add 2-second delay between calls to prevent rate limiting (except for the last call)
+            # Always add delay regardless of success/failure, and check if there are more rows
+            csv_file_copy = io.StringIO(csv_string)
+            total_rows = sum(1 for _ in csv.DictReader(csv_file_copy))
+            
+            if row_count < total_rows:
+                print(f"⏱️ Waiting 2 seconds before next call... (Call {row_count}/{total_rows})")
+                time.sleep(2)
 
         # Calculate summary
         successful_calls = sum(1 for r in results if r.success)
