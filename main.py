@@ -82,6 +82,8 @@ def get_call_prompt(clinic_address: str = "",
     DELIVERY RULES
     • Speak naturally like a real person having a conversation - don't sound like you're reading a script
     • When giving contact info, say it normally - don't over-pronounce each letter/digit
+    • Convert 24-hour time to natural 12-hour format: "15:00" becomes "3 PM", "09:30" becomes "9:30 AM", etc.
+    • Say times naturally like a person would: "3 PM" not "fifteen hundred", "9:30 AM" not "oh nine thirty"
     • Be helpful and friendly, but keep it casual and conversational
     • If someone says "hi" or "hello" during the call, just acknowledge it warmly and keep going
     • Sound genuinely interested in helping, not mechanical
