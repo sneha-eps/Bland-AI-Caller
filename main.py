@@ -12,21 +12,28 @@ from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from typing import Optional, List
 import importlib
-import re # Import the re module for regular expressions
+import importlib.util
+import re  # Import the re module for regular expressions
 
 # Check if 'blandai' package is available (optional since we're using requests directly)
 try:
     if importlib.util.find_spec("blandai") is not None:
         print("✅ blandai library is available")
     else:
-        print("⚠️ blandai library not found, but continuing with direct API calls")
+        print(
+            "⚠️ blandai library not found, but continuing with direct API calls"
+        )
 except ImportError:
-    print("⚠️ blandai library check failed, but continuing with direct API calls")
+    print(
+        "⚠️ blandai library check failed, but continuing with direct API calls"
+    )
 
-app = FastAPI(title="Bland AI Call Center", description="Make automated calls using Bland AI")
+app = FastAPI(title="Bland AI Call Center",
+              description="Make automated calls using Bland AI")
 templates = Jinja2Templates(directory="templates")
 
 # --- Configuration ---
+
 
 def get_api_key():
     """Retrieve the API key from Replit Secrets"""
@@ -35,20 +42,25 @@ def get_api_key():
     except KeyError:
         return None
 
-VOICE_MAP = {
-        "male_professional": "61507da3-4abd-49b6-983f-9ce659fd9e91",
-        "female_professional": "70f05206-71ab-4b39-b238-ed1bf17b365a",
-        "female_warm": "2f9fdbc7-4bf2-4792-8a18-21ce3c93978f",
-        "female_clear": "17e8f694-d230-4b64-b040-6108088d9e6c",
-        "female_friendly": "bbeabae6-ec8d-444f-92ad-c8e620d3de8d",
-        "male_casual": "a3d43393-dacb-43d3-91d7-b4cb913a5908",
-        "male_warm": "90295ec4-f0fe-4783-ab33-8b997ddc3ae4",
-        "male_clear": "37b3f1c8-a01e-4d70-b251-294733f08371"
-    }
 
-def get_voice_id(name = "female_professional") -> str:
+VOICE_MAP = {
+    "male_professional": "61507da3-4abd-49b6-983f-9ce659fd9e91",
+    "female_professional": "70f05206-71ab-4b39-b238-ed1bf17b365a",
+    "female_warm": "2f9fdbc7-4bf2-4792-8a18-21ce3c93978f",
+    "female_clear": "17e8f694-d230-4b64-b040-6108088d9e6c",
+    "female_friendly": "bbeabae6-ec8d-444f-92ad-c8e620d3de8d",
+    "male_casual": "a3d43393-dacb-43d3-91d7-b4cb913a5908",
+    "male_warm": "90295ec4-f0fe-4783-ab33-8b997ddc3ae4",
+    "male_clear": "37b3f1c8-a01e-4d70-b251-294733f08371"
+}
+
+
+def get_voice_id(name="female_professional") -> str:
     """Get the voice ID for the given voice name"""
-    return VOICE_MAP.get(name, VOICE_MAP["female_professional"])  # Default to female_professional
+    return VOICE_MAP.get(
+        name,
+        VOICE_MAP["female_professional"])  # Default to female_professional
+
 
 def get_call_prompt():
     """Return the call prompt"""
@@ -152,6 +164,7 @@ NATURAL CALL ENDING PROCESS:
 
 REMEMBER: Maintain natural conversation flow with appropriate pauses. Let patients naturally end with acknowledgments while ensuring calls don't continue indefinitely."""
 
+
 class CallRequest(BaseModel):
     phone_number: str
     patient_name: str
@@ -159,16 +172,19 @@ class CallRequest(BaseModel):
     appointment_date: str
     appointment_time: str
 
+
 class CallResult(BaseModel):
     success: bool
     call_id: Optional[str] = None
     status: Optional[str] = None
-    call_status: Optional[str] = None  # confirmed, rescheduled, cancelled, voicemail, busy
+    call_status: Optional[
+        str] = None  # confirmed, rescheduled, cancelled, voicemail, busy
     transcript: Optional[str] = None
     message: Optional[str] = None
     error: Optional[str] = None
     patient_name: str
     phone_number: str
+
 
 def format_phone_number(phone_number: str, country_code: str) -> str:
     """Format phone number with the selected country code"""
@@ -178,7 +194,9 @@ def format_phone_number(phone_number: str, country_code: str) -> str:
     # Add the selected country code
     return f"{country_code}{cleaned}"
 
-async def make_single_call_async(call_request: CallRequest, api_key: str, semaphore: asyncio.Semaphore) -> CallResult:
+
+async def make_single_call_async(call_request: CallRequest, api_key: str,
+                                 semaphore: asyncio.Semaphore) -> CallResult:
     """Make a single call asynchronously with concurrency control"""
     async with semaphore:  # Limit concurrent calls to 10
         call_data = {
@@ -189,7 +207,8 @@ async def make_single_call_async(call_request: CallRequest, api_key: str, semaph
         }
 
         try:
-            selected_voice = VOICE_MAP.get("female_professional", "default_voice_id")
+            selected_voice = VOICE_MAP.get("female_professional",
+                                           "default_voice_id")
 
             payload = {
                 "phone_number": call_request.phone_number,
@@ -198,43 +217,49 @@ async def make_single_call_async(call_request: CallRequest, api_key: str, semaph
                 "request_data": call_data
             }
 
-            print(f"🔄 Initiating call to {call_request.phone_number} for {call_request.patient_name}")
-            print(f"📞 API Payload keys: {list(payload.keys())}")  # Don't log full payload for security
+            print(
+                f"🔄 Initiating call to {call_request.phone_number} for {call_request.patient_name}"
+            )
+            print(f"📞 API Payload keys: {list(payload.keys())}"
+                  )  # Don't log full payload for security
 
             async with aiohttp.ClientSession() as session:
                 async with session.post(
-                    "https://api.bland.ai/v1/calls",
-                    headers={
-                        "Authorization": f"Bearer {api_key}",
-                        "Content-Type": "application/json"
-                    },
-                    json=payload,
-                    timeout=aiohttp.ClientTimeout(total=60)
-                ) as response:
-                    
+                        "https://api.bland.ai/v1/calls",
+                        headers={
+                            "Authorization": f"Bearer {api_key}",
+                            "Content-Type": "application/json"
+                        },
+                        json=payload,
+                        timeout=aiohttp.ClientTimeout(total=60)) as response:
+
                     response_text = await response.text()
                     print(f"📊 API Response Status: {response.status}")
                     print(f"📄 API Response: {response_text}")
 
                     if response.status == 200:
                         resp_json = await response.json()
-                        print(f"✅ Call initiated successfully for {call_request.patient_name}")
+                        print(
+                            f"✅ Call initiated successfully for {call_request.patient_name}"
+                        )
                         return CallResult(
                             success=True,
                             call_id=resp_json.get("call_id", "N/A"),
                             status=resp_json.get("status", "N/A"),
-                            message=resp_json.get("message", "Call successfully queued."),
+                            message=resp_json.get("message",
+                                                  "Call successfully queued."),
                             patient_name=call_request.patient_name,
-                            phone_number=call_request.phone_number
-                        )
+                            phone_number=call_request.phone_number)
                     elif response.status == 429:
-                        print(f"⏳ Rate limit hit for {call_request.patient_name}")
+                        print(
+                            f"⏳ Rate limit hit for {call_request.patient_name}"
+                        )
                         return CallResult(
                             success=False,
-                            error="Rate limit exceeded - please try again later",
+                            error=
+                            "Rate limit exceeded - please try again later",
                             patient_name=call_request.patient_name,
-                            phone_number=call_request.phone_number
-                        )
+                            phone_number=call_request.phone_number)
                     else:
                         error_msg = f"API error (Status {response.status})"
                         try:
@@ -247,22 +272,22 @@ async def make_single_call_async(call_request: CallRequest, api_key: str, semaph
                                 error_msg += f": {response_text}"
                         except:
                             error_msg += f": {response_text}"
-                        
-                        print(f"❌ API Error for {call_request.patient_name}: {error_msg}")
+
+                        print(
+                            f"❌ API Error for {call_request.patient_name}: {error_msg}"
+                        )
                         return CallResult(
                             success=False,
                             error=error_msg,
                             patient_name=call_request.patient_name,
-                            phone_number=call_request.phone_number
-                        )
+                            phone_number=call_request.phone_number)
         except Exception as e:
             print(f"💥 Exception during call initiation: {str(e)}")
-            return CallResult(
-                success=False,
-                error=str(e),
-                patient_name=call_request.patient_name,
-                phone_number=call_request.phone_number
-            )
+            return CallResult(success=False,
+                              error=str(e),
+                              patient_name=call_request.patient_name,
+                              phone_number=call_request.phone_number)
+
 
 def make_single_call(call_request: CallRequest, api_key: str) -> CallResult:
     """Make a single call and return the result"""
@@ -274,7 +299,8 @@ def make_single_call(call_request: CallRequest, api_key: str) -> CallResult:
     }
 
     try:
-        selected_voice = VOICE_MAP.get("female_professional", "default_voice_id")
+        selected_voice = VOICE_MAP.get("female_professional",
+                                       "default_voice_id")
 
         payload = {
             "phone_number": call_request.phone_number,
@@ -283,8 +309,11 @@ def make_single_call(call_request: CallRequest, api_key: str) -> CallResult:
             "request_data": call_data
         }
 
-        print(f"🔄 Initiating call to {call_request.phone_number} for {call_request.patient_name}")
-        print(f"📞 API Payload keys: {list(payload.keys())}")  # Don't log full payload for security
+        print(
+            f"🔄 Initiating call to {call_request.phone_number} for {call_request.patient_name}"
+        )
+        print(f"📞 API Payload keys: {list(payload.keys())}"
+              )  # Don't log full payload for security
 
         response = requests.post(
             "https://api.bland.ai/v1/calls",
@@ -301,24 +330,26 @@ def make_single_call(call_request: CallRequest, api_key: str) -> CallResult:
 
         if response.status_code == 200:
             resp_json = response.json()
-            print(f"✅ Call initiated successfully for {call_request.patient_name}")
-            return CallResult(
-                success=True,
-                call_id=resp_json.get("call_id", "N/A"),
-                status=resp_json.get("status", "N/A"),
-                message=resp_json.get("message", "Call initiated successfully"),
-                patient_name=call_request.patient_name,
-                phone_number=call_request.phone_number
+            print(
+                f"✅ Call initiated successfully for {call_request.patient_name}"
             )
+            return CallResult(success=True,
+                              call_id=resp_json.get("call_id", "N/A"),
+                              status=resp_json.get("status", "N/A"),
+                              message=resp_json.get(
+                                  "message", "Call initiated successfully"),
+                              patient_name=call_request.patient_name,
+                              phone_number=call_request.phone_number)
         elif response.status_code == 429:
-            print(f"⏳ Rate limit hit for {call_request.patient_name}, waiting 5 seconds...")
+            print(
+                f"⏳ Rate limit hit for {call_request.patient_name}, waiting 5 seconds..."
+            )
             time.sleep(5)
             return CallResult(
                 success=False,
                 error=f"Rate limit exceeded - please try again later",
                 patient_name=call_request.patient_name,
-                phone_number=call_request.phone_number
-            )
+                phone_number=call_request.phone_number)
         else:
             error_msg = f"API error (Status {response.status_code})"
             try:
@@ -331,45 +362,45 @@ def make_single_call(call_request: CallRequest, api_key: str) -> CallResult:
                     error_msg += f": {response.text}"
             except:
                 error_msg += f": {response.text}"
-            
+
             print(f"❌ API Error for {call_request.patient_name}: {error_msg}")
-            return CallResult(
-                success=False,
-                error=error_msg,
-                patient_name=call_request.patient_name,
-                phone_number=call_request.phone_number
-            )
+            return CallResult(success=False,
+                              error=error_msg,
+                              patient_name=call_request.patient_name,
+                              phone_number=call_request.phone_number)
     except Exception as e:
         print(f"💥 Exception during call initiation: {str(e)}")
-        return CallResult(
-            success=False,
-            error=str(e),
-            patient_name=call_request.patient_name,
-            phone_number=call_request.phone_number
-        )
+        return CallResult(success=False,
+                          error=str(e),
+                          patient_name=call_request.patient_name,
+                          phone_number=call_request.phone_number)
+
 
 @app.post("/make-call")
 async def make_call(call_request: CallRequest, country_code: str = "+1"):
     """Make a single call"""
     api_key = get_api_key()
-    
+
     if not api_key:
         raise HTTPException(
             status_code=400,
-            detail="BLAND_API_KEY not found in Secrets. Please add your API key."
-        )
-    
+            detail=
+            "BLAND_API_KEY not found in Secrets. Please add your API key.")
+
     try:
         # Format phone number with country code
-        formatted_phone = format_phone_number(call_request.phone_number, country_code)
-        print(f"📞 Original: {call_request.phone_number} -> Formatted: {formatted_phone} (Country Code: {country_code})")
-        
+        formatted_phone = format_phone_number(call_request.phone_number,
+                                              country_code)
+        print(
+            f"📞 Original: {call_request.phone_number} -> Formatted: {formatted_phone} (Country Code: {country_code})"
+        )
+
         # Update the call request with formatted phone number
         call_request.phone_number = formatted_phone
-        
+
         # Make the call
         result = make_single_call(call_request, api_key)
-        
+
         return {
             "success": result.success,
             "call_id": result.call_id,
@@ -379,12 +410,11 @@ async def make_call(call_request: CallRequest, country_code: str = "+1"):
             "patient_name": result.patient_name,
             "phone_number": result.phone_number
         }
-        
+
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error making call: {str(e)}"
-        )
+        raise HTTPException(status_code=500,
+                            detail=f"Error making call: {str(e)}")
+
 
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
@@ -395,23 +425,23 @@ async def index(request: Request):
         "has_api_key": bool(api_key)
     })
 
+
 @app.post("/process_csv")
-async def process_csv(file: UploadFile = File(...), country_code: str = Form("+1")):
+async def process_csv(file: UploadFile = File(...),
+                      country_code: str = Form("+1")):
     """Process CSV file and make calls for all rows"""
     api_key = get_api_key()
 
     if not api_key:
         raise HTTPException(
             status_code=400,
-            detail="BLAND_API_KEY not found in Secrets. Please add your API key."
-        )
+            detail=
+            "BLAND_API_KEY not found in Secrets. Please add your API key.")
 
     # Check if file is CSV
     if not file.filename or not file.filename.endswith('.csv'):
-        raise HTTPException(
-            status_code=400,
-            detail="Please upload a CSV file."
-        )
+        raise HTTPException(status_code=400,
+                            detail="Please upload a CSV file.")
 
     try:
         # Read CSV content
@@ -427,21 +457,30 @@ async def process_csv(file: UploadFile = File(...), country_code: str = Form("+1
         for row in csv_reader:
             row_count += 1
             # Validate required fields
-            required_fields = ['phone_number', 'patient_name', 'date', 'time', 'provider_name']
-            missing_fields = [field for field in required_fields if not row.get(field, '').strip()]
+            required_fields = [
+                'phone_number', 'patient_name', 'date', 'time', 'provider_name'
+            ]
+            missing_fields = [
+                field for field in required_fields
+                if not row.get(field, '').strip()
+            ]
 
             if missing_fields:
-                results.append(CallResult(
-                    success=False,
-                    error=f"Missing required fields: {', '.join(missing_fields)}",
-                    patient_name=row.get('patient_name', 'Unknown'),
-                    phone_number=row.get('phone_number', 'Unknown')
-                ))
+                results.append(
+                    CallResult(
+                        success=False,
+                        error=
+                        f"Missing required fields: {', '.join(missing_fields)}",
+                        patient_name=row.get('patient_name', 'Unknown'),
+                        phone_number=row.get('phone_number', 'Unknown')))
                 continue
 
             # Format phone number with selected country code
-            formatted_phone = format_phone_number(row['phone_number'].strip(), country_code)
-            print(f"📞 CSV Row: {row['phone_number'].strip()} -> Formatted: {formatted_phone} (Country Code: {country_code})")
+            formatted_phone = format_phone_number(row['phone_number'].strip(),
+                                                  country_code)
+            print(
+                f"📞 CSV Row: {row['phone_number'].strip()} -> Formatted: {formatted_phone} (Country Code: {country_code})"
+            )
 
             # Create call request
             call_request = CallRequest(
@@ -449,23 +488,24 @@ async def process_csv(file: UploadFile = File(...), country_code: str = Form("+1
                 patient_name=row['patient_name'].strip(),
                 provider_name=row['provider_name'].strip(),
                 appointment_date=row['date'].strip(),
-                appointment_time=row['time'].strip()
-            )
+                appointment_time=row['time'].strip())
             call_requests.append(call_request)
 
         # Process all valid calls concurrently (max 10 at a time)
         if call_requests:
-            print(f"🚀 Processing {len(call_requests)} calls concurrently (max 10 simultaneous)")
-            
+            print(
+                f"🚀 Processing {len(call_requests)} calls concurrently (max 10 simultaneous)"
+            )
+
             # Create semaphore to limit concurrent calls to 10
             semaphore = asyncio.Semaphore(10)
-            
+
             # Create tasks for all calls
             tasks = [
-                make_single_call_async(call_request, api_key, semaphore) 
+                make_single_call_async(call_request, api_key, semaphore)
                 for call_request in call_requests
             ]
-            
+
             # Run all tasks concurrently
             concurrent_results = await asyncio.gather(*tasks)
             results.extend(concurrent_results)
@@ -483,10 +523,9 @@ async def process_csv(file: UploadFile = File(...), country_code: str = Form("+1
         }
 
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error processing CSV: {str(e)}"
-        )
+        raise HTTPException(status_code=500,
+                            detail=f"Error processing CSV: {str(e)}")
+
 
 @app.get("/call_details/{call_id}")
 async def get_call_details(call_id: str):
@@ -494,18 +533,14 @@ async def get_call_details(call_id: str):
     api_key = get_api_key()
 
     if not api_key:
-        raise HTTPException(
-            status_code=400,
-            detail="BLAND_API_KEY not found in Secrets."
-        )
+        raise HTTPException(status_code=400,
+                            detail="BLAND_API_KEY not found in Secrets.")
 
     try:
-        response = requests.get(
-            f"https://api.bland.ai/v1/calls/{call_id}",
-            headers={
-                "Authorization": f"Bearer {api_key}",
-            }
-        )
+        response = requests.get(f"https://api.bland.ai/v1/calls/{call_id}",
+                                headers={
+                                    "Authorization": f"Bearer {api_key}",
+                                })
 
         if response.status_code == 200:
             call_data = response.json()
@@ -516,15 +551,19 @@ async def get_call_details(call_id: str):
 
             if transcript:
                 transcript_lower = transcript.lower()
-                if any(word in transcript_lower for word in ["confirm", "yes", "see you then", "i'll be there"]):
+                if any(word in transcript_lower for word in
+                       ["confirm", "yes", "see you then", "i'll be there"]):
                     call_status = "confirmed"
-                elif any(word in transcript_lower for word in ["reschedule", "different time", "change"]):
+                elif any(word in transcript_lower for word in
+                         ["reschedule", "different time", "change"]):
                     call_status = "rescheduled"
-                elif any(word in transcript_lower for word in ["cancel", "can't make it", "won't be available"]):
+                elif any(word in transcript_lower for word in
+                         ["cancel", "can't make it", "won't be available"]):
                     call_status = "cancelled"
                 elif "voicemail" in transcript_lower or "leave a message" in transcript_lower:
                     call_status = "voicemail"
-                elif any(word in transcript_lower for word in ["busy", "hang up", "ended call"]):
+                elif any(word in transcript_lower
+                         for word in ["busy", "hang up", "ended call"]):
                     call_status = "busy"
 
             return {
@@ -539,18 +578,17 @@ async def get_call_details(call_id: str):
         else:
             raise HTTPException(
                 status_code=response.status_code,
-                detail=f"Failed to get call details: {response.text}"
-            )
+                detail=f"Failed to get call details: {response.text}")
     except Exception as e:
-        raise HTTPException(
-            status_code=500,
-            detail=f"Error fetching call details: {str(e)}"
-        )
+        raise HTTPException(status_code=500,
+                            detail=f"Error fetching call details: {str(e)}")
+
 
 @app.get("/docs")
 async def get_docs():
     """Access FastAPI automatic documentation"""
     return {"message": "Visit /docs for interactive API documentation"}
+
 
 if __name__ == "__main__":
     import uvicorn
