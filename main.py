@@ -464,12 +464,12 @@ async def dashboard(request: Request):
     """Dashboard showing key metrics"""
     api_key = get_api_key()
     # In a real application, you would fetch these metrics from a database
-    # For now, we'll use placeholder data
+    # For now, we'll show zeros since no campaigns have been created yet
     metrics = {
-        "total_clients": 1247,
-        "total_campaigns": 34,
-        "total_calls": 8563,
-        "total_duration": "142h 35m"  # This would be calculated from actual call data
+        "total_clients": 0,
+        "total_campaigns": 0,
+        "total_calls": 0,
+        "total_duration": "0h 0m"  # This would be calculated from actual call data
     }
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
