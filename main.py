@@ -62,7 +62,11 @@ def get_voice_id(name="female_professional") -> str:
         VOICE_MAP["female_professional"])  # Default to female_professional
 
 
-def get_call_prompt(clinic_address: str = ""):
+def get_call_prompt(clinic_address: str = "",
+                    patient_name: str = "[patient name]",
+                    appointment_date: str = "[date]",
+                    appointment_time: str = "[time]",
+                    provider_name: str = "[provider name]"):
     """Return the call prompt"""
     return f"""
 ROLE & PERSONA
@@ -86,16 +90,16 @@ DELIVERY RULES
 CONVERSATION FLOW (STRICT ORDER)
 1) OPENING
    DO NOT speak immediately when call connects. Wait for the person to answer with "hello" or similar greeting first.
-   Only after they speak, say exactly: "Hi, I'm calling from [clinic name]. Am I speaking with {{patient name}}?"
+   Only after they speak, say exactly: "Hi, I'm calling from [clinic name]. Am I speaking with {patient_name}?"
    Then stop and wait.
 
 2) IDENTITY CHECK
-   • If response indicates wrong person/number: ask, "Just to confirm, may I please speak with {{patient name}}?" Wait.
+   • If response indicates wrong person/number: ask, "Just to confirm, may I please speak with {patient_name}?" Wait.
      – If again wrong/unavailable: say, "My apologies for the confusion. Thank you for your time, and have a good day." End the call.
    • If identity confirmed: proceed.
 
 3) APPOINTMENT CONFIRMATION QUESTION
-   Say: "Perfect! The reason for my call is to confirm your upcoming appointment on [date] at [time] with [provider name] at our [office location]. Will you be able to make it to your appointment?"
+   Say: "Perfect! The reason for my call is to confirm your upcoming appointment on {appointment_date} at {appointment_time} with {provider_name} at our [office location]. Will you be able to make it to your appointment?"
    Then stop and wait.
 
 ⚠️ CRITICAL CANCELLATION RULE ⚠️
@@ -213,7 +217,13 @@ async def make_single_call_async(call_request: CallRequest, api_key: str,
 
             payload = {
                 "phone_number": call_request.phone_number,
-                "task": get_call_prompt(call_request.clinic_address or ""),
+                "task": get_call_prompt(
+                    clinic_address=call_request.clinic_address or "",
+                    patient_name=call_request.patient_name,
+                    appointment_date=call_request.appointment_date,
+                    appointment_time=call_request.appointment_time,
+                    provider_name=call_request.provider_name
+                ),
                 "voice": selected_voice,
                 "request_data": call_data
             }
@@ -305,7 +315,13 @@ def make_single_call(call_request: CallRequest, api_key: str) -> CallResult:
 
         payload = {
             "phone_number": call_request.phone_number,
-            "task": get_call_prompt(call_request.clinic_address or ""),
+            "task": get_call_prompt(
+                clinic_address=call_request.clinic_address or "",
+                patient_name=call_request.patient_name,
+                appointment_date=call_request.appointment_date,
+                appointment_time=call_request.appointment_time,
+                provider_name=call_request.provider_name
+            ),
             "voice": selected_voice,
             "request_data": call_data
         }
