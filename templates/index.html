@@ -131,15 +131,73 @@
         
         .csv-format {
             background: linear-gradient(45deg, #f8fafc, #f1f5f9);
-            padding: 1.5rem;
-            border-radius: 12px;
+            padding: 2rem;
+            border-radius: 16px;
             margin-bottom: 2rem;
             border-left: 4px solid #4f46e5;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
         }
         
         .csv-format h3 {
             color: #4f46e5;
-            font-size: 1.25rem;
+            font-size: 1.375rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .format-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+        
+        .format-item {
+            background: white;
+            padding: 1rem;
+            border-radius: 10px;
+            border: 1px solid #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+        }
+        
+        .format-item:hover {
+            border-color: #4f46e5;
+            box-shadow: 0 2px 8px rgba(79, 70, 229, 0.1);
+        }
+        
+        .format-label {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-weight: 600;
+            color: #4f46e5;
+            font-size: 0.875rem;
+            background: #eff6ff;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        
+        .format-desc {
+            color: #64748b;
+            font-size: 0.875rem;
+            line-height: 1.4;
+        }
+        
+        .sample-section {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid #e2e8f0;
+        }
+        
+        .sample-section h4 {
+            color: #374151;
+            font-size: 1rem;
             font-weight: 600;
             margin-bottom: 1rem;
             display: flex;
@@ -147,35 +205,17 @@
             gap: 8px;
         }
         
-        .csv-format ul {
-            list-style: none;
-            padding-left: 0;
-        }
-        
-        .csv-format li {
-            padding: 0.5rem 0;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .csv-format li::before {
-            content: "✓";
-            color: #10b981;
-            font-weight: bold;
-        }
-        
         .csv-format code {
             background: #1e293b;
             color: #e2e8f0;
-            padding: 1rem;
+            padding: 1.25rem;
             border-radius: 8px;
             font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
             font-size: 0.875rem;
-            line-height: 1.4;
+            line-height: 1.5;
             display: block;
-            margin-top: 1rem;
             overflow-x: auto;
+            border: 1px solid #334155;
         }
         
         .form-section {
@@ -606,21 +646,39 @@
                 <div class="csv-format">
                     <h3>
                         <i class="fas fa-file-csv"></i>
-                        CSV File Format Requirements
+                        CSV Format Requirements
                     </h3>
-                    <p>Upload a CSV file with the following required columns:</p>
-                    <ul>
-                        <li><code>phone_number</code> - Phone number without country code (e.g., 1234567890)</li>
-                        <li><code>patient_name</code> - Patient's full name</li>
-                        <li><code>date</code> - Appointment date (YYYY-MM-DD format)</li>
-                        <li><code>time</code> - Appointment time (HH:MM 24-hour format)</li>
-                        <li><code>provider_name</code> - Doctor or provider name</li>
-                    </ul>
+                    <p style="margin-bottom: 1.5rem; color: #64748b;">Ensure your CSV file contains these required columns in the exact format shown below:</p>
                     
-                    <strong style="margin-top: 1rem; display: block;">Sample CSV Format:</strong>
-                    <code>phone_number,patient_name,date,time,provider_name
+                    <div class="format-grid">
+                        <div class="format-item">
+                            <span class="format-label">phone_number</span>
+                            <span class="format-desc">Digits only (e.g., 1234567890)</span>
+                        </div>
+                        <div class="format-item">
+                            <span class="format-label">patient_name</span>
+                            <span class="format-desc">Full name (e.g., John Smith)</span>
+                        </div>
+                        <div class="format-item">
+                            <span class="format-label">date</span>
+                            <span class="format-desc">YYYY-MM-DD format</span>
+                        </div>
+                        <div class="format-item">
+                            <span class="format-label">time</span>
+                            <span class="format-desc">24-hour format (HH:MM)</span>
+                        </div>
+                        <div class="format-item">
+                            <span class="format-label">provider_name</span>
+                            <span class="format-desc">Doctor/provider name</span>
+                        </div>
+                    </div>
+                    
+                    <div class="sample-section">
+                        <h4><i class="fas fa-eye"></i> Sample CSV</h4>
+                        <code>phone_number,patient_name,date,time,provider_name
 1234567890,John Smith,2024-01-15,14:30,Dr. Johnson
 0987654321,Jane Doe,2024-01-16,10:00,Dr. Wilson</code>
+                    </div>
                 </div>
                 
                 <div class="form-section">
