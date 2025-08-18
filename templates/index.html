@@ -626,6 +626,14 @@
                 <div class="form-section">
                     <form id="csvForm" enctype="multipart/form-data">
                         <div class="form-group">
+                            <label for="clinicAddress">
+                                <i class="fas fa-map-marker-alt"></i>
+                                Clinic Address
+                            </label>
+                            <input type="text" id="clinicAddress" name="clinic_address" placeholder="Enter your clinic's full address" required {% if not has_api_key %}disabled{% endif %} style="width: 100%; padding: 0.75rem 1rem; border: 2px solid #d1d5db; border-radius: 8px; font-size: 1rem; background: white; color: #374151; transition: border-color 0.2s;">
+                        </div>
+                        
+                        <div class="form-group">
                             <label for="countryCode">
                                 <i class="fas fa-globe"></i>
                                 Select Country Code
@@ -785,14 +793,21 @@
             const form = e.target;
             const formData = new FormData(form);
             const countryCode = document.getElementById('countryCode').value;
+            const clinicAddress = document.getElementById('clinicAddress').value;
             
             if (!countryCode) {
                 alert('Please select a country code');
                 return;
             }
             
-            // Add country code to form data
+            if (!clinicAddress.trim()) {
+                alert('Please enter your clinic address');
+                return;
+            }
+            
+            // Add country code and clinic address to form data
             formData.append('country_code', countryCode);
+            formData.append('clinic_address', clinicAddress);
             
             const loadingDiv = document.getElementById('loading');
             const resultsDiv = document.getElementById('results');

@@ -62,9 +62,9 @@ def get_voice_id(name="female_professional") -> str:
         VOICE_MAP["female_professional"])  # Default to female_professional
 
 
-def get_call_prompt():
+def get_call_prompt(clinic_address: str = ""):
     """Return the call prompt"""
-    return """
+    return f"""
 ROLE & PERSONA
 You are an AI voice agent calling from [clinic name]. You are professional, polite, and empathetic. Speak in complete, natural sentences and combine related thoughts smoothly. Always wait for the patient's full response before continuing or ending the call. Do not skip or reorder steps.
 
@@ -73,7 +73,7 @@ CLINIC DETAILS (USE AS-IS WHEN NEEDED)
 • Phone: 2 1 0 7 4 2 6 5 5 5
 • Email: live oak office @ hill side primary care dot com
 • Hours: 8 a.m. to 5 p.m., Monday to Friday
-• Address: [address]
+• Address: {clinic_address if clinic_address else '[address]'}
 
 DELIVERY RULES
 • When stating the website URL, email address, or phone number, spell them out clearly as written above.
@@ -158,7 +158,7 @@ NATURAL CALL ENDING PROCESS:
 • Wait 10-15 seconds to allow for final questions
 • If questions arise: answer briefly, then ask "Is there anything else I can help you with?" and wait another 10-15 seconds.
 • If brief acknowledgment: "You're welcome! Have a great day!" then wait 3-4 seconds before ending call.
-• If silence after 10-15 second wait: "Alright, have a great day!" and end call.
+• If silence after 10-15 second wait: "Alright, have a great day!" and end the call.
 • If no response after 3-4 second wait: end call.
 • If silence after 10 seconds at any point after the main task is done: end call automatically.
 
@@ -171,6 +171,7 @@ class CallRequest(BaseModel):
     provider_name: str
     appointment_date: str
     appointment_time: str
+    clinic_address: Optional[str] = None # Added clinic_address field
 
 
 class CallResult(BaseModel):
@@ -212,7 +213,7 @@ async def make_single_call_async(call_request: CallRequest, api_key: str,
 
             payload = {
                 "phone_number": call_request.phone_number,
-                "task": get_call_prompt(),
+                "task": get_call_prompt(call_request.clinic_address or ""),
                 "voice": selected_voice,
                 "request_data": call_data
             }
@@ -304,7 +305,7 @@ def make_single_call(call_request: CallRequest, api_key: str) -> CallResult:
 
         payload = {
             "phone_number": call_request.phone_number,
-            "task": get_call_prompt(),
+            "task": get_call_prompt(call_request.clinic_address or ""),
             "voice": selected_voice,
             "request_data": call_data
         }
@@ -428,7 +429,8 @@ async def index(request: Request):
 
 @app.post("/process_csv")
 async def process_csv(file: UploadFile = File(...),
-                      country_code: str = Form("+1")):
+                      country_code: str = Form("+1"),
+                      clinic_address: str = Form("")): # Added clinic_address field
     """Process CSV file and make calls for all rows"""
     api_key = get_api_key()
 
@@ -488,7 +490,8 @@ async def process_csv(file: UploadFile = File(...),
                 patient_name=row['patient_name'].strip(),
                 provider_name=row['provider_name'].strip(),
                 appointment_date=row['date'].strip(),
-                appointment_time=row['time'].strip())
+                appointment_time=row['time'].strip(),
+                clinic_address=clinic_address) # Pass clinic_address
             call_requests.append(call_request)
 
         # Process all valid calls concurrently (max 10 at a time)
