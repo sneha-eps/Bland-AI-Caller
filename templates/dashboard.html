@@ -1,0 +1,462 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - Bland AI Call Center</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1rem 0;
+            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+        
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #4f46e5;
+        }
+        
+        .logo i {
+            font-size: 2rem;
+        }
+        
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+        
+        .nav-link {
+            color: #4f46e5;
+            text-decoration: none;
+            font-weight: 600;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        
+        .nav-link:hover {
+            background: #4f46e5;
+            color: white;
+        }
+        
+        .nav-link.active {
+            background: #4f46e5;
+            color: white;
+        }
+        
+        .status-badge {
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .status-connected {
+            background: linear-gradient(45deg, #10b981, #059669);
+            color: white;
+        }
+        
+        .status-error {
+            background: linear-gradient(45deg, #ef4444, #dc2626);
+            color: white;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 2rem auto;
+            padding: 0 20px;
+        }
+        
+        .dashboard-header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        
+        .dashboard-header h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #4f46e5;
+            margin-bottom: 0.5rem;
+        }
+        
+        .dashboard-header p {
+            font-size: 1.125rem;
+            color: #64748b;
+        }
+        
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+        
+        .metric-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 25px 50px rgba(0,0,0,0.15);
+        }
+        
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(135deg, var(--card-color-1), var(--card-color-2));
+        }
+        
+        .metric-card.clients {
+            --card-color-1: #4f46e5;
+            --card-color-2: #7c3aed;
+        }
+        
+        .metric-card.campaigns {
+            --card-color-1: #10b981;
+            --card-color-2: #059669;
+        }
+        
+        .metric-card.calls {
+            --card-color-1: #f59e0b;
+            --card-color-2: #d97706;
+        }
+        
+        .metric-card.duration {
+            --card-color-1: #ef4444;
+            --card-color-2: #dc2626;
+        }
+        
+        .metric-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+        }
+        
+        .metric-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .metric-icon {
+            width: 50px;
+            height: 50px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+        }
+        
+        .metric-card.clients .metric-icon {
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+        }
+        
+        .metric-card.campaigns .metric-icon {
+            background: linear-gradient(135deg, #10b981, #059669);
+        }
+        
+        .metric-card.calls .metric-icon {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+        }
+        
+        .metric-card.duration .metric-icon {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+        }
+        
+        .metric-value {
+            font-size: 3rem;
+            font-weight: 800;
+            color: #1e293b;
+            line-height: 1;
+            margin-bottom: 0.5rem;
+        }
+        
+        .metric-change {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+        
+        .metric-change.positive {
+            color: #10b981;
+        }
+        
+        .metric-change.negative {
+            color: #ef4444;
+        }
+        
+        .metric-change.neutral {
+            color: #64748b;
+        }
+        
+        .quick-actions {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        
+        .quick-actions h2 {
+            color: #4f46e5;
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .actions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+        
+        .action-btn {
+            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            color: white;
+            text-decoration: none;
+            padding: 1.5rem;
+            border-radius: 12px;
+            font-weight: 600;
+            text-align: center;
+            transition: all 0.3s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(79, 70, 229, 0.3);
+            color: white;
+        }
+        
+        .action-btn i {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+        }
+        
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+            
+            .nav-links {
+                order: -1;
+            }
+            
+            .container {
+                padding: 0 1rem;
+            }
+            
+            .dashboard-header h1 {
+                font-size: 2rem;
+            }
+            
+            .metrics-grid {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+            
+            .metric-value {
+                font-size: 2.5rem;
+            }
+            
+            .actions-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-content">
+            <div class="logo">
+                <i class="fas fa-phone-alt"></i>
+                <span>Bland AI Call Center</span>
+            </div>
+            <div class="nav-links">
+                <a href="/" class="nav-link active">
+                    <i class="fas fa-chart-line"></i>
+                    Dashboard
+                </a>
+                <a href="/upload" class="nav-link">
+                    <i class="fas fa-upload"></i>
+                    Upload CSV
+                </a>
+            </div>
+            <div class="status-badge {% if has_api_key %}status-connected{% else %}status-error{% endif %}">
+                <i class="fas {% if has_api_key %}fa-check-circle{% else %}fa-exclamation-triangle{% endif %}"></i>
+                {% if has_api_key %}API Connected{% else %}API Not Configured{% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="dashboard-header">
+            <h1><i class="fas fa-chart-line"></i> Call Center Dashboard</h1>
+            <p>Monitor your automated calling campaigns and track performance metrics</p>
+        </div>
+        
+        <div class="metrics-grid">
+            <div class="metric-card clients">
+                <div class="metric-header">
+                    <div class="metric-title">Total Clients</div>
+                    <div class="metric-icon">
+                        <i class="fas fa-users"></i>
+                    </div>
+                </div>
+                <div class="metric-value">{{ metrics.total_clients | number_format }}</div>
+                <div class="metric-change positive">
+                    <i class="fas fa-arrow-up"></i>
+                    <span>+12% from last month</span>
+                </div>
+            </div>
+            
+            <div class="metric-card campaigns">
+                <div class="metric-header">
+                    <div class="metric-title">Total Campaigns</div>
+                    <div class="metric-icon">
+                        <i class="fas fa-bullhorn"></i>
+                    </div>
+                </div>
+                <div class="metric-value">{{ metrics.total_campaigns }}</div>
+                <div class="metric-change positive">
+                    <i class="fas fa-arrow-up"></i>
+                    <span>+3 this month</span>
+                </div>
+            </div>
+            
+            <div class="metric-card calls">
+                <div class="metric-header">
+                    <div class="metric-title">Total Calls</div>
+                    <div class="metric-icon">
+                        <i class="fas fa-phone"></i>
+                    </div>
+                </div>
+                <div class="metric-value">{{ metrics.total_calls | number_format }}</div>
+                <div class="metric-change positive">
+                    <i class="fas fa-arrow-up"></i>
+                    <span>+8% this week</span>
+                </div>
+            </div>
+            
+            <div class="metric-card duration">
+                <div class="metric-header">
+                    <div class="metric-title">Total Duration</div>
+                    <div class="metric-icon">
+                        <i class="fas fa-clock"></i>
+                    </div>
+                </div>
+                <div class="metric-value">{{ metrics.total_duration }}</div>
+                <div class="metric-change neutral">
+                    <i class="fas fa-minus"></i>
+                    <span>Average call time</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="quick-actions">
+            <h2>
+                <i class="fas fa-bolt"></i>
+                Quick Actions
+            </h2>
+            <div class="actions-grid">
+                <a href="/upload" class="action-btn">
+                    <i class="fas fa-upload"></i>
+                    <span>Upload CSV</span>
+                    <small>Start new campaign</small>
+                </a>
+                <a href="#" class="action-btn" onclick="alert('Feature coming soon!')">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>View Reports</span>
+                    <small>Analytics & insights</small>
+                </a>
+                <a href="#" class="action-btn" onclick="alert('Feature coming soon!')">
+                    <i class="fas fa-cog"></i>
+                    <span>Settings</span>
+                    <small>Configure system</small>
+                </a>
+                <a href="#" class="action-btn" onclick="alert('Feature coming soon!')">
+                    <i class="fas fa-history"></i>
+                    <span>Call History</span>
+                    <small>Recent activities</small>
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Add number formatting filter functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add any dashboard-specific JavaScript here
+            console.log('Dashboard loaded successfully');
+        });
+    </script>
+</body>
+</html>

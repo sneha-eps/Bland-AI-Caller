@@ -32,6 +32,17 @@ app = FastAPI(title="Bland AI Call Center",
               description="Make automated calls using Bland AI")
 templates = Jinja2Templates(directory="templates")
 
+# Add number formatting filter
+def number_format(value):
+    """Format numbers with commas"""
+    try:
+        return f"{int(value):,}"
+    except (ValueError, TypeError):
+        return value
+
+# Add the filter to Jinja2 environment
+templates.env.filters['number_format'] = number_format
+
 # --- Configuration ---
 
 
@@ -449,8 +460,26 @@ async def make_call(call_request: CallRequest, country_code: str = "+1"):
 
 
 @app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
-    """Main page with the CSV upload interface"""
+async def dashboard(request: Request):
+    """Dashboard showing key metrics"""
+    api_key = get_api_key()
+    # In a real application, you would fetch these metrics from a database
+    # For now, we'll use placeholder data
+    metrics = {
+        "total_clients": 1247,
+        "total_campaigns": 34,
+        "total_calls": 8563,
+        "total_duration": "142h 35m"  # This would be calculated from actual call data
+    }
+    return templates.TemplateResponse("dashboard.html", {
+        "request": request,
+        "has_api_key": bool(api_key),
+        "metrics": metrics
+    })
+
+@app.get("/upload", response_class=HTMLResponse)
+async def upload_page(request: Request):
+    """CSV upload interface"""
     api_key = get_api_key()
     return templates.TemplateResponse("index.html", {
         "request": request,
