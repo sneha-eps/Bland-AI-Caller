@@ -567,14 +567,14 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(...)):
     # Get campaign details
     if campaign_id not in campaigns_db:
         raise HTTPException(status_code=404, detail="Campaign not found")
-    
+
     campaign = campaigns_db[campaign_id]
-    
+
     # Get client details
     client_id = campaign['client_id']
     if client_id not in clients_db:
         raise HTTPException(status_code=404, detail="Client not found")
-    
+
     client = clients_db[client_id]
 
     # Check if file is CSV or XLSX
@@ -584,7 +584,7 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(...)):
     try:
         # Read file content based on format
         content = await file.read()
-        
+
         if file.filename.endswith('.xlsx'):
             # Read Excel file
             df = pd.read_excel(io.BytesIO(content))
@@ -608,7 +608,7 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(...)):
             ]
             missing_fields = [
                 field for field in required_fields
-                if not row.get(field, '').strip()
+                if not str(row.get(field, '')).strip()
             ]
 
             if missing_fields:
@@ -666,7 +666,7 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(...)):
             "started_at": pd.Timestamp.now().isoformat(),
             "results": [result.dict() for result in results]
         }
-        
+
         # Store in a simple in-memory results database
         if not hasattr(start_campaign, 'results_db'):
             start_campaign.results_db = {}
@@ -723,7 +723,7 @@ async def process_csv(file: UploadFile = File(...),
     try:
         # Read file content based on format
         content = await file.read()
-        
+
         if file.filename.endswith('.xlsx'):
             # Read Excel file
             df = pd.read_excel(io.BytesIO(content))
@@ -747,7 +747,7 @@ async def process_csv(file: UploadFile = File(...),
             ]
             missing_fields = [
                 field for field in required_fields
-                if not row.get(field, '').strip()
+                if not str(row.get(field, '')).strip()
             ]
 
             if missing_fields:
