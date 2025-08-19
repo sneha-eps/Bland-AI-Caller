@@ -541,7 +541,7 @@ def load_campaigns():
 
 
 @app.get("/campaigns", response_class=HTMLResponse)
-async def campaigns_page(request: Request, client_id: str = None, client_name: str = None):
+async def campaigns_page(request: Request, client_id: Optional[str] = None, client_name: Optional[str] = None):
     """Display campaigns page"""
     try:
         clients = load_clients()
