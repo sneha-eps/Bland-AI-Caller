@@ -959,6 +959,154 @@ async def process_csv(file: UploadFile = File(...),
                             detail=f"Error processing CSV: {str(e)}")
 
 
+def analyze_call_transcript(transcript: str) -> str:
+    """Analyze transcript to determine call status"""
+    if not transcript:
+        return 'failed'
+    
+    transcript_lower = transcript.lower()
+    
+    # Check for voicemail indicators first
+    voicemail_indicators = [
+        "voicemail", "leave a message", "after the beep", "not available",
+        "please leave", "can't come to the phone", "mailbox", "voice message"
+    ]
+    if any(indicator in transcript_lower for indicator in voicemail_indicators):
+        return 'voicemail'
+    
+    # Check for busy/no answer indicators
+    busy_indicators = [
+        "busy", "hang up", "ended call", "no answer", "disconnected",
+        "line busy", "call ended", "hung up"
+    ]
+    if any(indicator in transcript_lower for indicator in busy_indicators):
+        return 'busy'
+    
+    # Check for confirmation indicators
+    confirmation_indicators = [
+        "confirm", "yes", "see you then", "i'll be there", "sounds good",
+        "that works", "perfect", "okay", "sure", "will be there",
+        "looking forward", "thank you"
+    ]
+    if any(indicator in transcript_lower for indicator in confirmation_indicators):
+        return 'confirmed'
+    
+    # Check for rescheduling indicators
+    reschedule_indicators = [
+        "reschedule", "different time", "change", "move", "another time",
+        "can we schedule", "find a new time", "not that time", "different day"
+    ]
+    if any(indicator in transcript_lower for indicator in reschedule_indicators):
+        return 'rescheduled'
+    
+    # Check for cancellation indicators
+    cancellation_indicators = [
+        "cancel", "can't make it", "won't be available", "not coming",
+        "unable to", "won't be able", "have to cancel", "need to cancel"
+    ]
+    if any(indicator in transcript_lower for indicator in cancellation_indicators):
+        return 'cancelled'
+    
+    # If we have a transcript but can't categorize it, mark as completed
+    return 'completed'
+
+
+def get_voicemail_prompt(patient_name: str = "[patient name]", 
+                        appointment_date: str = "[date]", 
+                        appointment_time: str = "[time]", 
+                        provider_name: str = "[provider name]", 
+                        office_location: str = "[office location]") -> str:
+    """Get the voicemail message prompt"""
+    return f"""
+    ROLE & PERSONA
+    You are an AI voice agent leaving a voicemail message from Hillside Medical Group. You are professional, clear, and concise.
+
+    VOICEMAIL MESSAGE
+    Hi Good Morning, I am calling from Hillside Medical Group. This call is for {patient_name} to remind him/her of an upcoming appointment on {appointment_date} at {appointment_time} with {provider_name} at {office_location}. Please make sure to arrive 15 minutes prior to your appointment. Also, Please make sure to email us your insurance information ASAP so that we can get it verified and avoid any delays on the day of your appointment. If you wish to cancel or reschedule your appointment, please inform us at least 24 hours in advance to avoid cancellation charge of $25.00. For more information, you can call us back on 210-742-6555. Thank you and have a blessed day.
+
+    DELIVERY RULES
+    • Speak clearly and at a moderate pace
+    • Pause briefly between sentences
+    • Emphasize important information like the appointment date, time, and callback number
+    • End the call after delivering the complete message
+    """
+
+
+@app.post("/send_voicemail")
+async def send_voicemail(call_request: CallRequest):
+    """Send a voicemail message to a patient"""
+    api_key = get_api_key()
+
+    if not api_key:
+        raise HTTPException(
+            status_code=400,
+            detail="BLAND_API_KEY not found in Secrets. Please add your API key.")
+
+    try:
+        selected_voice = VOICE_MAP.get("female_professional", "default_voice_id")
+
+        payload = {
+            "phone_number": call_request.phone_number,
+            "task": get_voicemail_prompt(
+                patient_name=call_request.patient_name,
+                appointment_date=call_request.appointment_date,
+                appointment_time=call_request.appointment_time,
+                provider_name=call_request.provider_name,
+                office_location=call_request.office_location
+            ),
+            "voice": selected_voice,
+            "request_data": {
+                "patient_name": call_request.patient_name,
+                "appointment_date": call_request.appointment_date,
+                "appointment_time": call_request.appointment_time,
+                "provider_name": call_request.provider_name,
+                "office_location": call_request.office_location
+            }
+        }
+
+        print(f"🔄 Sending voicemail to {call_request.phone_number} for {call_request.patient_name}")
+
+        response = requests.post(
+            "https://api.bland.ai/v1/calls",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            },
+            json=payload,
+            timeout=60
+        )
+
+        if response.status_code == 200:
+            resp_json = response.json()
+            print(f"✅ Voicemail sent successfully for {call_request.patient_name}")
+            return {
+                "success": True,
+                "call_id": resp_json.get("call_id", "N/A"),
+                "status": resp_json.get("status", "N/A"),
+                "message": "Voicemail sent successfully",
+                "patient_name": call_request.patient_name,
+                "phone_number": call_request.phone_number
+            }
+        else:
+            error_msg = f"API error (Status {response.status_code}): {response.text}"
+            print(f"❌ Error sending voicemail for {call_request.patient_name}: {error_msg}")
+            return {
+                "success": False,
+                "error": error_msg,
+                "patient_name": call_request.patient_name,
+                "phone_number": call_request.phone_number
+            }
+
+    except Exception as e:
+        print(f"💥 Exception during voicemail sending: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "patient_name": call_request.patient_name,
+            "phone_number": call_request.phone_number
+        }
+
+
 @app.get("/campaign_analytics/{campaign_id}")
 async def get_campaign_analytics(campaign_id: str):
     """Get campaign analytics including performance metrics and call details"""
@@ -995,16 +1143,18 @@ async def get_campaign_analytics(campaign_id: str):
                     'call_id': result.get('call_id'),
                     'transcript': None,
                     'duration': 0,
+                    'call_status': 'failed',
                     'created_at': campaign_results['started_at']
                 }
 
                 # If call was successful and has call_id, try to get detailed info
                 if result['success'] and result.get('call_id'):
                     try:
+                        print(f"🔍 Fetching call details for call_id: {result.get('call_id')}")
                         call_response = requests.get(
                             f"https://api.bland.ai/v1/calls/{result['call_id']}",
                             headers={"Authorization": f"Bearer {api_key}"},
-                            timeout=10
+                            timeout=15
                         )
 
                         if call_response.status_code == 200:
@@ -1013,37 +1163,42 @@ async def get_campaign_analytics(campaign_id: str):
                             call_details['duration'] = call_data.get('duration', 0)
                             call_details['created_at'] = call_data.get('created_at', campaign_results['started_at'])
 
-                            # Add to total duration
-                            total_duration += call_details['duration']
+                            # Add to total duration (convert to seconds if needed)
+                            duration = call_details['duration']
+                            if isinstance(duration, str):
+                                # If duration is in format like "1m 30s", convert to seconds
+                                try:
+                                    if 'm' in duration and 's' in duration:
+                                        parts = duration.replace('s', '').split('m')
+                                        minutes = int(parts[0]) if parts[0] else 0
+                                        seconds = int(parts[1]) if len(parts) > 1 and parts[1] else 0
+                                        duration = minutes * 60 + seconds
+                                    elif 's' in duration:
+                                        duration = int(duration.replace('s', ''))
+                                    elif 'm' in duration:
+                                        duration = int(duration.replace('m', '')) * 60
+                                    else:
+                                        duration = 0
+                                except:
+                                    duration = 0
+                            
+                            total_duration += duration
+                            call_details['duration'] = duration
 
-                            # Analyze transcript for status and set call_details status
-                            transcript = call_details['transcript'].lower() if call_details['transcript'] else ''
-                            if any(word in transcript for word in ["confirm", "yes", "see you then", "i'll be there"]):
-                                call_details['call_status'] = 'confirmed'
-                                status_counts['confirmed'] += 1
-                            elif any(word in transcript for word in ["reschedule", "different time", "change"]):
-                                call_details['call_status'] = 'rescheduled'
-                                status_counts['rescheduled'] += 1
-                            elif any(word in transcript for word in ["cancel", "can't make it", "won't be available"]):
-                                call_details['call_status'] = 'cancelled'
-                                status_counts['cancelled'] += 1
-                            elif "voicemail" in transcript or "leave a message" in transcript:
-                                call_details['call_status'] = 'voicemail'
-                                status_counts['voicemail'] += 1
-                            elif any(word in transcript for word in ["busy", "hang up", "ended call"]):
-                                call_details['call_status'] = 'busy'
-                                status_counts['busy'] += 1
-                            else:
-                                call_details['call_status'] = 'completed'
-                                status_counts['completed'] += 1
+                            # Analyze transcript for status using our improved function
+                            call_details['call_status'] = analyze_call_transcript(call_details['transcript'])
+                            status_counts[call_details['call_status']] += 1
+
+                            print(f"✅ Call details retrieved for {result['patient_name']}: Status={call_details['call_status']}, Duration={duration}s")
                         else:
+                            print(f"❌ Failed to get call details: Status {call_response.status_code}")
                             call_details['call_status'] = 'failed'
                             status_counts['failed'] += 1
                     except Exception as e:
                         # If we can't get call details, count as failed
                         call_details['call_status'] = 'failed'
                         status_counts['failed'] += 1
-                        print(f"Error getting call details for {result.get('call_id')}: {str(e)}")
+                        print(f"❌ Error getting call details for {result.get('call_id')}: {str(e)}")
                 else:
                     # Failed calls count as failed
                     call_details['call_status'] = 'failed'
@@ -1056,9 +1211,16 @@ async def get_campaign_analytics(campaign_id: str):
             successful_calls = sum(1 for call in calls_with_details if call['success'])
             success_rate = round((successful_calls / total_calls * 100) if total_calls > 0 else 0, 1)
 
+            # Format total duration
+            hours = total_duration // 3600
+            minutes = (total_duration % 3600) // 60
+            seconds = total_duration % 60
+            formatted_duration = f"{hours}h {minutes}m {seconds}s"
+
             analytics = {
                 'total_calls': total_calls,
                 'total_duration': total_duration,
+                'formatted_duration': formatted_duration,
                 'campaign_runs': 1,  # For now, each entry represents one run
                 'success_rate': success_rate,
                 'status_counts': status_counts,
@@ -1078,6 +1240,7 @@ async def get_campaign_analytics(campaign_id: str):
             }
 
     except Exception as e:
+        print(f"❌ Error in campaign analytics: {str(e)}")
         raise HTTPException(status_code=500,
                             detail=f"Error fetching campaign analytics: {str(e)}")
 
@@ -1095,38 +1258,40 @@ async def get_call_details(call_id: str):
         response = requests.get(f"https://api.bland.ai/v1/calls/{call_id}",
                                 headers={
                                     "Authorization": f"Bearer {api_key}",
-                                })
+                                },
+                                timeout=15)
 
         if response.status_code == 200:
             call_data = response.json()
 
-            # Determine call status based on transcript analysis
+            # Use our improved transcript analysis function
             transcript = call_data.get("transcript", "")
-            call_status = "unknown"
+            call_status = analyze_call_transcript(transcript)
 
-            if transcript:
-                transcript_lower = transcript.lower()
-                if any(word in transcript_lower for word in
-                       ["confirm", "yes", "see you then", "i'll be there"]):
-                    call_status = "confirmed"
-                elif any(word in transcript_lower for word in
-                         ["reschedule", "different time", "change"]):
-                    call_status = "rescheduled"
-                elif any(word in transcript_lower for word in
-                         ["cancel", "can't make it", "won't be available"]):
-                    call_status = "cancelled"
-                elif "voicemail" in transcript_lower or "leave a message" in transcript_lower:
-                    call_status = "voicemail"
-                elif any(word in transcript_lower
-                         for word in ["busy", "hang up", "ended call"]):
-                    call_status = "busy"
+            # Handle duration formatting
+            duration = call_data.get("duration", 0)
+            if isinstance(duration, str):
+                try:
+                    if 'm' in duration and 's' in duration:
+                        parts = duration.replace('s', '').split('m')
+                        minutes = int(parts[0]) if parts[0] else 0
+                        seconds = int(parts[1]) if len(parts) > 1 and parts[1] else 0
+                        duration = minutes * 60 + seconds
+                    elif 's' in duration:
+                        duration = int(duration.replace('s', ''))
+                    elif 'm' in duration:
+                        duration = int(duration.replace('m', '')) * 60
+                    else:
+                        duration = 0
+                except:
+                    duration = 0
 
             return {
                 "call_id": call_id,
                 "status": call_data.get("status", "unknown"),
                 "call_status": call_status,
                 "transcript": transcript,
-                "duration": call_data.get("duration", 0),
+                "duration": duration,
                 "created_at": call_data.get("created_at", ""),
                 "phone_number": call_data.get("phone_number", ""),
             }

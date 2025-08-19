@@ -852,6 +852,243 @@
                 display: none;
             }
         }
+
+        /* Analytics Modal Styles */
+        .analytics-summary {
+            margin-bottom: 1.5rem;
+            padding: 1.5rem;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            gap: 1rem;
+        }
+
+        .summary-item {
+            text-align: center;
+        }
+
+        .summary-value {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .summary-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+        }
+
+        .analytics-charts {
+            margin-bottom: 1.5rem;
+            background: var(--bg-secondary);
+            padding: 1.5rem;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .analytics-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .analytics-table th,
+        .analytics-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .analytics-table th {
+            background: var(--bg-tertiary);
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .analytics-table td {
+            color: var(--text-secondary);
+        }
+
+        .analytics-table td.duration-cell {
+            font-family: monospace;
+            font-weight: bold;
+        }
+
+        /* Voicemail Modal Styles */
+        .modal-header h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .modal-body form {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 1rem;
+        }
+
+        .modal-body .form-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .btn-secondary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Specific styles for the changes */
+        .btn-analytics {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.3s ease;
+            margin-right: 5px;
+        }
+
+        .btn-analytics:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-voicemail {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            transition: all 0.3s ease;
+        }
+
+        .btn-voicemail:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(240, 147, 251, 0.3);
+        }
+
+        .call-status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+
+        .status-confirmed {
+            background-color: #d4edda;
+            color: #155724;
+        }
+
+        .status-cancelled {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-rescheduled {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .status-busy {
+            background-color: #e2e3e5;
+            color: #383d41;
+        }
+
+        .status-voicemail {
+            background-color: #cce7ff;
+            color: #004085;
+        }
+
+        .status-completed {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .status-failed {
+            background-color: #f5c6cb;
+            color: #721c24;
+        }
+
+        .transcript-preview {
+            max-width: 200px;
+            max-height: 60px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            cursor: pointer;
+            color: #007bff;
+            text-decoration: underline;
+        }
+
+        .duration-cell {
+            font-family: monospace;
+            font-weight: bold;
+        }
+
+        /* Adjustments for modals */
+        #campaignResultsModal .modal-content {
+            max-width: 1200px;
+        }
+
+        #campaignResultsModal .modal-body {
+            max-height: 75vh;
+        }
+
+        #editCampaignModal .modal-content,
+        #createCampaignModal .modal-content {
+            max-width: 600px;
+        }
+
+        #startCampaignModal .modal-content {
+            max-width: 500px;
+        }
+
+        #voicemailModal .modal-content {
+            max-width: 500px;
+        }
+
+        /* Styling for the close button in modals if needed */
+        .modal .modal-header .close {
+            font-size: 1.75rem;
+            line-height: 1;
+            color: white;
+            background: none;
+            border: none;
+            cursor: pointer;
+            opacity: 0.8;
+            transition: var(--transition);
+        }
+        .modal .modal-header .close:hover {
+            opacity: 1;
+        }
     </style>
 </head>
 <body data-theme="light">
@@ -1357,6 +1594,85 @@
         </div>
     </div>
 
+    <!-- Analytics Modal -->
+    <div id="analyticsModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="analyticsModalTitle">Campaign Analytics</h3>
+                <button class="modal-close" onclick="closeAnalyticsModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="analytics-summary" id="analyticsSummary">
+                    <!-- Summary will be populated here -->
+                </div>
+                <div class="analytics-charts">
+                    <canvas id="statusChart" width="400" height="200"></canvas>
+                </div>
+                <table class="analytics-table">
+                    <thead>
+                        <tr>
+                            <th>Patient Name</th>
+                            <th>Phone Number</th>
+                            <th>Call Status</th>
+                            <th>Duration</th>
+                            <th>Transcript</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="analyticsTableBody">
+                        <!-- Analytics data will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Voicemail Modal -->
+    <div id="voicemailModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Send Voicemail</h3>
+                <button class="modal-close" onclick="closeVoicemailModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="voicemailForm">
+                    <div class="form-group">
+                        <label for="vmPatientName">Patient Name:</label>
+                        <input type="text" id="vmPatientName" name="patient_name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="vmPhoneNumber">Phone Number:</label>
+                        <input type="tel" id="vmPhoneNumber" name="phone_number" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="vmAppointmentDate">Appointment Date:</label>
+                        <input type="text" id="vmAppointmentDate" name="appointment_date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="vmAppointmentTime">Appointment Time:</label>
+                        <input type="text" id="vmAppointmentTime" name="appointment_time" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="vmProviderName">Provider Name:</label>
+                        <input type="text" id="vmProviderName" name="provider_name" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="vmOfficeLocation">Office Location:</label>
+                        <input type="text" id="vmOfficeLocation" name="office_location" required>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">Send Voicemail</button>
+                        <button type="button" onclick="closeVoicemailModal()" class="btn-secondary">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <script>
         // Theme management
         const themeToggle = document.getElementById('themeToggle');
@@ -1414,7 +1730,7 @@
         // Modal management
         function openCreateCampaignModal() {
             document.getElementById('createCampaignModal').style.display = 'block';
-            
+
             // Pre-select client if we're filtering by client
             const filteredClientId = '{{ filtered_client_id or "" }}';
             if (filteredClientId) {
@@ -1798,6 +2114,9 @@
             const startModal = document.getElementById('startCampaignModal');
             const editModal = document.getElementById('editCampaignModal');
             const resultsModal = document.getElementById('campaignResultsModal');
+            const analyticsModal = document.getElementById('analyticsModal');
+            const voicemailModal = document.getElementById('voicemailModal');
+
             if (event.target === createModal) {
                 closeCreateCampaignModal();
             }
@@ -1810,7 +2129,182 @@
             if (event.target === resultsModal) {
                 closeCampaignResultsModal();
             }
+            if (event.target === analyticsModal) {
+                closeAnalyticsModal();
+            }
+            if (event.target === voicemailModal) {
+                closeVoicemailModal();
+            }
         }
+
+        // Updated JavaScript functions for voicemail and improved analytics
+        function viewAnalytics(campaignId) {
+            console.log('Viewing analytics for campaign:', campaignId);
+
+            fetch(`/campaign_analytics/${campaignId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('analyticsModalTitle').textContent = 
+                            `Analytics: ${data.campaign_name}`;
+
+                        // Populate summary
+                        const summary = data.analytics;
+                        document.getElementById('analyticsSummary').innerHTML = `
+                            <div class="summary-grid">
+                                <div class="summary-item">
+                                    <div class="summary-value">${summary.total_calls}</div>
+                                    <div class="summary-label">Total Calls</div>
+                                </div>
+                                <div class="summary-item">
+                                    <div class="summary-value">${summary.formatted_duration || summary.total_duration + 's'}</div>
+                                    <div class="summary-label">Total Duration</div>
+                                </div>
+                                <div class="summary-item">
+                                    <div class="summary-value">${summary.success_rate}%</div>
+                                    <div class="summary-label">Success Rate</div>
+                                </div>
+                                <div class="summary-item">
+                                    <div class="summary-value">${summary.status_counts.confirmed}</div>
+                                    <div class="summary-label">Confirmed</div>
+                                </div>
+                                <div class="summary-item">
+                                    <div class="summary-value">${summary.status_counts.cancelled}</div>
+                                    <div class="summary-label">Cancelled</div>
+                                </div>
+                                <div class="summary-item">
+                                    <div class="summary-value">${summary.status_counts.rescheduled}</div>
+                                    <div class="summary-label">Rescheduled</div>
+                                </div>
+                                <div class="summary-item">
+                                    <div class="summary-value">${summary.status_counts.voicemail}</div>
+                                    <div class="summary-label">Voicemail</div>
+                                </div>
+                                <div class="summary-item">
+                                    <div class="summary-value">${summary.status_counts.busy}</div>
+                                    <div class="summary-label">Busy</div>
+                                </div>
+                            </div>
+                        `;
+
+                        // Populate table
+                        const tableBody = document.getElementById('analyticsTableBody');
+                        tableBody.innerHTML = '';
+
+                        summary.calls.forEach(call => {
+                            const row = document.createElement('tr');
+                            const statusClass = `status-${call.call_status || 'failed'}`;
+                            const duration = call.duration ? `${Math.floor(call.duration / 60)}m ${call.duration % 60}s` : '0s';
+                            const transcriptPreview = call.transcript ? 
+                                (call.transcript.length > 50 ? call.transcript.substring(0, 50) + '...' : call.transcript) : 
+                                'No transcript';
+
+                            row.innerHTML = `
+                                <td>${call.patient_name}</td>
+                                <td>${call.phone_number}</td>
+                                <td><span class="call-status ${statusClass}">${call.call_status || 'Failed'}</span></td>
+                                <td class="duration-cell">${duration}</td>
+                                <td><span class="transcript-preview" onclick="viewFullTranscript('${encodeURIComponent(call.transcript || '')}')">${transcriptPreview}</span></td>
+                                <td>
+                                    ${call.call_status === 'voicemail' || call.call_status === 'busy' ? 
+                                        `<button onclick="sendIndividualVoicemail('${call.patient_name}', '${call.phone_number}')" class="btn-voicemail" style="font-size: 12px; padding: 4px 8px;">
+                                            <i class="fas fa-voicemail"></i> Voicemail
+                                        </button>` : 
+                                        ''
+                                    }
+                                </td>
+                            `;
+                            tableBody.appendChild(row);
+                        });
+
+                        // Show modal
+                        document.getElementById('analyticsModal').style.display = 'block';
+                    } else {
+                        alert('Failed to load analytics: ' + data.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading analytics:', error);
+                    alert('Error loading analytics');
+                });
+        }
+
+        function viewFullTranscript(transcript) {
+            const decodedTranscript = decodeURIComponent(transcript);
+            if (decodedTranscript && decodedTranscript !== 'undefined') {
+                alert('Full Transcript:\n\n' + decodedTranscript);
+            } else {
+                alert('No transcript available for this call.');
+            }
+        }
+
+        function sendVoicemail(campaignId) {
+            document.getElementById('voicemailModal').style.display = 'block';
+        }
+
+        function sendIndividualVoicemail(patientName, phoneNumber) {
+            // Pre-fill the form with patient info
+            document.getElementById('vmPatientName').value = patientName;
+            document.getElementById('vmPhoneNumber').value = phoneNumber;
+            document.getElementById('voicemailModal').style.display = 'block';
+        }
+
+        function closeAnalyticsModal() {
+            document.getElementById('analyticsModal').style.display = 'none';
+        }
+
+        function closeVoicemailModal() {
+            document.getElementById('voicemailModal').style.display = 'none';
+            // Reset form on close
+            document.getElementById('voicemailForm').reset();
+        }
+
+        // Handle voicemail form submission
+        document.getElementById('voicemailForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const formData = new FormData(this);
+            const voicemailData = {
+                phone_number: formData.get('phone_number'),
+                patient_name: formData.get('patient_name'),
+                appointment_date: formData.get('appointment_date'),
+                appointment_time: formData.get('appointment_time'),
+                provider_name: formData.get('provider_name'),
+                office_location: formData.get('office_location')
+            };
+
+            // Show loading state
+            const submitBtn = this.querySelector('button[type="submit"]');
+            const originalText = submitBtn.textContent;
+            submitBtn.textContent = 'Sending...';
+            submitBtn.disabled = true;
+
+            fetch('/send_voicemail', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(voicemailData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Voicemail sent successfully!');
+                    closeVoicemailModal();
+                    this.reset();
+                } else {
+                    alert('Failed to send voicemail: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error sending voicemail:', error);
+                alert('Error sending voicemail');
+            })
+            .finally(() => {
+                submitBtn.textContent = originalText;
+                submitBtn.disabled = false;
+            });
+        });
     </script>
 </body>
 </html>
