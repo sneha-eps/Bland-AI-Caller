@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -53,7 +52,7 @@
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
             background: var(--bg-primary);
@@ -219,12 +218,12 @@
             align-items: center;
             gap: 8px;
         }
-        
+
         .status-connected {
             background: var(--success-color);
             color: white;
         }
-        
+
         .status-error {
             background: var(--danger-color);
             color: white;
@@ -1008,12 +1007,12 @@
             <div class="modal-body">
                 <form id="startCampaignForm">
                     <input type="hidden" id="campaignId" name="campaign_id">
-                    
+
                     <div class="form-group">
                         <label>Campaign</label>
                         <input type="text" id="campaignNameDisplay" readonly style="background: var(--bg-secondary);">
                     </div>
-                    
+
                     <div class="form-group">
                         <label>Note</label>
                         <div style="padding: 1rem; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border-color);">
@@ -1021,7 +1020,7 @@
                             This campaign will use the CSV/Excel file that was uploaded when the campaign was created. If you need to use a different file, please edit the campaign first.
                         </div>
                     </div>
-                    
+
                     <button type="submit" class="btn-submit">
                         <i class="fas fa-rocket"></i>
                         Start Campaign Calls
@@ -1145,12 +1144,12 @@
             <div class="modal-body">
                 <form id="editCampaignForm">
                     <input type="hidden" id="editCampaignId" name="campaign_id">
-                    
+
                     <div class="form-group">
                         <label for="editCampaignName">Campaign Name</label>
                         <input type="text" id="editCampaignName" name="name" required>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="editClientSelect">Client</label>
                         <select id="editClientSelect" name="client_id" required>
@@ -1160,17 +1159,17 @@
                             {% endfor %}
                         </select>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="editMaxAttempts">Max Attempts</label>
                         <input type="number" id="editMaxAttempts" name="max_attempts" min="1" max="10" required>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="editRetryInterval">Retry Interval (minutes)</label>
                         <input type="number" id="editRetryInterval" name="retry_interval" min="5" max="1440" required>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="editCountryCode">Country Code</label>
                         <select id="editCountryCode" name="country_code" required>
@@ -1213,7 +1212,7 @@
                             <option value="+62">🇮🇩 Indonesia (+62)</option>
                         </select>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="editCsvFile">Upload New CSV/Excel File (Optional)</label>
                         <div class="file-input-wrapper">
@@ -1227,7 +1226,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <button type="submit" class="btn-submit">
                         <i class="fas fa-save"></i>
                         Update Campaign
@@ -1252,7 +1251,7 @@
                         <label for="campaignName">Campaign Name</label>
                         <input type="text" id="campaignName" name="name" required>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="clientSelect">Client</label>
                         <select id="clientSelect" name="client_id" required>
@@ -1262,17 +1261,17 @@
                             {% endfor %}
                         </select>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="maxAttempts">Max Attempts</label>
                         <input type="number" id="maxAttempts" name="max_attempts" min="1" max="10" value="3" required>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="retryInterval">Retry Interval (minutes)</label>
                         <input type="number" id="retryInterval" name="retry_interval" min="5" max="1440" value="30" required>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="countryCode">Country Code</label>
                         <select id="countryCode" name="country_code" required>
@@ -1315,7 +1314,7 @@
                             <option value="+62">🇮🇩 Indonesia (+62)</option>
                         </select>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="csvFile">Upload CSV/Excel File</label>
                         <div class="file-input-wrapper">
@@ -1329,7 +1328,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <button type="submit" class="btn-submit">
                         <i class="fas fa-rocket"></i>
                         Create Campaign
@@ -1352,7 +1351,7 @@
         themeToggle.addEventListener('click', () => {
             const currentTheme = body.getAttribute('data-theme');
             const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-            
+
             body.setAttribute('data-theme', newTheme);
             localStorage.setItem('theme', newTheme);
             updateThemeIcon(newTheme);
@@ -1368,19 +1367,23 @@
         const sidebarOverlay = document.getElementById('sidebarOverlay');
         const mainContent = document.getElementById('mainContent');
 
-        sidebarToggle.addEventListener('click', toggleSidebar);
-        sidebarOverlay.addEventListener('click', closeSidebar);
+        if (sidebarToggle) {
+            sidebarToggle.addEventListener('click', toggleSidebar);
+        }
+        if (sidebarOverlay) {
+            sidebarOverlay.addEventListener('click', closeSidebar);
+        }
 
         function toggleSidebar() {
-            sidebar.classList.toggle('open');
-            sidebarOverlay.classList.toggle('active');
-            mainContent.classList.toggle('sidebar-open');
+            if (sidebar) sidebar.classList.toggle('open');
+            if (sidebarOverlay) sidebarOverlay.classList.toggle('active');
+            if (mainContent) mainContent.classList.toggle('sidebar-open');
         }
 
         function closeSidebar() {
-            sidebar.classList.remove('open');
-            sidebarOverlay.classList.remove('active');
-            mainContent.classList.remove('sidebar-open');
+            if (sidebar) sidebar.classList.remove('open');
+            if (sidebarOverlay) sidebarOverlay.classList.remove('active');
+            if (mainContent) mainContent.classList.remove('sidebar-open');
         }
 
         window.addEventListener('resize', () => {
@@ -1446,17 +1449,17 @@
         if (createForm) {
             createForm.addEventListener('submit', async function(e) {
             e.preventDefault();
-            
+
             const formData = new FormData(e.target);
-            
+
             try {
                 const response = await fetch('/add_campaign', {
                     method: 'POST',
                     body: formData
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (result.success) {
                     alert('Campaign created successfully!');
                     window.location.reload();
@@ -1484,7 +1487,7 @@
         function viewCampaignResults(campaignId) {
             // Show the campaign results modal
             document.getElementById('campaignResultsModal').style.display = 'block';
-            
+
             // Load campaign analytics data
             loadCampaignAnalytics(campaignId);
         }
@@ -1500,27 +1503,27 @@
                 document.getElementById('totalDuration').textContent = 'Loading...';
                 document.getElementById('campaignRuns').textContent = 'Loading...';
                 document.getElementById('successRate').textContent = 'Loading...';
-                
+
                 const response = await fetch(`/campaign_analytics/${campaignId}`);
                 const data = await response.json();
-                
+
                 if (data.success) {
                     // Update score cards
                     document.getElementById('totalCalls').textContent = data.analytics.total_calls.toLocaleString();
                     document.getElementById('totalDuration').textContent = formatDuration(data.analytics.total_duration);
                     document.getElementById('campaignRuns').textContent = data.analytics.campaign_runs;
                     document.getElementById('successRate').textContent = data.analytics.success_rate + '%';
-                    
+
                     // Update status counts
                     document.getElementById('confirmedCount').textContent = data.analytics.status_counts.confirmed;
                     document.getElementById('cancelledCount').textContent = data.analytics.status_counts.cancelled;
                     document.getElementById('rescheduledCount').textContent = data.analytics.status_counts.rescheduled;
                     document.getElementById('busyCount').textContent = data.analytics.status_counts.busy;
                     document.getElementById('voicemailCount').textContent = data.analytics.status_counts.voicemail;
-                    
+
                     // Populate calls table
                     populateCallsTable(data.analytics.calls);
-                    
+
                     // Hide no calls message
                     document.getElementById('noCallsMessage').style.display = 'none';
                 } else {
@@ -1541,22 +1544,22 @@
         function populateCallsTable(calls) {
             const tbody = document.getElementById('callsTableBody');
             tbody.innerHTML = '';
-            
+
             if (!calls || calls.length === 0) {
                 document.getElementById('noCallsMessage').style.display = 'block';
                 document.querySelector('.calls-table-container').style.display = 'none';
                 return;
             }
-            
+
             document.querySelector('.calls-table-container').style.display = 'block';
-            
+
             calls.forEach((call, index) => {
                 const row = document.createElement('tr');
-                
+
                 // Determine call status from transcript or error
                 let callStatus = 'pending';
                 let statusIcon = 'fa-clock';
-                
+
                 if (call.success === false) {
                     callStatus = 'busy';
                     statusIcon = 'fa-phone-slash';
@@ -1579,12 +1582,12 @@
                         statusIcon = 'fa-phone-slash';
                     }
                 }
-                
+
                 // Create transcript preview
                 const transcriptPreview = call.transcript 
                     ? (call.transcript.length > 50 ? call.transcript.substring(0, 50) + '...' : call.transcript)
                     : (call.error || 'No transcript available');
-                
+
                 row.innerHTML = `
                     <td>${call.patient_name || 'Unknown'}</td>
                     <td>${call.phone_number || 'Unknown'}</td>
@@ -1604,7 +1607,7 @@
                         ` : ''}
                     </td>
                 `;
-                
+
                 tbody.appendChild(row);
             });
         }
@@ -1612,7 +1615,7 @@
         function toggleTranscript(index) {
             const fullTranscript = document.getElementById(`transcript-${index}`);
             const toggleButton = fullTranscript.previousElementSibling;
-            
+
             if (fullTranscript.style.display === 'none' || !fullTranscript.style.display) {
                 fullTranscript.style.display = 'block';
                 toggleButton.textContent = 'Show Less';
@@ -1624,11 +1627,11 @@
 
         function formatDuration(seconds) {
             if (!seconds) return '0s';
-            
+
             const hours = Math.floor(seconds / 3600);
             const minutes = Math.floor((seconds % 3600) / 60);
             const secs = seconds % 60;
-            
+
             if (hours > 0) {
                 return `${hours}h ${minutes}m`;
             } else if (minutes > 0) {
@@ -1664,7 +1667,7 @@
             // Find campaign data
             const campaigns = {{ campaigns | tojson }};
             const campaign = campaigns.find(c => c.id === campaignId);
-            
+
             if (campaign) {
                 document.getElementById('editCampaignId').value = campaignId;
                 document.getElementById('editCampaignName').value = campaign.name;
@@ -1672,7 +1675,7 @@
                 document.getElementById('editMaxAttempts').value = campaign.max_attempts;
                 document.getElementById('editRetryInterval').value = campaign.retry_interval;
                 document.getElementById('editCountryCode').value = campaign.country_code;
-                
+
                 document.getElementById('editCampaignModal').style.display = 'block';
             }
         }
@@ -1708,18 +1711,18 @@
         if (editForm) {
             editForm.addEventListener('submit', async function(e) {
             e.preventDefault();
-            
+
             const formData = new FormData(e.target);
             const campaignId = formData.get('campaign_id');
-            
+
             try {
                 const response = await fetch(`/update_campaign/${campaignId}`, {
                     method: 'PUT',
                     body: formData
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (result.success) {
                     alert('Campaign updated successfully!');
                     window.location.reload();
@@ -1737,18 +1740,18 @@
         if (startForm) {
             startForm.addEventListener('submit', async function(e) {
             e.preventDefault();
-            
+
             const formData = new FormData(e.target);
             const campaignId = formData.get('campaign_id');
-            
+
             try {
                 const response = await fetch(`/start_campaign/${campaignId}`, {
                     method: 'POST',
                     body: formData
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (result.success) {
                     alert(`Campaign started successfully! Total calls: ${result.total_calls}, Successful: ${result.successful_calls}, Failed: ${result.failed_calls}`);
                     closeStartCampaignModal();
