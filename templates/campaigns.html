@@ -1238,7 +1238,7 @@
     </div>
 
     <!-- Create Campaign Modal -->
-    <div id="createCampaignModal" class="modal"></div>
+    <div id="createCampaignModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">
                 <h3><i class="fas fa-bullhorn"></i> Create New Campaign</h3>
@@ -1403,44 +1403,48 @@
         const fileInput = document.getElementById('csvFile');
         const fileDisplay = document.getElementById('fileDisplay');
 
-        fileInput.addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                fileDisplay.classList.add('has-file');
-                const fileIcon = file.name.endsWith('.xlsx') ? 'fa-file-excel' : 'fa-file-csv';
-                fileDisplay.innerHTML = `
-                    <i class="fas ${fileIcon}"></i>
-                    <div>
-                        <strong>${file.name}</strong><br>
-                        <span>Ready to process (${(file.size / 1024).toFixed(1)} KB)</span>
-                    </div>
-                `;
-            }
-        });
+        if (fileInput && fileDisplay) {
+            fileInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    fileDisplay.classList.add('has-file');
+                    const fileIcon = file.name.endsWith('.xlsx') ? 'fa-file-excel' : 'fa-file-csv';
+                    fileDisplay.innerHTML = `
+                        <i class="fas ${fileIcon}"></i>
+                        <div>
+                            <strong>${file.name}</strong><br>
+                            <span>Ready to process (${(file.size / 1024).toFixed(1)} KB)</span>
+                        </div>
+                    `;
+                }
+            });
 
-        // Drag and drop functionality
-        fileDisplay.addEventListener('dragover', function(e) {
-            e.preventDefault();
-            fileDisplay.classList.add('dragover');
-        });
+            // Drag and drop functionality
+            fileDisplay.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                fileDisplay.classList.add('dragover');
+            });
 
-        fileDisplay.addEventListener('dragleave', function(e) {
-            e.preventDefault();
-            fileDisplay.classList.remove('dragover');
-        });
+            fileDisplay.addEventListener('dragleave', function(e) {
+                e.preventDefault();
+                fileDisplay.classList.remove('dragover');
+            });
 
-        fileDisplay.addEventListener('drop', function(e) {
-            e.preventDefault();
-            fileDisplay.classList.remove('dragover');
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                fileInput.files = files;
-                fileInput.dispatchEvent(new Event('change'));
-            }
-        });
+            fileDisplay.addEventListener('drop', function(e) {
+                e.preventDefault();
+                fileDisplay.classList.remove('dragover');
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    fileInput.files = files;
+                    fileInput.dispatchEvent(new Event('change'));
+                }
+            });
+        }
 
         // Form submission
-        document.getElementById('createCampaignForm').addEventListener('submit', async function(e) {
+        const createForm = document.getElementById('createCampaignForm');
+        if (createForm) {
+            createForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const formData = new FormData(e.target);
@@ -1462,7 +1466,8 @@
             } catch (error) {
                 alert('Error creating campaign: ' + error.message);
             }
-        });
+            });
+        }
 
         // Campaign management functions
         function startCampaign(campaignId, campaignName) {
@@ -1637,20 +1642,22 @@
         const campaignFileInput = document.getElementById('campaignCsvFile');
         const campaignFileDisplay = document.getElementById('campaignFileDisplay');
 
-        campaignFileInput.addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                campaignFileDisplay.classList.add('has-file');
-                const fileIcon = file.name.endsWith('.xlsx') ? 'fa-file-excel' : 'fa-file-csv';
-                campaignFileDisplay.innerHTML = `
-                    <i class="fas ${fileIcon}"></i>
-                    <div>
-                        <strong>${file.name}</strong><br>
-                        <span>Ready to process (${(file.size / 1024).toFixed(1)} KB)</span>
-                    </div>
-                `;
-            }
-        });
+        if (campaignFileInput && campaignFileDisplay) {
+            campaignFileInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    campaignFileDisplay.classList.add('has-file');
+                    const fileIcon = file.name.endsWith('.xlsx') ? 'fa-file-excel' : 'fa-file-csv';
+                    campaignFileDisplay.innerHTML = `
+                        <i class="fas ${fileIcon}"></i>
+                        <div>
+                            <strong>${file.name}</strong><br>
+                            <span>Ready to process (${(file.size / 1024).toFixed(1)} KB)</span>
+                        </div>
+                    `;
+                }
+            });
+        }
 
         // Edit campaign functions
         function editCampaign(campaignId) {
@@ -1679,23 +1686,27 @@
         const editFileInput = document.getElementById('editCsvFile');
         const editFileDisplay = document.getElementById('editFileDisplay');
 
-        editFileInput.addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (file) {
-                editFileDisplay.classList.add('has-file');
-                const fileIcon = file.name.endsWith('.xlsx') ? 'fa-file-excel' : 'fa-file-csv';
-                editFileDisplay.innerHTML = `
-                    <i class="fas ${fileIcon}"></i>
-                    <div>
-                        <strong>${file.name}</strong><br>
-                        <span>Ready to process (${(file.size / 1024).toFixed(1)} KB)</span>
-                    </div>
-                `;
-            }
-        });
+        if (editFileInput && editFileDisplay) {
+            editFileInput.addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (file) {
+                    editFileDisplay.classList.add('has-file');
+                    const fileIcon = file.name.endsWith('.xlsx') ? 'fa-file-excel' : 'fa-file-csv';
+                    editFileDisplay.innerHTML = `
+                        <i class="fas ${fileIcon}"></i>
+                        <div>
+                            <strong>${file.name}</strong><br>
+                            <span>Ready to process (${(file.size / 1024).toFixed(1)} KB)</span>
+                        </div>
+                    `;
+                }
+            });
+        }
 
         // Edit campaign form submission
-        document.getElementById('editCampaignForm').addEventListener('submit', async function(e) {
+        const editForm = document.getElementById('editCampaignForm');
+        if (editForm) {
+            editForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const formData = new FormData(e.target);
@@ -1718,10 +1729,13 @@
             } catch (error) {
                 alert('Error updating campaign: ' + error.message);
             }
-        });
+            });
+        }
 
         // Start campaign form submission
-        document.getElementById('startCampaignForm').addEventListener('submit', async function(e) {
+        const startForm = document.getElementById('startCampaignForm');
+        if (startForm) {
+            startForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const formData = new FormData(e.target);
@@ -1744,7 +1758,8 @@
             } catch (error) {
                 alert('Error starting campaign: ' + error.message);
             }
-        });
+            });
+        }
 
         // Close modal when clicking outside
         window.onclick = function(event) {
