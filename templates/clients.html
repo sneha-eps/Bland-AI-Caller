@@ -295,6 +295,7 @@
         .client-card:hover {
             transform: translateY(-2px);
             box-shadow: var(--shadow-lg);
+            cursor: pointer;
         }
 
         .client-header {
@@ -613,7 +614,7 @@
         {% if clients %}
         <div class="clients-grid">
             {% for client in clients %}
-            <div class="client-card">
+            <div class="client-card" onclick="viewClientCampaigns('{{ client.id }}', '{{ client.name }}')">
                 <div class="client-header">
                     <div class="client-name">{{ client.name }}</div>
                 </div>
@@ -851,6 +852,12 @@
                 alert('Error adding client: ' + error.message);
             }
         });
+
+        // Client card click handler
+        function viewClientCampaigns(clientId, clientName) {
+            // Redirect to campaigns page with client filter
+            window.location.href = `/campaigns?client_id=${clientId}&client_name=${encodeURIComponent(clientName)}`;
+        }
 
         // Close modal when clicking outside
         window.onclick = function(event) {

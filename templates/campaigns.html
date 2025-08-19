@@ -918,10 +918,24 @@
     <!-- Main Content -->
     <div class="main-content" id="mainContent">
         <div class="page-header">
-            <h1 class="page-title">
-                <i class="fas fa-bullhorn"></i>
-                Campaigns
-            </h1>
+            <div>
+                {% if filtered_client_name %}
+                <div style="margin-bottom: 0.5rem;">
+                    <a href="/campaigns" style="color: var(--text-secondary); text-decoration: none; font-size: 0.875rem;">
+                        <i class="fas fa-arrow-left"></i> All Campaigns
+                    </a>
+                </div>
+                <h1 class="page-title">
+                    <i class="fas fa-bullhorn"></i>
+                    Campaigns for {{ filtered_client_name }}
+                </h1>
+                {% else %}
+                <h1 class="page-title">
+                    <i class="fas fa-bullhorn"></i>
+                    Campaigns
+                </h1>
+                {% endif %}
+            </div>
             {% if clients %}
             <button class="btn-primary" onclick="openCreateCampaignModal()">
                 <i class="fas fa-plus"></i>
@@ -985,11 +999,16 @@
         {% else %}
         <div class="empty-state">
             <i class="fas fa-bullhorn"></i>
+            {% if filtered_client_name %}
+            <h3>No Campaigns for {{ filtered_client_name }}</h3>
+            <p>This client doesn't have any campaigns yet. Create one to get started.</p>
+            {% else %}
             <h3>No Campaigns Yet</h3>
             <p>Create your first campaign to start making automated calls</p>
+            {% endif %}
             <button class="btn-primary" onclick="openCreateCampaignModal()">
                 <i class="fas fa-plus"></i>
-                Create Your First Campaign
+                {% if filtered_client_name %}Create Campaign for {{ filtered_client_name }}{% else %}Create Your First Campaign{% endif %}
             </button>
         </div>
         {% endif %}
@@ -1395,6 +1414,12 @@
         // Modal management
         function openCreateCampaignModal() {
             document.getElementById('createCampaignModal').style.display = 'block';
+            
+            // Pre-select client if we're filtering by client
+            const filteredClientId = '{{ filtered_client_id or "" }}';
+            if (filteredClientId) {
+                document.getElementById('clientSelect').value = filteredClientId;
+            }
         }
 
         function closeCreateCampaignModal() {

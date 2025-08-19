@@ -532,16 +532,21 @@ def load_campaigns():
 
 
 @app.get("/campaigns", response_class=HTMLResponse)
-async def campaigns_page(request: Request):
+async def campaigns_page(request: Request, client_id: str = None, client_name: str = None):
     """Display campaigns page"""
     try:
         clients = load_clients()
         campaigns = load_campaigns()
         has_api_key = bool(os.getenv("BLAND_API_KEY"))
 
+        # Filter campaigns by client if client_id is provided
+        filtered_campaigns = campaigns
+        if client_id:
+            filtered_campaigns = [c for c in campaigns if c.get('client_id') == client_id]
+
         # Remove file data from campaigns to make them JSON serializable
         serializable_campaigns = []
-        for campaign in campaigns:
+        for campaign in filtered_campaigns:
             campaign_copy = campaign.copy()
             # Remove any file-related data that might be bytes
             if 'file_data' in campaign_copy:
@@ -554,7 +559,9 @@ async def campaigns_page(request: Request):
             "request": request,
             "clients": clients,
             "campaigns": serializable_campaigns,
-            "has_api_key": has_api_key
+            "has_api_key": has_api_key,
+            "filtered_client_id": client_id,
+            "filtered_client_name": client_name
         })
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error loading campaigns page: {str(e)}")
