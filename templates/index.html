@@ -4,9 +4,50 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bland AI Call Center - Professional Dashboard</title>
+    <title>Upload CSV - Bland AI Call Center</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
+        :root {
+            --primary-color: #4f46e5;
+            --primary-hover: #4338ca;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+            --sidebar-width: 280px;
+            --header-height: 70px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Light theme variables */
+        [data-theme="light"] {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-tertiary: #f1f5f9;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --text-tertiary: #94a3b8;
+            --border-color: #e2e8f0;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Dark theme variables */
+        [data-theme="dark"] {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --text-tertiary: #94a3b8;
+            --border-color: #334155;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
+        }
+
         * {
             margin: 0;
             padding: 0;
@@ -15,44 +56,160 @@
         
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            color: #333;
+            background: var(--bg-primary);
+            color: var(--text-primary);
             line-height: 1.6;
+            transition: var(--transition);
         }
-        
-        .header {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            padding: 1rem 0;
-            box-shadow: 0 2px 20px rgba(0,0,0,0.1);
-            position: sticky;
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            left: 0;
             top: 0;
-            z-index: 100;
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            z-index: 1000;
+            transform: translateX(-100%);
+            transition: var(--transition);
+            overflow-y: auto;
         }
-        
-        .header-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 20px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+
+        .sidebar.open {
+            transform: translateX(0);
         }
-        
-        .logo {
+
+        .sidebar-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-logo {
             display: flex;
             align-items: center;
             gap: 12px;
-            font-size: 1.5rem;
+            font-size: 1.25rem;
             font-weight: 700;
-            color: #4f46e5;
+            color: var(--primary-color);
+            text-decoration: none;
         }
-        
-        .logo i {
-            font-size: 2rem;
+
+        .sidebar-logo i {
+            font-size: 1.5rem;
         }
-        
+
+        .sidebar-nav {
+            padding: 1rem 0;
+        }
+
+        .nav-section {
+            margin-bottom: 2rem;
+        }
+
+        .nav-section-title {
+            padding: 0.5rem 1.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-tertiary);
+            margin-bottom: 0.5rem;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0.75rem 1.5rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: var(--transition);
+            border-left: 3px solid transparent;
+        }
+
+        .nav-link:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .nav-link.active {
+            background: var(--bg-tertiary);
+            color: var(--primary-color);
+            border-left-color: var(--primary-color);
+        }
+
+        .nav-link i {
+            width: 20px;
+            text-align: center;
+        }
+
+        /* Header */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--header-height);
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border-color);
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1.5rem;
+            transition: var(--transition);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .sidebar-toggle {
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1.25rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 8px;
+            transition: var(--transition);
+        }
+
+        .sidebar-toggle:hover {
+            background: var(--bg-secondary);
+        }
+
+        .header-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .theme-toggle {
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1.25rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 8px;
+            transition: var(--transition);
+        }
+
+        .theme-toggle:hover {
+            background: var(--bg-secondary);
+        }
+
         .status-badge {
             padding: 0.5rem 1rem;
             border-radius: 25px;
@@ -64,31 +221,36 @@
         }
         
         .status-connected {
-            background: linear-gradient(45deg, #10b981, #059669);
+            background: var(--success-color);
             color: white;
         }
         
         .status-error {
-            background: linear-gradient(45deg, #ef4444, #dc2626);
+            background: var(--danger-color);
             color: white;
         }
-        
-        .container {
-            max-width: 1200px;
-            margin: 2rem auto;
-            padding: 0 20px;
+
+        /* Main Content */
+        .main-content {
+            margin-top: var(--header-height);
+            padding: 2rem;
+            transition: var(--transition);
         }
-        
+
+        .main-content.sidebar-open {
+            margin-left: var(--sidebar-width);
+        }
+
         .main-card {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            box-shadow: var(--shadow-lg);
             overflow: hidden;
+            border: 1px solid var(--border-color);
         }
         
         .card-header {
-            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            background: linear-gradient(135deg, var(--primary-color) 0%, #7c3aed 100%);
             color: white;
             padding: 2rem;
             text-align: center;
@@ -117,6 +279,7 @@
             display: flex;
             align-items: center;
             gap: 12px;
+            border: 1px solid var(--border-color);
         }
         
         .alert i {
@@ -124,22 +287,23 @@
         }
         
         .alert-error {
-            background: linear-gradient(45deg, #fef2f2, #fee2e2);
-            color: #991b1b;
-            border-left: 4px solid #dc2626;
+            background: var(--bg-tertiary);
+            color: var(--danger-color);
+            border-left: 4px solid var(--danger-color);
         }
         
         .csv-format {
-            background: linear-gradient(45deg, #f8fafc, #f1f5f9);
+            background: var(--bg-tertiary);
             padding: 2rem;
-            border-radius: 16px;
+            border-radius: 12px;
             margin-bottom: 2rem;
-            border-left: 4px solid #4f46e5;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            border-left: 4px solid var(--primary-color);
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color);
         }
         
         .csv-format h3 {
-            color: #4f46e5;
+            color: var(--primary-color);
             font-size: 1.375rem;
             font-weight: 700;
             margin-bottom: 0.75rem;
@@ -148,66 +312,9 @@
             gap: 10px;
         }
         
-        .format-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-        }
-        
-        .format-item {
-            background: white;
-            padding: 1rem;
-            border-radius: 10px;
-            border: 1px solid #e2e8f0;
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-            transition: all 0.2s ease;
-        }
-        
-        .format-item:hover {
-            border-color: #4f46e5;
-            box-shadow: 0 2px 8px rgba(79, 70, 229, 0.1);
-        }
-        
-        .format-label {
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-            font-weight: 600;
-            color: #4f46e5;
-            font-size: 0.875rem;
-            background: #eff6ff;
-            padding: 0.25rem 0.5rem;
-            border-radius: 4px;
-            display: inline-block;
-        }
-        
-        .format-desc {
-            color: #64748b;
-            font-size: 0.875rem;
-            line-height: 1.4;
-        }
-        
-        .sample-section {
-            background: white;
-            padding: 1.5rem;
-            border-radius: 12px;
-            border: 1px solid #e2e8f0;
-        }
-        
-        .sample-section h4 {
-            color: #374151;
-            font-size: 1rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
         .csv-format code {
-            background: #1e293b;
-            color: #e2e8f0;
+            background: var(--bg-primary);
+            color: var(--text-primary);
             padding: 1.25rem;
             border-radius: 8px;
             font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
@@ -215,14 +322,15 @@
             line-height: 1.5;
             display: block;
             overflow-x: auto;
-            border: 1px solid #334155;
+            border: 1px solid var(--border-color);
         }
         
         .form-section {
-            background: #f8fafc;
+            background: var(--bg-tertiary);
             padding: 2rem;
             border-radius: 12px;
             margin-bottom: 2rem;
+            border: 1px solid var(--border-color);
         }
         
         .form-group {
@@ -233,7 +341,7 @@
             display: block;
             margin-bottom: 0.5rem;
             font-weight: 600;
-            color: #374151;
+            color: var(--text-primary);
             font-size: 1rem;
         }
         
@@ -252,42 +360,42 @@
         }
         
         .file-input-display {
-            background: white;
-            border: 2px dashed #d1d5db;
+            background: var(--bg-primary);
+            border: 2px dashed var(--border-color);
             border-radius: 12px;
             padding: 2rem;
             text-align: center;
-            transition: all 0.3s ease;
+            transition: var(--transition);
             cursor: pointer;
         }
         
         .file-input-display:hover {
-            border-color: #4f46e5;
-            background: #f8fafc;
+            border-color: var(--primary-color);
+            background: var(--bg-secondary);
         }
         
         .file-input-display.dragover {
-            border-color: #4f46e5;
-            background: #eff6ff;
+            border-color: var(--primary-color);
+            background: var(--bg-secondary);
         }
         
         .file-input-display i {
             font-size: 3rem;
-            color: #9ca3af;
+            color: var(--text-tertiary);
             margin-bottom: 1rem;
         }
         
         .file-input-display.has-file {
-            border-color: #10b981;
-            background: #f0fdf4;
+            border-color: var(--success-color);
+            background: var(--bg-secondary);
         }
         
         .file-input-display.has-file i {
-            color: #10b981;
+            color: var(--success-color);
         }
         
         .btn {
-            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            background: linear-gradient(135deg, var(--primary-color) 0%, #7c3aed 100%);
             color: white;
             padding: 1rem 2rem;
             border: none;
@@ -296,7 +404,7 @@
             font-weight: 600;
             cursor: pointer;
             width: 100%;
-            transition: all 0.3s ease;
+            transition: var(--transition);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -309,19 +417,43 @@
         }
         
         .btn:disabled {
-            background: #9ca3af;
+            background: var(--text-tertiary);
             cursor: not-allowed;
             transform: none;
             box-shadow: none;
+        }
+        
+        select {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1rem;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            transition: var(--transition);
+        }
+        
+        select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+        
+        select:disabled {
+            background: var(--bg-tertiary);
+            color: var(--text-tertiary);
+            cursor: not-allowed;
         }
         
         .loading {
             display: none;
             text-align: center;
             padding: 2rem;
-            background: #f8fafc;
+            background: var(--bg-secondary);
             border-radius: 12px;
             margin: 2rem 0;
+            border: 1px solid var(--border-color);
         }
         
         .loading-content {
@@ -334,8 +466,8 @@
         .spinner {
             width: 40px;
             height: 40px;
-            border: 4px solid #e5e7eb;
-            border-top: 4px solid #4f46e5;
+            border: 4px solid var(--border-color);
+            border-top: 4px solid var(--primary-color);
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
@@ -351,15 +483,16 @@
         }
         
         .results-summary {
-            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            background: var(--bg-secondary);
             padding: 1.5rem;
             border-radius: 12px;
             margin-bottom: 1.5rem;
-            border-left: 4px solid #0ea5e9;
+            border-left: 4px solid var(--primary-color);
+            border: 1px solid var(--border-color);
         }
         
         .results-summary h3 {
-            color: #0c4a6e;
+            color: var(--primary-color);
             font-size: 1.25rem;
             margin-bottom: 1rem;
             display: flex;
@@ -375,51 +508,54 @@
         }
         
         .stat-item {
-            background: white;
+            background: var(--bg-primary);
             padding: 1rem;
             border-radius: 8px;
             text-align: center;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color);
         }
         
         .stat-number {
             font-size: 1.75rem;
             font-weight: bold;
             margin-bottom: 0.25rem;
+            color: var(--text-primary);
         }
         
         .stat-label {
-            color: #64748b;
+            color: var(--text-secondary);
             font-size: 0.875rem;
         }
         
         .results-table {
             width: 100%;
             border-collapse: collapse;
-            background: white;
+            background: var(--bg-primary);
             border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 4px 16px rgba(0,0,0,0.1);
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border-color);
         }
         
         .results-table th,
         .results-table td {
             padding: 1rem;
             text-align: left;
-            border-bottom: 1px solid #e5e7eb;
+            border-bottom: 1px solid var(--border-color);
         }
         
         .results-table th {
-            background: #f8fafc;
+            background: var(--bg-secondary);
             font-weight: 600;
-            color: #374151;
+            color: var(--text-primary);
             font-size: 0.875rem;
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
         
         .results-table tbody tr:hover {
-            background: #f9fafb;
+            background: var(--bg-secondary);
         }
         
         .status-badge-table {
@@ -433,53 +569,30 @@
         }
         
         .status-success {
-            background: #dcfce7;
-            color: #166534;
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success-color);
         }
         
         .status-error {
-            background: #fee2e2;
-            color: #991b1b;
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger-color);
         }
         
         .btn-small {
-            background: #4f46e5;
+            background: var(--primary-color);
             color: white;
             border: none;
             padding: 0.5rem 1rem;
             border-radius: 6px;
             font-size: 0.875rem;
             cursor: pointer;
-            transition: background-color 0.2s;
+            transition: var(--transition);
         }
         
         .btn-small:hover {
-            background: #4338ca;
+            background: var(--primary-hover);
         }
-        
-        select {
-            width: 100%;
-            padding: 0.75rem 1rem;
-            border: 2px solid #d1d5db;
-            border-radius: 8px;
-            font-size: 1rem;
-            background: white;
-            color: #374151;
-            transition: border-color 0.2s;
-        }
-        
-        select:focus {
-            outline: none;
-            border-color: #4f46e5;
-            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
-        }
-        
-        select:disabled {
-            background: #f3f4f6;
-            color: #9ca3af;
-            cursor: not-allowed;
-        }
-        
+
         .modal {
             display: none;
             position: fixed;
@@ -493,7 +606,7 @@
         }
         
         .modal-content {
-            background: white;
+            background: var(--bg-primary);
             margin: 2% auto;
             padding: 0;
             border-radius: 16px;
@@ -501,11 +614,12 @@
             max-width: 900px;
             max-height: 90vh;
             overflow: hidden;
-            box-shadow: 0 25px 50px rgba(0,0,0,0.25);
+            box-shadow: var(--shadow-xl);
+            border: 1px solid var(--border-color);
         }
         
         .modal-header {
-            background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+            background: linear-gradient(135deg, var(--primary-color) 0%, #7c3aed 100%);
             color: white;
             padding: 1.5rem 2rem;
             display: flex;
@@ -525,7 +639,7 @@
             font-size: 1.5rem;
             cursor: pointer;
             opacity: 0.8;
-            transition: opacity 0.2s;
+            transition: var(--transition);
         }
         
         .modal-close:hover {
@@ -539,10 +653,11 @@
         }
         
         .call-details-card {
-            background: #f8fafc;
+            background: var(--bg-secondary);
             padding: 1.5rem;
             border-radius: 12px;
             margin-bottom: 1.5rem;
+            border: 1px solid var(--border-color);
         }
         
         .detail-grid {
@@ -558,7 +673,7 @@
         
         .detail-label {
             font-size: 0.75rem;
-            color: #64748b;
+            color: var(--text-tertiary);
             text-transform: uppercase;
             letter-spacing: 0.05em;
             margin-bottom: 0.25rem;
@@ -566,12 +681,12 @@
         
         .detail-value {
             font-weight: 600;
-            color: #1e293b;
+            color: var(--text-primary);
         }
         
         .transcript-card {
-            background: #1e293b;
-            color: #e2e8f0;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
             padding: 1.5rem;
             border-radius: 12px;
             font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
@@ -579,17 +694,31 @@
             line-height: 1.6;
             max-height: 400px;
             overflow-y: auto;
+            border: 1px solid var(--border-color);
+        }
+
+        /* Overlay */
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            opacity: 0;
+            visibility: hidden;
+            transition: var(--transition);
+        }
+
+        .sidebar-overlay.active {
+            opacity: 1;
+            visibility: visible;
         }
         
         @media (max-width: 768px) {
-            .header-content {
-                flex-direction: column;
-                gap: 1rem;
-                text-align: center;
-            }
-            
-            .container {
-                padding: 0 1rem;
+            .main-content {
+                padding: 1rem;
             }
             
             .card-header h1 {
@@ -609,15 +738,87 @@
                 padding: 0.75rem 0.5rem;
             }
         }
+
+        @media (min-width: 1024px) {
+            .sidebar {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: var(--sidebar-width);
+            }
+
+            .sidebar-overlay {
+                display: none;
+            }
+
+            .sidebar-toggle {
+                display: none;
+            }
+        }
     </style>
 </head>
-<body>
-    <div class="header">
-        <div class="header-content">
-            <div class="logo">
+<body data-theme="light">
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <a href="/" class="sidebar-logo">
                 <i class="fas fa-phone-alt"></i>
-                <span>Bland AI Call Center</span>
+                <span>Bland AI</span>
+            </a>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-section-title">Main</div>
+                <a href="/" class="nav-link">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/upload" class="nav-link active">
+                    <i class="fas fa-upload"></i>
+                    <span>Upload CSV</span>
+                </a>
             </div>
+            <div class="nav-section">
+                <div class="nav-section-title">Analytics</div>
+                <a href="#" class="nav-link" onclick="alert('Feature coming soon!')">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>Reports</span>
+                </a>
+                <a href="#" class="nav-link" onclick="alert('Feature coming soon!')">
+                    <i class="fas fa-history"></i>
+                    <span>Call History</span>
+                </a>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title">Settings</div>
+                <a href="#" class="nav-link" onclick="alert('Feature coming soon!')">
+                    <i class="fas fa-cog"></i>
+                    <span>Configuration</span>
+                </a>
+                <a href="#" class="nav-link" onclick="alert('Feature coming soon!')">
+                    <i class="fas fa-user"></i>
+                    <span>Profile</span>
+                </a>
+            </div>
+        </nav>
+    </div>
+
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- Header -->
+    <div class="header">
+        <div class="header-left">
+            <button class="sidebar-toggle" id="sidebarToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            <h1 class="header-title">Upload CSV</h1>
+        </div>
+        <div class="header-right">
+            <button class="theme-toggle" id="themeToggle" title="Toggle theme">
+                <i class="fas fa-moon"></i>
+            </button>
             <div class="status-badge {% if has_api_key %}status-connected{% else %}status-error{% endif %}">
                 <i class="fas {% if has_api_key %}fa-check-circle{% else %}fa-exclamation-triangle{% endif %}"></i>
                 {% if has_api_key %}API Connected{% else %}API Not Configured{% endif %}
@@ -625,7 +826,8 @@
         </div>
     </div>
 
-    <div class="container">
+    <!-- Main Content -->
+    <div class="main-content" id="mainContent">
         <div class="main-card">
             <div class="card-header">
                 <h1>Professional Call Management</h1>
@@ -648,7 +850,7 @@
                         <i class="fas fa-file-csv"></i>
                         File Format Requirements
                     </h3>
-                    <p style="margin-bottom: 1rem; color: #64748b;">
+                    <p style="margin-bottom: 1rem; color: var(--text-secondary);">
                         <strong>Supported formats:</strong> CSV (.csv) and Excel (.xlsx)<br>
                         <strong>Required columns:</strong> <code>phone_number</code>, <code>patient_name</code>, <code>office_location</code>, <code>date</code> (YYYY-MM-DD), <code>time</code> (HH:MM), <code>provider_name</code>
                     </p>
@@ -776,6 +978,57 @@
     </div>
 
     <script>
+        // Theme management
+        const themeToggle = document.getElementById('themeToggle');
+        const body = document.body;
+        const themeIcon = themeToggle.querySelector('i');
+
+        // Load saved theme or default to light
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        body.setAttribute('data-theme', savedTheme);
+        updateThemeIcon(savedTheme);
+
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = body.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            
+            body.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeIcon(newTheme);
+        });
+
+        function updateThemeIcon(theme) {
+            themeIcon.className = theme === 'light' ? 'fas fa-moon' : 'fas fa-sun';
+        }
+
+        // Sidebar management
+        const sidebar = document.getElementById('sidebar');
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+        const mainContent = document.getElementById('mainContent');
+
+        sidebarToggle.addEventListener('click', toggleSidebar);
+        sidebarOverlay.addEventListener('click', closeSidebar);
+
+        function toggleSidebar() {
+            sidebar.classList.toggle('open');
+            sidebarOverlay.classList.toggle('active');
+            mainContent.classList.toggle('sidebar-open');
+        }
+
+        function closeSidebar() {
+            sidebar.classList.remove('open');
+            sidebarOverlay.classList.remove('active');
+            mainContent.classList.remove('sidebar-open');
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (window.innerWidth >= 1024) {
+                closeSidebar();
+            }
+        });
+
         // Enhanced file upload with drag and drop
         const fileInput = document.getElementById('csvFile');
         const fileDisplay = document.getElementById('fileDisplay');
@@ -865,11 +1118,11 @@
                                 <div class="stat-label">Total Calls</div>
                             </div>
                             <div class="stat-item">
-                                <div class="stat-number" style="color: #10b981;">${result.successful_calls}</div>
+                                <div class="stat-number" style="color: var(--success-color);">${result.successful_calls}</div>
                                 <div class="stat-label">Successful</div>
                             </div>
                             <div class="stat-item">
-                                <div class="stat-number" style="color: #ef4444;">${result.failed_calls}</div>
+                                <div class="stat-number" style="color: var(--danger-color);">${result.failed_calls}</div>
                                 <div class="stat-label">Failed</div>
                             </div>
                             <div class="stat-item">
@@ -910,7 +1163,7 @@
                                     `<button class="btn-small" onclick="viewTranscript('${call.call_id}', '${call.patient_name}')">
                                         <i class="fas fa-eye"></i> View Details
                                      </button>` : 
-                                    '<span style="color: #9ca3af;">N/A</span>'}
+                                    '<span style="color: var(--text-tertiary);">N/A</span>'}
                             </td>
                         `;
                     });
@@ -972,7 +1225,7 @@
                     
                     callDetails.innerHTML = `
                         <div class="call-details-card">
-                            <h4 style="margin-bottom: 1rem; color: #4f46e5;"><i class="fas fa-info-circle"></i> Call Information</h4>
+                            <h4 style="margin-bottom: 1rem; color: var(--primary-color);"><i class="fas fa-info-circle"></i> Call Information</h4>
                             <div class="detail-grid">
                                 <div class="detail-item">
                                     <div class="detail-label">Call ID</div>
@@ -1000,7 +1253,7 @@
                     
                     transcriptContent.innerHTML = `
                         <div>
-                            <h4 style="margin-bottom: 1rem; color: #4f46e5;"><i class="fas fa-comments"></i> Call Transcript</h4>
+                            <h4 style="margin-bottom: 1rem; color: var(--primary-color);"><i class="fas fa-comments"></i> Call Transcript</h4>
                             <div class="transcript-card">
 ${data.transcript || 'Transcript not available yet. Call may still be in progress or completed without recording.'}
                             </div>
@@ -1034,6 +1287,8 @@ ${data.transcript || 'Transcript not available yet. Call may still be in progres
                 closeModal();
             }
         }
+
+        console.log('Upload page loaded successfully');
     </script>
 </body>
 </html>
