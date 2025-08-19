@@ -247,15 +247,16 @@ class Campaign(BaseModel):
     file_data: Optional[bytes] = None
 
 
-def format_phone_number(phone_number: str, country_code: str) -> str:
+def format_phone_number(phone_number, country_code) -> str:
     """Format phone number with the selected country code"""
     if phone_number is None:
         phone_number = ''
     if country_code is None:
         country_code = '+1'
-    
-    # Remove all non-digit characters
-    cleaned = re.sub(r'[^\d]', '', str(phone_number).strip())
+
+    # Convert to string and remove all non-digit characters
+    phone_str = str(phone_number) if phone_number is not None else ''
+    cleaned = re.sub(r'[^\d]', '', phone_str.strip())
 
     # Add the selected country code
     return f"{country_code}{cleaned}"
@@ -754,18 +755,23 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
                 continue
 
             # Format phone number with campaign's country code
-            phone_number_str = str(row.get('phone_number', '')).strip() if row.get('phone_number') is not None else ''
-            formatted_phone = format_phone_number(phone_number_str, campaign['country_code'])
-            print(f"📞 Campaign {campaign['name']}: {phone_number_str} -> Formatted: {formatted_phone} (Country Code: {campaign['country_code']})")
+            phone_number_raw = row.get('phone_number', '')
+            phone_number_str = str(phone_number_raw).strip() if phone_number_raw is not None else ''
+            campaign_country_code = campaign.get('country_code', '+1') or '+1'
+            formatted_phone = format_phone_number(phone_number_str, campaign_country_code)
+            print(f"📞 Campaign {campaign['name']}: {phone_number_str} -> Formatted: {formatted_phone} (Country Code: {campaign_country_code})")
 
-            # Create call request
+            # Create call request - safely handle None values
+            def safe_str(value):
+                return str(value).strip() if value is not None else ''
+
             call_request = CallRequest(
                 phone_number=formatted_phone,
-                patient_name=str(row.get('patient_name', '')).strip() if row.get('patient_name') is not None else '',
-                provider_name=str(row.get('provider_name', '')).strip() if row.get('provider_name') is not None else '',
-                appointment_date=str(row.get('date', '')).strip() if row.get('date') is not None else '',
-                appointment_time=str(row.get('time', '')).strip() if row.get('time') is not None else '',
-                office_location=str(row.get('office_location', '')).strip() if row.get('office_location') is not None else '')
+                patient_name=safe_str(row.get('patient_name', '')),
+                provider_name=safe_str(row.get('provider_name', '')),
+                appointment_date=safe_str(row.get('date', '')),
+                appointment_time=safe_str(row.get('time', '')),
+                office_location=safe_str(row.get('office_location', '')))
             call_requests.append(call_request)
 
         # Process all valid calls concurrently (max 10 at a time)
@@ -896,20 +902,25 @@ async def process_csv(file: UploadFile = File(...),
                 continue
 
             # Format phone number with selected country code
-            phone_number_str = str(row.get('phone_number', '')).strip() if row.get('phone_number') is not None else ''
-            formatted_phone = format_phone_number(phone_number_str, country_code)
+            phone_number_raw = row.get('phone_number', '')
+            phone_number_str = str(phone_number_raw).strip() if phone_number_raw is not None else ''
+            safe_country_code = country_code or '+1'
+            formatted_phone = format_phone_number(phone_number_str, safe_country_code)
             print(
-                f"📞 CSV Row: {phone_number_str} -> Formatted: {formatted_phone} (Country Code: {country_code})"
+                f"📞 CSV Row: {phone_number_str} -> Formatted: {formatted_phone} (Country Code: {safe_country_code})"
             )
 
-            # Create call request
+            # Create call request - safely handle None values
+            def safe_str(value):
+                return str(value).strip() if value is not None else ''
+
             call_request = CallRequest(
                 phone_number=formatted_phone,
-                patient_name=str(row.get('patient_name', '')).strip() if row.get('patient_name') is not None else '',
-                provider_name=str(row.get('provider_name', '')).strip() if row.get('provider_name') is not None else '',
-                appointment_date=str(row.get('date', '')).strip() if row.get('date') is not None else '',
-                appointment_time=str(row.get('time', '')).strip() if row.get('time') is not None else '',
-                office_location=str(row.get('office_location', '')).strip() if row.get('office_location') is not None else '')
+                patient_name=safe_str(row.get('patient_name', '')),
+                provider_name=safe_str(row.get('provider_name', '')),
+                appointment_date=safe_str(row.get('date', '')),
+                appointment_time=safe_str(row.get('time', '')),
+                office_location=safe_str(row.get('office_location', '')))
             call_requests.append(call_request)
 
         # Process all valid calls concurrently (max 10 at a time)
