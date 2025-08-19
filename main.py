@@ -760,18 +760,21 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
 @app.get("/voice_preview/{voice_id}")
 async def voice_preview(voice_id: str):
     """Get voice preview audio URL"""
-    # In a real implementation, you would have actual preview audio URLs
-    preview_urls = {
-        "61507da3-4abd-49b6-983f-9ce659fd9e91": "https://example.com/preview/male_professional.mp3",
-        "70f05206-71ab-4b39-b238-ed1bf17b365a": "https://example.com/preview/female_professional.mp3",
-        "2f9fdbc7-4bf2-4792-8a18-21ce3c93978f": "https://example.com/preview/female_warm.mp3",
-        "17e8f694-d230-4b64-b040-6108088d9e6c": "https://example.com/preview/female_clear.mp3",
-        "bbeabae6-ec8d-444f-92ad-c8e620d3de8d": "https://example.com/preview/female_friendly.mp3",
-        "a3d43393-dacb-43d3-91d7-b4cb913a5908": "https://example.com/preview/male_casual.mp3",
-        "90295ec4-f0fe-4783-ab33-8b997ddc3ae4": "https://example.com/preview/male_warm.mp3",
-        "37b3f1c8-a01e-4d70-b251-294733f08371": "https://example.com/preview/male_clear.mp3"
-    }
-    return {"preview_url": preview_urls.get(voice_id, "")}
+    try:
+        # In a real implementation, you would have actual preview audio URLs
+        preview_urls = {
+            "61507da3-4abd-49b6-983f-9ce659fd9e91": "https://example.com/preview/male_professional.mp3",
+            "70f05206-71ab-4b39-b238-ed1bf17b365a": "https://example.com/preview/female_professional.mp3",
+            "2f9fdbc7-4bf2-4792-8a18-21ce3c93978f": "https://example.com/preview/female_warm.mp3",
+            "17e8f694-d230-4b64-b040-6108088d9e6c": "https://example.com/preview/female_clear.mp3",
+            "bbeabae6-ec8d-444f-92ad-c8e620d3de8d": "https://example.com/preview/female_friendly.mp3",
+            "a3d43393-dacb-43d3-91d7-b4cb913a5908": "https://example.com/preview/male_casual.mp3",
+            "90295ec4-f0fe-4783-ab33-8b997ddc3ae4": "https://example.com/preview/male_warm.mp3",
+            "37b3f1c8-a01e-4d70-b251-294733f08371": "https://example.com/preview/male_clear.mp3"
+        }
+        return {"success": True, "preview_url": preview_urls.get(voice_id, "")}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error getting voice preview: {str(e)}")
 
 
 @app.post("/process_csv")
