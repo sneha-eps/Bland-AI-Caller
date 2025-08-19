@@ -4,17 +4,19 @@ import requests
 import csv
 import io
 import pandas as pd
-import time  # Add time import for delays
+import time
 import asyncio
 import aiohttp
+import uuid
+from datetime import datetime
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional, List, Dict, Any
 import importlib
 import importlib.util
-import re  # Import the re module for regular expressions
+import re
 
 # Check if 'blandai' package is available (optional since we're using requests directly)
 try:
@@ -537,7 +539,7 @@ async def campaigns_page(request: Request, client_id: str = None, client_name: s
     try:
         clients = load_clients()
         campaigns = load_campaigns()
-        has_api_key = bool(os.getenv("BLAND_API_KEY"))
+        has_api_key = bool(get_api_key())
 
         # Filter campaigns by client if client_id is provided
         filtered_campaigns = campaigns
@@ -547,12 +549,13 @@ async def campaigns_page(request: Request, client_id: str = None, client_name: s
         # Remove file data from campaigns to make them JSON serializable
         serializable_campaigns = []
         for campaign in filtered_campaigns:
-            campaign_copy = campaign.copy()
+            campaign_copy = campaign.copy() if isinstance(campaign, dict) else campaign
             # Remove any file-related data that might be bytes
-            if 'file_data' in campaign_copy:
-                del campaign_copy['file_data']
-            if 'csv_data' in campaign_copy:
-                del campaign_copy['csv_data']
+            if isinstance(campaign_copy, dict):
+                if 'file_data' in campaign_copy:
+                    del campaign_copy['file_data']
+                if 'csv_data' in campaign_copy:
+                    del campaign_copy['csv_data']
             serializable_campaigns.append(campaign_copy)
 
         return templates.TemplateResponse("campaigns.html", {
@@ -564,13 +567,13 @@ async def campaigns_page(request: Request, client_id: str = None, client_name: s
             "filtered_client_name": client_name
         })
     except Exception as e:
+        print(f"Error in campaigns_page: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error loading campaigns page: {str(e)}")
 
 
 @app.post("/add_client")
 async def add_client(client: Client):
     """Add a new client"""
-    import uuid
     client_id = str(uuid.uuid4())
     client.id = client_id
     clients_db[client_id] = client.dict()
@@ -588,8 +591,6 @@ async def add_campaign(
 ):
     """Add a new campaign with file"""
     try:
-        import uuid
-
         # Validate required fields
         if not name or not name.strip():
             raise HTTPException(status_code=400, detail="Campaign name is required.")
@@ -790,7 +791,7 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
             "total_calls": len(results),
             "successful_calls": successful_calls,
             "failed_calls": failed_calls,
-            "started_at": pd.Timestamp.now().isoformat(),
+            "started_at": datetime.now().isoformat(),
             "results": [result.dict() for result in results]
         }
 
@@ -953,8 +954,12 @@ async def get_campaign_analytics(campaign_id: str):
                             detail="BLAND_API_KEY not found in Secrets.")
 
     try:
+        # Initialize results_db if it doesn't exist
+        if not hasattr(start_campaign, 'results_db'):
+            start_campaign.results_db = {}
+
         # Get campaign results from in-memory storage (in production, use a database)
-        if hasattr(start_campaign, 'results_db') and campaign_id in start_campaign.results_db:
+        if campaign_id in start_campaign.results_db:
             campaign_results = start_campaign.results_db[campaign_id]
 
             # Get detailed call information for each call
@@ -965,7 +970,9 @@ async def get_campaign_analytics(campaign_id: str):
                 'cancelled': 0,
                 'rescheduled': 0,
                 'busy': 0,
-                'voicemail': 0
+                'voicemail': 0,
+                'completed': 0,
+                'failed': 0
             }
 
             for result in campaign_results['results']:
@@ -1017,18 +1024,19 @@ async def get_campaign_analytics(campaign_id: str):
                                 status_counts['busy'] += 1
                             else:
                                 call_details['call_status'] = 'completed'
-                                status_counts['busy'] += 1  # Count as busy if status unclear
+                                status_counts['completed'] += 1
                         else:
                             call_details['call_status'] = 'failed'
-                            status_counts['busy'] += 1
-                    except:
-                        # If we can't get call details, count as busy
+                            status_counts['failed'] += 1
+                    except Exception as e:
+                        # If we can't get call details, count as failed
                         call_details['call_status'] = 'failed'
-                        status_counts['busy'] += 1
+                        status_counts['failed'] += 1
+                        print(f"Error getting call details for {result.get('call_id')}: {str(e)}")
                 else:
-                    # Failed calls count as busy
+                    # Failed calls count as failed
                     call_details['call_status'] = 'failed'
-                    status_counts['busy'] += 1
+                    status_counts['failed'] += 1
 
                 calls_with_details.append(call_details)
 
