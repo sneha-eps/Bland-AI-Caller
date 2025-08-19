@@ -627,11 +627,11 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(...)):
             # Create call request
             call_request = CallRequest(
                 phone_number=formatted_phone,
-                patient_name=row['patient_name'].strip(),
-                provider_name=row['provider_name'].strip(),
-                appointment_date=row['date'].strip(),
-                appointment_time=row['time'].strip(),
-                office_location=row['office_location'].strip())
+                patient_name=str(row['patient_name']).strip(),
+                provider_name=str(row['provider_name']).strip(),
+                appointment_date=str(row['date']).strip(),
+                appointment_time=str(row['time']).strip(),
+                office_location=str(row['office_location']).strip())
             call_requests.append(call_request)
 
         # Process all valid calls concurrently (max 10 at a time)
@@ -770,11 +770,11 @@ async def process_csv(file: UploadFile = File(...),
             # Create call request
             call_request = CallRequest(
                 phone_number=formatted_phone,
-                patient_name=row['patient_name'].strip(),
-                provider_name=row['provider_name'].strip(),
-                appointment_date=row['date'].strip(),
-                appointment_time=row['time'].strip(),
-                office_location=row['office_location'].strip())
+                patient_name=str(row['patient_name']).strip(),
+                provider_name=str(row['provider_name']).strip(),
+                appointment_date=str(row['date']).strip(),
+                appointment_time=str(row['time']).strip(),
+                office_location=str(row['office_location']).strip())
             call_requests.append(call_request)
 
         # Process all valid calls concurrently (max 10 at a time)
