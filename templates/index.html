@@ -646,9 +646,12 @@
                 <div class="csv-format">
                     <h3>
                         <i class="fas fa-file-csv"></i>
-                        CSV Format Requirements
+                        File Format Requirements
                     </h3>
-                    <p style="margin-bottom: 1rem; color: #64748b;">Required columns: <code>phone_number</code>, <code>patient_name</code>, <code>office_location</code>, <code>date</code> (YYYY-MM-DD), <code>time</code> (HH:MM), <code>provider_name</code></p>
+                    <p style="margin-bottom: 1rem; color: #64748b;">
+                        <strong>Supported formats:</strong> CSV (.csv) and Excel (.xlsx)<br>
+                        <strong>Required columns:</strong> <code>phone_number</code>, <code>patient_name</code>, <code>office_location</code>, <code>date</code> (YYYY-MM-DD), <code>time</code> (HH:MM), <code>provider_name</code>
+                    </p>
                     
                     <code>phone_number,patient_name,office_location,date,time,provider_name
 1234567890,John Smith,123 Main St Downtown Clinic,2024-01-15,14:30,Dr. Johnson
@@ -707,14 +710,14 @@
                         <div class="form-group">
                             <label for="csvFile">
                                 <i class="fas fa-cloud-upload-alt"></i>
-                                Upload CSV File
+                                Upload CSV or Excel File
                             </label>
                             <div class="file-input-wrapper">
-                                <input type="file" id="csvFile" name="file" accept=".csv" required {% if not has_api_key %}disabled{% endif %}>
+                                <input type="file" id="csvFile" name="file" accept=".csv,.xlsx" required {% if not has_api_key %}disabled{% endif %}>
                                 <div class="file-input-display" id="fileDisplay">
                                     <i class="fas fa-cloud-upload-alt"></i>
                                     <div>
-                                        <strong>Click to select CSV file</strong><br>
+                                        <strong>Click to select CSV or Excel file</strong><br>
                                         <span>or drag and drop your file here</span>
                                     </div>
                                 </div>
@@ -723,7 +726,7 @@
                         
                         <button type="submit" class="btn" {% if not has_api_key %}disabled{% endif %}>
                             <i class="fas fa-phone"></i>
-                            Process CSV & Initiate Calls
+                            Process File & Initiate Calls
                         </button>
                     </form>
                 </div>
@@ -732,7 +735,7 @@
                     <div class="loading-content">
                         <div class="spinner"></div>
                         <h3>Processing Your Request</h3>
-                        <p>Analyzing CSV file and initiating automated calls...</p>
+                        <p>Analyzing file and initiating automated calls...</p>
                     </div>
                 </div>
                 
@@ -781,8 +784,9 @@
             const file = e.target.files[0];
             if (file) {
                 fileDisplay.classList.add('has-file');
+                const fileIcon = file.name.endsWith('.xlsx') ? 'fa-file-excel' : 'fa-file-csv';
                 fileDisplay.innerHTML = `
-                    <i class="fas fa-file-csv"></i>
+                    <i class="fas ${fileIcon}"></i>
                     <div>
                         <strong>${file.name}</strong><br>
                         <span>Ready to process (${(file.size / 1024).toFixed(1)} KB)</span>
@@ -832,7 +836,7 @@
             const submitBtn = form.querySelector('button[type="submit"]');
             
             if (!fileInput.files.length) {
-                alert('Please select a CSV file');
+                alert('Please select a CSV or Excel file');
                 return;
             }
             

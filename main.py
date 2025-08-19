@@ -3,6 +3,7 @@ import sys
 import requests
 import csv
 import io
+import pandas as pd
 import time  # Add time import for delays
 import asyncio
 import aiohttp
@@ -490,7 +491,7 @@ async def upload_page(request: Request):
 @app.post("/process_csv")
 async def process_csv(file: UploadFile = File(...),
                       country_code: str = Form("+1")):
-    """Process CSV file and make calls for all rows"""
+    """Process CSV or XLSX file and make calls for all rows"""
     api_key = get_api_key()
 
     if not api_key:
@@ -499,23 +500,31 @@ async def process_csv(file: UploadFile = File(...),
             detail=
             "BLAND_API_KEY not found in Secrets. Please add your API key.")
 
-    # Check if file is CSV
-    if not file.filename or not file.filename.endswith('.csv'):
+    # Check if file is CSV or XLSX
+    if not file.filename or not (file.filename.endswith('.csv') or file.filename.endswith('.xlsx')):
         raise HTTPException(status_code=400,
-                            detail="Please upload a CSV file.")
+                            detail="Please upload a CSV or XLSX file.")
 
     try:
-        # Read CSV content
+        # Read file content based on format
         content = await file.read()
-        csv_string = content.decode('utf-8')
-        csv_reader = csv.DictReader(io.StringIO(csv_string))
+        
+        if file.filename.endswith('.xlsx'):
+            # Read Excel file
+            df = pd.read_excel(io.BytesIO(content))
+            rows = df.to_dict('records')
+        else:
+            # Read CSV file
+            csv_string = content.decode('utf-8')
+            csv_reader = csv.DictReader(io.StringIO(csv_string))
+            rows = list(csv_reader)
 
         results = []
         row_count = 0
 
         # Prepare all call requests
         call_requests = []
-        for row in csv_reader:
+        for row in rows:
             row_count += 1
             # Validate required fields
             required_fields = [
