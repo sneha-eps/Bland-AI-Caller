@@ -479,6 +479,48 @@
             box-shadow: 0 8px 20px rgba(79, 70, 229, 0.3);
         }
 
+        .btn-start-campaign {
+            background: linear-gradient(135deg, var(--success-color) 0%, #059669 100%);
+            color: white;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.875rem;
+            flex: 1;
+        }
+
+        .btn-start-campaign:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 15px rgba(16, 185, 129, 0.3);
+        }
+
+        .btn-view-results {
+            background: linear-gradient(135deg, var(--warning-color) 0%, #d97706 100%);
+            color: white;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.875rem;
+            flex: 1;
+        }
+
+        .btn-view-results:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 15px rgba(245, 158, 11, 0.3);
+        }
+
         .empty-state {
             text-align: center;
             padding: 4rem 2rem;
@@ -654,7 +696,7 @@
                 <div class="campaign-info">
                     <div class="info-item">
                         <i class="fas fa-user"></i>
-                        <span>Client: {{ campaign.client_id }}</span>
+                        <span>Client: {% for client in clients %}{% if client.id == campaign.client_id %}{{ client.name }}{% endif %}{% endfor %}</span>
                     </div>
                     <div class="info-item">
                         <i class="fas fa-redo"></i>
@@ -668,6 +710,16 @@
                         <i class="fas fa-globe"></i>
                         <span>Country: {{ campaign.country_code }}</span>
                     </div>
+                </div>
+                <div style="margin-top: 1rem; display: flex; gap: 0.5rem;">
+                    <button class="btn-start-campaign" onclick="startCampaign('{{ campaign.id }}', '{{ campaign.name }}')">
+                        <i class="fas fa-play"></i>
+                        Start Campaign
+                    </button>
+                    <button class="btn-view-results" onclick="viewCampaignResults('{{ campaign.id }}')">
+                        <i class="fas fa-chart-bar"></i>
+                        View Results
+                    </button>
                 </div>
             </div>
             {% endfor %}
@@ -683,6 +735,47 @@
             </button>
         </div>
         {% endif %}
+    </div>
+
+    <!-- Start Campaign Modal -->
+    <div id="startCampaignModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-play"></i> Start Campaign</h3>
+                <button class="modal-close" onclick="closeStartCampaignModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="startCampaignForm">
+                    <input type="hidden" id="campaignId" name="campaign_id">
+                    
+                    <div class="form-group">
+                        <label>Campaign</label>
+                        <input type="text" id="campaignNameDisplay" readonly style="background: var(--bg-secondary);">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="campaignCsvFile">Upload CSV/Excel File with Contact Data</label>
+                        <div class="file-input-wrapper">
+                            <input type="file" id="campaignCsvFile" name="file" accept=".csv,.xlsx" required>
+                            <div class="file-input-display" id="campaignFileDisplay">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <div>
+                                    <strong>Click to select CSV or Excel file</strong><br>
+                                    <span>File should contain: phone_number, patient_name, date, time, provider_name, office_location</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn-submit">
+                        <i class="fas fa-rocket"></i>
+                        Start Campaign Calls
+                    </button>
+                </form>
+            </div>
+        </div>
     </div>
 
     <!-- Create Campaign Modal -->
@@ -919,11 +1012,83 @@
             }
         });
 
+        // Campaign management functions
+        function startCampaign(campaignId, campaignName) {
+            document.getElementById('campaignId').value = campaignId;
+            document.getElementById('campaignNameDisplay').value = campaignName;
+            document.getElementById('startCampaignModal').style.display = 'block';
+        }
+
+        function closeStartCampaignModal() {
+            document.getElementById('startCampaignModal').style.display = 'none';
+            document.getElementById('startCampaignForm').reset();
+        }
+
+        function viewCampaignResults(campaignId) {
+            // For now, show an alert - this can be expanded to show detailed results
+            alert('Campaign results feature coming soon! Campaign ID: ' + campaignId);
+        }
+
+        // Handle campaign file upload
+        const campaignFileInput = document.getElementById('campaignCsvFile');
+        const campaignFileDisplay = document.getElementById('campaignFileDisplay');
+
+        campaignFileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                campaignFileDisplay.classList.add('has-file');
+                const fileIcon = file.name.endsWith('.xlsx') ? 'fa-file-excel' : 'fa-file-csv';
+                campaignFileDisplay.innerHTML = `
+                    <i class="fas ${fileIcon}"></i>
+                    <div>
+                        <strong>${file.name}</strong><br>
+                        <span>Ready to process (${(file.size / 1024).toFixed(1)} KB)</span>
+                    </div>
+                `;
+            }
+        });
+
+        // Start campaign form submission
+        document.getElementById('startCampaignForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const campaignId = formData.get('campaign_id');
+            const file = formData.get('file');
+            
+            if (!file) {
+                alert('Please select a CSV or Excel file');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/start_campaign/${campaignId}`, {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert(`Campaign started successfully! Total calls: ${result.total_calls}, Successful: ${result.successful_calls}, Failed: ${result.failed_calls}`);
+                    closeStartCampaignModal();
+                } else {
+                    alert('Error starting campaign: ' + (result.detail || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error starting campaign: ' + error.message);
+            }
+        });
+
         // Close modal when clicking outside
         window.onclick = function(event) {
-            const modal = document.getElementById('createCampaignModal');
-            if (event.target === modal) {
+            const createModal = document.getElementById('createCampaignModal');
+            const startModal = document.getElementById('startCampaignModal');
+            if (event.target === createModal) {
                 closeCreateCampaignModal();
+            }
+            if (event.target === startModal) {
+                closeStartCampaignModal();
             }
         }
     </script>

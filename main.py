@@ -554,6 +554,138 @@ async def add_campaign(campaign: Campaign):
     return {"success": True, "campaign_id": campaign_id, "message": "Campaign created successfully"}
 
 
+@app.post("/start_campaign/{campaign_id}")
+async def start_campaign(campaign_id: str, file: UploadFile = File(...)):
+    """Start a campaign by processing the uploaded CSV/Excel file"""
+    api_key = get_api_key()
+
+    if not api_key:
+        raise HTTPException(
+            status_code=400,
+            detail="BLAND_API_KEY not found in Secrets. Please add your API key.")
+
+    # Get campaign details
+    if campaign_id not in campaigns_db:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    
+    campaign = campaigns_db[campaign_id]
+    
+    # Get client details
+    client_id = campaign['client_id']
+    if client_id not in clients_db:
+        raise HTTPException(status_code=404, detail="Client not found")
+    
+    client = clients_db[client_id]
+
+    # Check if file is CSV or XLSX
+    if not file.filename or not (file.filename.endswith('.csv') or file.filename.endswith('.xlsx')):
+        raise HTTPException(status_code=400, detail="Please upload a CSV or XLSX file.")
+
+    try:
+        # Read file content based on format
+        content = await file.read()
+        
+        if file.filename.endswith('.xlsx'):
+            # Read Excel file
+            df = pd.read_excel(io.BytesIO(content))
+            rows = df.to_dict('records')
+        else:
+            # Read CSV file
+            csv_string = content.decode('utf-8')
+            csv_reader = csv.DictReader(io.StringIO(csv_string))
+            rows = list(csv_reader)
+
+        results = []
+        row_count = 0
+
+        # Prepare all call requests
+        call_requests = []
+        for row in rows:
+            row_count += 1
+            # Validate required fields
+            required_fields = [
+                'phone_number', 'patient_name', 'date', 'time', 'provider_name', 'office_location'
+            ]
+            missing_fields = [
+                field for field in required_fields
+                if not row.get(field, '').strip()
+            ]
+
+            if missing_fields:
+                results.append(
+                    CallResult(
+                        success=False,
+                        error=f"Missing required fields: {', '.join(missing_fields)}",
+                        patient_name=row.get('patient_name', 'Unknown'),
+                        phone_number=row.get('phone_number', 'Unknown')))
+                continue
+
+            # Format phone number with campaign's country code
+            formatted_phone = format_phone_number(row['phone_number'].strip(), campaign['country_code'])
+            print(f"📞 Campaign {campaign['name']}: {row['phone_number'].strip()} -> Formatted: {formatted_phone} (Country Code: {campaign['country_code']})")
+
+            # Create call request
+            call_request = CallRequest(
+                phone_number=formatted_phone,
+                patient_name=row['patient_name'].strip(),
+                provider_name=row['provider_name'].strip(),
+                appointment_date=row['date'].strip(),
+                appointment_time=row['time'].strip(),
+                office_location=row['office_location'].strip())
+            call_requests.append(call_request)
+
+        # Process all valid calls concurrently (max 10 at a time)
+        if call_requests:
+            print(f"🚀 Starting campaign '{campaign['name']}' - Processing {len(call_requests)} calls concurrently (max 10 simultaneous)")
+
+            # Create semaphore to limit concurrent calls to 10
+            semaphore = asyncio.Semaphore(10)
+
+            # Create tasks for all calls
+            tasks = [
+                make_single_call_async(call_request, api_key, semaphore)
+                for call_request in call_requests
+            ]
+
+            # Run all tasks concurrently
+            concurrent_results = await asyncio.gather(*tasks)
+            results.extend(concurrent_results)
+
+        # Calculate summary
+        successful_calls = sum(1 for r in results if r.success)
+        failed_calls = len(results) - successful_calls
+
+        # Store campaign results (in production, use a database)
+        campaign_results = {
+            "campaign_id": campaign_id,
+            "campaign_name": campaign['name'],
+            "client_name": client['name'],
+            "total_calls": len(results),
+            "successful_calls": successful_calls,
+            "failed_calls": failed_calls,
+            "started_at": pd.Timestamp.now().isoformat(),
+            "results": [result.dict() for result in results]
+        }
+        
+        # Store in a simple in-memory results database
+        if not hasattr(start_campaign, 'results_db'):
+            start_campaign.results_db = {}
+        start_campaign.results_db[campaign_id] = campaign_results
+
+        return {
+            "success": True,
+            "campaign_id": campaign_id,
+            "campaign_name": campaign['name'],
+            "total_calls": len(results),
+            "successful_calls": successful_calls,
+            "failed_calls": failed_calls,
+            "results": [result.dict() for result in results]
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error starting campaign: {str(e)}")
+
+
 @app.get("/voice_preview/{voice_id}")
 async def voice_preview(voice_id: str):
     """Get voice preview audio URL"""
