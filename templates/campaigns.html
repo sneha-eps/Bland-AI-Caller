@@ -782,16 +782,6 @@
             color: #9ca3af;
         }
 
-        .call-status.completed {
-            background: rgba(34, 197, 94, 0.1);
-            color: #22c55e;
-        }
-
-        .call-status.in-progress {
-            background: rgba(59, 130, 246, 0.1);
-            color: #3b82f6;
-        }
-
         .transcript-preview {
             max-width: 200px;
             white-space: nowrap;
@@ -1437,7 +1427,7 @@
             document.getElementById('createCampaignForm').reset();
         }
 
-        // File upload handling - only add listeners if elements exist
+        // File upload handling
         const fileInput = document.getElementById('csvFile');
         const fileDisplay = document.getElementById('fileDisplay');
 
@@ -1591,77 +1581,57 @@
             calls.forEach((call, index) => {
                 const row = document.createElement('tr');
 
-                // Determine call status from transcript or error
-                let callStatus = 'pending';
+                // Use the call_status from analytics data if available, otherwise determine from transcript
+                let callStatus = call.call_status || 'pending';
                 let statusIcon = 'fa-clock';
 
-                if (call.success === false) {
-                    callStatus = 'busy';
-                    statusIcon = 'fa-phone-slash';
-                } else if (call.transcript && call.transcript.trim()) {
-                    const transcript = call.transcript.toLowerCase();
-                    if (transcript.includes('confirm') || transcript.includes('yes') || transcript.includes('see you then') || transcript.includes("i'll be there")) {
-                        callStatus = 'confirmed';
+                // Set appropriate icon based on status
+                switch (callStatus) {
+                    case 'confirmed':
                         statusIcon = 'fa-check-circle';
-                    } else if (transcript.includes('reschedule') || transcript.includes('different time') || transcript.includes('change')) {
-                        callStatus = 'rescheduled';
-                        statusIcon = 'fa-calendar-alt';
-                    } else if (transcript.includes('cancel') || transcript.includes("can't make it") || transcript.includes("won't be available")) {
-                        callStatus = 'cancelled';
+                        break;
+                    case 'cancelled':
                         statusIcon = 'fa-times-circle';
-                    } else if (transcript.includes('voicemail') || transcript.includes('leave a message')) {
-                        callStatus = 'voicemail';
+                        break;
+                    case 'rescheduled':
+                        statusIcon = 'fa-calendar-alt';
+                        break;
+                    case 'voicemail':
                         statusIcon = 'fa-voicemail';
-                    } else if (transcript.includes('busy') || transcript.includes('hang up') || transcript.includes('ended call')) {
-                        callStatus = 'busy';
+                        break;
+                    case 'busy':
+                    case 'failed':
                         statusIcon = 'fa-phone-slash';
-                    } else {
-                        // If we have a transcript but can't determine status, mark as completed
-                        callStatus = 'completed';
+                        break;
+                    case 'completed':
                         statusIcon = 'fa-check';
-                    }
-                } else if (call.call_id) {
-                    // Call was successful but no transcript yet
-                    callStatus = 'in-progress';
-                    statusIcon = 'fa-spinner';
+                        break;
+                    default:
+                        statusIcon = 'fa-clock';
+                        callStatus = 'pending';
                 }
 
                 // Create transcript preview
-                let transcriptPreview = 'No transcript available';
-                let hasFullTranscript = false;
-
-                if (call.transcript && call.transcript.trim()) {
-                    transcriptPreview = call.transcript.length > 100 
-                        ? call.transcript.substring(0, 100) + '...' 
-                        : call.transcript;
-                    hasFullTranscript = call.transcript.length > 100;
-                } else if (call.error) {
-                    transcriptPreview = call.error;
-                } else if (call.call_id && call.success) {
-                    transcriptPreview = 'Call completed - transcript may be processing';
-                }
+                const transcriptPreview = call.transcript 
+                    ? (call.transcript.length > 50 ? call.transcript.substring(0, 50) + '...' : call.transcript)
+                    : (call.error || 'No transcript available');
 
                 row.innerHTML = `
                     <td>${call.patient_name || 'Unknown'}</td>
                     <td>${call.phone_number || 'Unknown'}</td>
                     <td>
                         <span class="call-status ${callStatus}">
-                            <i class="fas ${statusIcon}${callStatus === 'in-progress' ? ' fa-spin' : ''}"></i>
-                            ${callStatus.charAt(0).toUpperCase() + callStatus.slice(1).replace('-', ' ')}
+                            <i class="fas ${statusIcon}"></i>
+                            ${callStatus.charAt(0).toUpperCase() + callStatus.slice(1)}
                         </span>
                     </td>
                     <td>${formatDuration(call.duration || 0)}</td>
                     <td>${call.created_at ? new Date(call.created_at).toLocaleString() : 'N/A'}</td>
                     <td>
                         <div class="transcript-preview">${transcriptPreview}</div>
-                        ${hasFullTranscript ? `
+                        ${call.transcript && call.transcript.length > 50 ? `
                             <button class="transcript-toggle" onclick="toggleTranscript(${index})">Show More</button>
                             <div class="transcript-full" id="transcript-${index}">${call.transcript}</div>
-                        ` : ''}
-                        ${call.call_id && !call.transcript ? `
-                            <button class="transcript-toggle" onclick="refreshCallDetails('${call.call_id}', ${index})" style="color: var(--primary-color);">
-                                <i class="fas fa-refresh"></i> Refresh
-                            </button>
                         ` : ''}
                     </td>
                 `;
@@ -1683,71 +1653,6 @@
             }
         }
 
-        async function refreshCallDetails(callId, rowIndex) {
-            try {
-                const response = await fetch(`/call_details/${callId}`);
-                if (response.ok) {
-                    const callData = await response.json();
-                    
-                    // Find the row and update its content
-                    const tableBody = document.getElementById('callsTableBody');
-                    const row = tableBody.children[rowIndex];
-                    
-                    if (row && callData.transcript) {
-                        // Update the transcript cell
-                        const transcriptCell = row.children[5];
-                        const transcriptPreview = callData.transcript.length > 100 
-                            ? callData.transcript.substring(0, 100) + '...' 
-                            : callData.transcript;
-                        
-                        let newStatus = 'completed';
-                        let statusIcon = 'fa-check';
-                        
-                        const transcript = callData.transcript.toLowerCase();
-                        if (transcript.includes('confirm') || transcript.includes('yes') || transcript.includes('see you then')) {
-                            newStatus = 'confirmed';
-                            statusIcon = 'fa-check-circle';
-                        } else if (transcript.includes('reschedule') || transcript.includes('different time')) {
-                            newStatus = 'rescheduled';
-                            statusIcon = 'fa-calendar-alt';
-                        } else if (transcript.includes('cancel') || transcript.includes("can't make it")) {
-                            newStatus = 'cancelled';
-                            statusIcon = 'fa-times-circle';
-                        } else if (transcript.includes('voicemail')) {
-                            newStatus = 'voicemail';
-                            statusIcon = 'fa-voicemail';
-                        }
-                        
-                        // Update status cell
-                        const statusCell = row.children[2];
-                        statusCell.innerHTML = `
-                            <span class="call-status ${newStatus}">
-                                <i class="fas ${statusIcon}"></i>
-                                ${newStatus.charAt(0).toUpperCase() + newStatus.slice(1)}
-                            </span>
-                        `;
-                        
-                        // Update duration cell
-                        const durationCell = row.children[3];
-                        durationCell.textContent = formatDuration(callData.duration || 0);
-                        
-                        // Update transcript cell
-                        transcriptCell.innerHTML = `
-                            <div class="transcript-preview">${transcriptPreview}</div>
-                            ${callData.transcript.length > 100 ? `
-                                <button class="transcript-toggle" onclick="toggleTranscript(${rowIndex})">Show More</button>
-                                <div class="transcript-full" id="transcript-${rowIndex}">${callData.transcript}</div>
-                            ` : ''}
-                        `;
-                    }
-                } else {
-                    console.error('Failed to refresh call details');
-                }
-            } catch (error) {
-                console.error('Error refreshing call details:', error);
-            }
-        }
-
         function formatDuration(seconds) {
             if (!seconds) return '0s';
 
@@ -1764,7 +1669,7 @@
             }
         }
 
-        // Handle campaign file upload - only if elements exist
+        // Handle campaign file upload
         const campaignFileInput = document.getElementById('campaignCsvFile');
         const campaignFileDisplay = document.getElementById('campaignFileDisplay');
 

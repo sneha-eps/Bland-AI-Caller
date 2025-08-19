@@ -998,25 +998,36 @@ async def get_campaign_analytics(campaign_id: str):
                             # Add to total duration
                             total_duration += call_details['duration']
 
-                            # Analyze transcript for status
+                            # Analyze transcript for status and set call_details status
                             transcript = call_details['transcript'].lower() if call_details['transcript'] else ''
                             if any(word in transcript for word in ["confirm", "yes", "see you then", "i'll be there"]):
+                                call_details['call_status'] = 'confirmed'
                                 status_counts['confirmed'] += 1
                             elif any(word in transcript for word in ["reschedule", "different time", "change"]):
+                                call_details['call_status'] = 'rescheduled'
                                 status_counts['rescheduled'] += 1
                             elif any(word in transcript for word in ["cancel", "can't make it", "won't be available"]):
+                                call_details['call_status'] = 'cancelled'
                                 status_counts['cancelled'] += 1
                             elif "voicemail" in transcript or "leave a message" in transcript:
+                                call_details['call_status'] = 'voicemail'
                                 status_counts['voicemail'] += 1
                             elif any(word in transcript for word in ["busy", "hang up", "ended call"]):
+                                call_details['call_status'] = 'busy'
                                 status_counts['busy'] += 1
+                            else:
+                                call_details['call_status'] = 'completed'
+                                status_counts['busy'] += 1  # Count as busy if status unclear
                         else:
+                            call_details['call_status'] = 'failed'
                             status_counts['busy'] += 1
                     except:
                         # If we can't get call details, count as busy
+                        call_details['call_status'] = 'failed'
                         status_counts['busy'] += 1
                 else:
                     # Failed calls count as busy
+                    call_details['call_status'] = 'failed'
                     status_counts['busy'] += 1
 
                 calls_with_details.append(call_details)
