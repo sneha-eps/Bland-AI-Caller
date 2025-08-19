@@ -791,6 +791,53 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
             concurrent_results = await asyncio.gather(*tasks)
             results.extend(concurrent_results)
 
+            # Send automatic voicemails for busy/unanswered calls
+            voicemail_tasks = []
+            for i, result in enumerate(concurrent_results):
+                if result.success and result.call_id:
+                    # Wait a bit for the call to complete, then check status
+                    await asyncio.sleep(2)  # Brief delay to allow call processing
+
+                    try:
+                        # Check call status to determine if voicemail is needed
+                        async with aiohttp.ClientSession() as session:
+                            async with session.get(
+                                f"https://api.bland.ai/v1/calls/{result.call_id}",
+                                headers={"Authorization": f"Bearer {api_key}"},
+                                timeout=aiohttp.ClientTimeout(total=15)
+                            ) as call_response:
+
+                                if call_response.status == 200:
+                                    call_data = await call_response.json()
+                                    transcript = call_data.get('transcript', '')
+                                    call_status = analyze_call_transcript(transcript)
+
+                                    # If call resulted in busy/voicemail, send automatic voicemail
+                                    if call_status == 'busy' or call_status == 'voicemail': # Modified to include busy
+                                        print(f"📞 Call to {call_requests[i].patient_name} resulted in {call_status}, sending automatic voicemail...")
+                                        voicemail_task = send_automatic_voicemail(call_requests[i], api_key)
+                                        voicemail_tasks.append(voicemail_task)
+                                else:
+                                    # If we can't get call details, assume busy and send voicemail
+                                    print(f"📞 Cannot get call details for {call_requests[i].patient_name}, sending automatic voicemail...")
+                                    voicemail_task = send_automatic_voicemail(call_requests[i], api_key)
+                                    voicemail_tasks.append(voicemail_task)
+                    except Exception as e:
+                        print(f"❌ Error checking call status for {call_requests[i].patient_name}: {str(e)}")
+                        # On error, send voicemail as backup
+                        voicemail_task = send_automatic_voicemail(call_requests[i], api_key)
+                        voicemail_tasks.append(voicemail_task)
+                elif not result.success:
+                    # Failed calls get automatic voicemail
+                    print(f"📞 Call failed for {call_requests[i].patient_name}, sending automatic voicemail...")
+                    voicemail_task = send_automatic_voicemail(call_requests[i], api_key)
+                    voicemail_tasks.append(voicemail_task)
+
+            # Send all voicemails concurrently
+            if voicemail_tasks:
+                print(f"📬 Sending {len(voicemail_tasks)} automatic voicemails...")
+                await asyncio.gather(*voicemail_tasks)
+
         # Calculate summary
         successful_calls = sum(1 for r in results if r.success)
         failed_calls = len(results) - successful_calls
@@ -963,25 +1010,19 @@ def analyze_call_transcript(transcript: str) -> str:
     """Analyze transcript to determine call status"""
     if not transcript:
         return 'failed'
-    
+
     transcript_lower = transcript.lower()
-    
-    # Check for voicemail indicators first
-    voicemail_indicators = [
-        "voicemail", "leave a message", "after the beep", "not available",
-        "please leave", "can't come to the phone", "mailbox", "voice message"
+
+    # Check for busy/voicemail indicators
+    busy_voicemail_indicators = [
+        "busy", "no answer", "disconnected", "line busy", "call ended",
+        "hung up", "voicemail", "leave a message", "after the beep",
+        "not available", "please leave", "can't come to the phone", "mailbox",
+        "voice message"
     ]
-    if any(indicator in transcript_lower for indicator in voicemail_indicators):
-        return 'voicemail'
-    
-    # Check for busy/no answer indicators
-    busy_indicators = [
-        "busy", "hang up", "ended call", "no answer", "disconnected",
-        "line busy", "call ended", "hung up"
-    ]
-    if any(indicator in transcript_lower for indicator in busy_indicators):
-        return 'busy'
-    
+    if any(indicator in transcript_lower for indicator in busy_voicemail_indicators):
+        return 'busy_voicemail' # Consolidated status
+
     # Check for confirmation indicators
     confirmation_indicators = [
         "confirm", "yes", "see you then", "i'll be there", "sounds good",
@@ -990,7 +1031,7 @@ def analyze_call_transcript(transcript: str) -> str:
     ]
     if any(indicator in transcript_lower for indicator in confirmation_indicators):
         return 'confirmed'
-    
+
     # Check for rescheduling indicators
     reschedule_indicators = [
         "reschedule", "different time", "change", "move", "another time",
@@ -998,7 +1039,7 @@ def analyze_call_transcript(transcript: str) -> str:
     ]
     if any(indicator in transcript_lower for indicator in reschedule_indicators):
         return 'rescheduled'
-    
+
     # Check for cancellation indicators
     cancellation_indicators = [
         "cancel", "can't make it", "won't be available", "not coming",
@@ -1006,16 +1047,16 @@ def analyze_call_transcript(transcript: str) -> str:
     ]
     if any(indicator in transcript_lower for indicator in cancellation_indicators):
         return 'cancelled'
-    
+
     # If we have a transcript but can't categorize it, mark as completed
     return 'completed'
 
 
-def get_voicemail_prompt(patient_name: str = "[patient name]", 
-                        appointment_date: str = "[date]", 
-                        appointment_time: str = "[time]", 
-                        provider_name: str = "[provider name]", 
-                        office_location: str = "[office location]") -> str:
+def get_voicemail_prompt(patient_name: str = "[patient name]",
+        appointment_date: str = "[date]",
+        appointment_time: str = "[time]",
+        provider_name: str = "[provider name]",
+        office_location: str = "[office location]") -> str:
     """Get the voicemail message prompt"""
     return f"""
     ROLE & PERSONA
@@ -1030,6 +1071,72 @@ def get_voicemail_prompt(patient_name: str = "[patient name]",
     • Emphasize important information like the appointment date, time, and callback number
     • End the call after delivering the complete message
     """
+
+async def send_automatic_voicemail(call_request: CallRequest, api_key: str):
+    """Send a voicemail message to a patient, used for automatic follow-ups"""
+    try:
+        selected_voice = VOICE_MAP.get("female_professional", "default_voice_id")
+
+        payload = {
+            "phone_number": call_request.phone_number,
+            "task": get_voicemail_prompt(
+                patient_name=call_request.patient_name,
+                appointment_date=call_request.appointment_date,
+                appointment_time=call_request.appointment_time,
+                provider_name=call_request.provider_name,
+                office_location=call_request.office_location
+            ),
+            "voice": selected_voice,
+            "request_data": {
+                "patient_name": call_request.patient_name,
+                "appointment_date": call_request.appointment_date,
+                "appointment_time": call_request.appointment_time,
+                "provider_name": call_request.provider_name,
+                "office_location": call_request.office_location
+            }
+        }
+
+        print(f"🔄 Sending automatic voicemail to {call_request.phone_number} for {call_request.patient_name}")
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                    "https://api.bland.ai/v1/calls",
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json"
+                    },
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=60)
+            ) as response:
+                if response.status == 200:
+                    resp_json = await response.json()
+                    print(f"✅ Automatic voicemail sent successfully for {call_request.patient_name}")
+                    return {
+                        "success": True,
+                        "call_id": resp_json.get("call_id", "N/A"),
+                        "status": resp_json.get("status", "N/A"),
+                        "message": "Automatic voicemail sent successfully",
+                        "patient_name": call_request.patient_name,
+                        "phone_number": call_request.phone_number
+                    }
+                else:
+                    error_msg = f"API error (Status {response.status}): {await response.text()}"
+                    print(f"❌ Error sending automatic voicemail for {call_request.patient_name}: {error_msg}")
+                    return {
+                        "success": False,
+                        "error": error_msg,
+                        "patient_name": call_request.patient_name,
+                        "phone_number": call_request.phone_number
+                    }
+
+    except Exception as e:
+        print(f"💥 Exception during automatic voicemail sending: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "patient_name": call_request.patient_name,
+            "phone_number": call_request.phone_number
+        }
 
 
 @app.post("/send_voicemail")
@@ -1131,7 +1238,8 @@ async def get_campaign_analytics(campaign_id: str):
                 'busy': 0,
                 'voicemail': 0,
                 'completed': 0,
-                'failed': 0
+                'failed': 0,
+                'busy_voicemail': 0 # Added for the new consolidated status
             }
 
             for result in campaign_results['results']:
@@ -1181,7 +1289,7 @@ async def get_campaign_analytics(campaign_id: str):
                                         duration = 0
                                 except:
                                     duration = 0
-                            
+
                             total_duration += duration
                             call_details['duration'] = duration
 

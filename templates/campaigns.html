@@ -702,10 +702,6 @@
             background: #6b7280;
         }
 
-        .status-indicator.voicemail {
-            background: var(--primary-color);
-        }
-
         /* Calls Table */
         .calls-table-container {
             max-height: 400px;
@@ -772,14 +768,9 @@
             color: #6b7280;
         }
 
-        .call-status.voicemail {
-            background: rgba(79, 70, 229, 0.1);
-            color: var(--primary-color);
-        }
-
-        .call-status.pending {
-            background: rgba(156, 163, 175, 0.1);
-            color: #9ca3af;
+        .call-status.busy_voicemail {
+            background: rgba(107, 114, 128, 0.1);
+            color: #6b7280;
         }
 
         .transcript-preview {
@@ -1022,19 +1013,9 @@
             color: #383d41;
         }
 
-        .status-voicemail {
-            background-color: #cce7ff;
-            color: #004085;
-        }
-
-        .status-completed {
-            background-color: #d1ecf1;
-            color: #0c5460;
-        }
-
-        .status-failed {
-            background-color: #f5c6cb;
-            color: #721c24;
+        .status-busy_voicemail {
+            background-color: #e2e3e5;
+            color: #383d41;
         }
 
         .transcript-preview {
@@ -1352,11 +1333,7 @@
                     </div>
                     <div class="status-item">
                         <div class="status-indicator busy"></div>
-                        <span>Busy/No Answer: <strong id="busyCount">0</strong></span>
-                    </div>
-                    <div class="status-item">
-                        <div class="status-indicator voicemail"></div>
-                        <span>Voicemail: <strong id="voicemailCount">0</strong></span>
+                        <span>Busy/Voicemail: <strong id="busyVoicemailCount">0</strong></span>
                     </div>
                 </div>
 
@@ -1859,8 +1836,7 @@
                     document.getElementById('confirmedCount').textContent = data.analytics.status_counts.confirmed;
                     document.getElementById('cancelledCount').textContent = data.analytics.status_counts.cancelled;
                     document.getElementById('rescheduledCount').textContent = data.analytics.status_counts.rescheduled;
-                    document.getElementById('busyCount').textContent = data.analytics.status_counts.busy;
-                    document.getElementById('voicemailCount').textContent = data.analytics.status_counts.voicemail;
+                    document.getElementById('busyVoicemailCount').textContent = data.analytics.status_counts.busy_voicemail;
 
                     // Populate calls table
                     populateCallsTable(data.analytics.calls);
@@ -2177,12 +2153,8 @@
                                     <div class="summary-label">Rescheduled</div>
                                 </div>
                                 <div class="summary-item">
-                                    <div class="summary-value">${summary.status_counts.voicemail}</div>
-                                    <div class="summary-label">Voicemail</div>
-                                </div>
-                                <div class="summary-item">
-                                    <div class="summary-value">${summary.status_counts.busy}</div>
-                                    <div class="summary-label">Busy</div>
+                                    <div class="summary-value">${summary.status_counts.busy_voicemail}</div>
+                                    <div class="summary-label">Busy/Voicemail</div>
                                 </div>
                             </div>
                         `;
