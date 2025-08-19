@@ -38,6 +38,7 @@ templates = Jinja2Templates(directory="templates")
 # In-memory storage (in production, use a database)
 clients_db = {}
 campaigns_db = {}
+campaign_results_db = {}
 
 # Add number formatting filter
 def number_format(value):
@@ -795,10 +796,8 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
             "results": [result.dict() for result in results]
         }
 
-        # Store in a simple in-memory results database
-        if not hasattr(start_campaign, 'results_db'):
-            start_campaign.results_db = {}
-        start_campaign.results_db[campaign_id] = campaign_results
+        # Store in the global results database
+        campaign_results_db[campaign_id] = campaign_results
 
         return {
             "success": True,
@@ -954,13 +953,9 @@ async def get_campaign_analytics(campaign_id: str):
                             detail="BLAND_API_KEY not found in Secrets.")
 
     try:
-        # Initialize results_db if it doesn't exist
-        if not hasattr(start_campaign, 'results_db'):
-            start_campaign.results_db = {}
-
         # Get campaign results from in-memory storage (in production, use a database)
-        if campaign_id in start_campaign.results_db:
-            campaign_results = start_campaign.results_db[campaign_id]
+        if campaign_id in campaign_results_db:
+            campaign_results = campaign_results_db[campaign_id]
 
             # Get detailed call information for each call
             calls_with_details = []
