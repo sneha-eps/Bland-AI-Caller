@@ -523,17 +523,41 @@ async def clients_page(request: Request):
         "clients": list(clients_db.values())
     })
 
+# Helper functions to load data (mimicking database interaction)
+def load_clients():
+    return list(clients_db.values())
+
+def load_campaigns():
+    return list(campaigns_db.values())
+
 
 @app.get("/campaigns", response_class=HTMLResponse)
 async def campaigns_page(request: Request):
-    """Campaigns management page"""
-    api_key = get_api_key()
-    return templates.TemplateResponse("campaigns.html", {
-        "request": request,
-        "has_api_key": bool(api_key),
-        "campaigns": list(campaigns_db.values()),
-        "clients": list(clients_db.values())
-    })
+    """Display campaigns page"""
+    try:
+        clients = load_clients()
+        campaigns = load_campaigns()
+        has_api_key = bool(os.getenv("BLAND_API_KEY"))
+
+        # Remove file data from campaigns to make them JSON serializable
+        serializable_campaigns = []
+        for campaign in campaigns:
+            campaign_copy = campaign.copy()
+            # Remove any file-related data that might be bytes
+            if 'file_data' in campaign_copy:
+                del campaign_copy['file_data']
+            if 'csv_data' in campaign_copy:
+                del campaign_copy['csv_data']
+            serializable_campaigns.append(campaign_copy)
+
+        return templates.TemplateResponse("campaigns.html", {
+            "request": request,
+            "clients": clients,
+            "campaigns": serializable_campaigns,
+            "has_api_key": has_api_key
+        })
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error loading campaigns page: {str(e)}")
 
 
 @app.post("/add_client")
@@ -558,30 +582,30 @@ async def add_campaign(
     """Add a new campaign with file"""
     try:
         import uuid
-        
+
         # Validate required fields
         if not name or not name.strip():
             raise HTTPException(status_code=400, detail="Campaign name is required.")
-        
+
         if not client_id or client_id not in clients_db:
             raise HTTPException(status_code=400, detail="Valid client is required.")
-        
+
         # Validate file type
         if not file.filename or not (file.filename.endswith('.csv') or file.filename.endswith('.xlsx')):
             raise HTTPException(status_code=400, detail="Please upload a CSV or XLSX file.")
-        
+
         # Validate file size (max 10MB)
         file_content = await file.read()
         if len(file_content) > 10 * 1024 * 1024:  # 10MB limit
             raise HTTPException(status_code=400, detail="File size too large. Maximum 10MB allowed.")
-        
+
         # Validate numeric fields
         if max_attempts < 1 or max_attempts > 10:
             raise HTTPException(status_code=400, detail="Max attempts must be between 1 and 10.")
-            
+
         if retry_interval < 5 or retry_interval > 1440:
             raise HTTPException(status_code=400, detail="Retry interval must be between 5 and 1440 minutes.")
-        
+
         campaign_id = str(uuid.uuid4())
         campaign_data = {
             "id": campaign_id,
@@ -593,11 +617,11 @@ async def add_campaign(
             "file_name": file.filename,
             "file_data": file_content
         }
-        
+
         campaigns_db[campaign_id] = campaign_data
         print(f"✅ Campaign '{name}' created successfully with ID: {campaign_id}")
         return {"success": True, "campaign_id": campaign_id, "message": "Campaign created successfully"}
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -618,9 +642,9 @@ async def update_campaign(
     """Update an existing campaign"""
     if campaign_id not in campaigns_db:
         raise HTTPException(status_code=404, detail="Campaign not found")
-    
+
     campaign = campaigns_db[campaign_id]
-    
+
     # Update basic fields
     campaign.update({
         "name": name,
@@ -629,16 +653,16 @@ async def update_campaign(
         "retry_interval": retry_interval,
         "country_code": country_code
     })
-    
+
     # Update file if provided
     if file and file.filename:
         if not (file.filename.endswith('.csv') or file.filename.endswith('.xlsx')):
             raise HTTPException(status_code=400, detail="Please upload a CSV or XLSX file.")
-        
+
         file_content = await file.read()
         campaign["file_name"] = file.filename
         campaign["file_data"] = file_content
-    
+
     campaigns_db[campaign_id] = campaign
     return {"success": True, "message": "Campaign updated successfully"}
 
@@ -924,7 +948,7 @@ async def get_campaign_analytics(campaign_id: str):
         # Get campaign results from in-memory storage (in production, use a database)
         if hasattr(start_campaign, 'results_db') and campaign_id in start_campaign.results_db:
             campaign_results = start_campaign.results_db[campaign_id]
-            
+
             # Get detailed call information for each call
             calls_with_details = []
             total_duration = 0
@@ -935,7 +959,7 @@ async def get_campaign_analytics(campaign_id: str):
                 'busy': 0,
                 'voicemail': 0
             }
-            
+
             for result in campaign_results['results']:
                 call_details = {
                     'patient_name': result['patient_name'],
@@ -947,7 +971,7 @@ async def get_campaign_analytics(campaign_id: str):
                     'duration': 0,
                     'created_at': campaign_results['started_at']
                 }
-                
+
                 # If call was successful and has call_id, try to get detailed info
                 if result['success'] and result.get('call_id'):
                     try:
@@ -956,16 +980,16 @@ async def get_campaign_analytics(campaign_id: str):
                             headers={"Authorization": f"Bearer {api_key}"},
                             timeout=10
                         )
-                        
+
                         if call_response.status_code == 200:
                             call_data = call_response.json()
                             call_details['transcript'] = call_data.get('transcript', '')
                             call_details['duration'] = call_data.get('duration', 0)
                             call_details['created_at'] = call_data.get('created_at', campaign_results['started_at'])
-                            
+
                             # Add to total duration
                             total_duration += call_details['duration']
-                            
+
                             # Analyze transcript for status
                             transcript = call_details['transcript'].lower() if call_details['transcript'] else ''
                             if any(word in transcript for word in ["confirm", "yes", "see you then", "i'll be there"]):
@@ -986,14 +1010,14 @@ async def get_campaign_analytics(campaign_id: str):
                 else:
                     # Failed calls count as busy
                     status_counts['busy'] += 1
-                
+
                 calls_with_details.append(call_details)
-            
+
             # Calculate analytics
             total_calls = len(campaign_results['results'])
             successful_calls = sum(1 for call in calls_with_details if call['success'])
             success_rate = round((successful_calls / total_calls * 100) if total_calls > 0 else 0, 1)
-            
+
             analytics = {
                 'total_calls': total_calls,
                 'total_duration': total_duration,
@@ -1002,7 +1026,7 @@ async def get_campaign_analytics(campaign_id: str):
                 'status_counts': status_counts,
                 'calls': calls_with_details
             }
-            
+
             return {
                 "success": True,
                 "campaign_id": campaign_id,
@@ -1014,7 +1038,7 @@ async def get_campaign_analytics(campaign_id: str):
                 "success": False,
                 "message": "No analytics data available for this campaign"
             }
-            
+
     except Exception as e:
         raise HTTPException(status_code=500,
                             detail=f"Error fetching campaign analytics: {str(e)}")
