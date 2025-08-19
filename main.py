@@ -240,6 +240,8 @@ class Campaign(BaseModel):
     max_attempts: int
     retry_interval: int
     country_code: str
+    file_name: Optional[str] = None
+    file_data: Optional[bytes] = None
 
 
 def format_phone_number(phone_number: str, country_code: str) -> str:
@@ -545,18 +547,80 @@ async def add_client(client: Client):
 
 
 @app.post("/add_campaign")
-async def add_campaign(campaign: Campaign):
-    """Add a new campaign"""
+async def add_campaign(
+    name: str = Form(...),
+    client_id: str = Form(...),
+    max_attempts: int = Form(...),
+    retry_interval: int = Form(...),
+    country_code: str = Form(...),
+    file: UploadFile = File(...)
+):
+    """Add a new campaign with file"""
     import uuid
+    
+    # Validate file type
+    if not file.filename or not (file.filename.endswith('.csv') or file.filename.endswith('.xlsx')):
+        raise HTTPException(status_code=400, detail="Please upload a CSV or XLSX file.")
+    
+    # Read and store file data
+    file_content = await file.read()
+    
     campaign_id = str(uuid.uuid4())
-    campaign.id = campaign_id
-    campaigns_db[campaign_id] = campaign.dict()
+    campaign_data = {
+        "id": campaign_id,
+        "name": name,
+        "client_id": client_id,
+        "max_attempts": max_attempts,
+        "retry_interval": retry_interval,
+        "country_code": country_code,
+        "file_name": file.filename,
+        "file_data": file_content
+    }
+    
+    campaigns_db[campaign_id] = campaign_data
     return {"success": True, "campaign_id": campaign_id, "message": "Campaign created successfully"}
 
 
+@app.put("/update_campaign/{campaign_id}")
+async def update_campaign(
+    campaign_id: str,
+    name: str = Form(...),
+    client_id: str = Form(...),
+    max_attempts: int = Form(...),
+    retry_interval: int = Form(...),
+    country_code: str = Form(...),
+    file: UploadFile = File(None)
+):
+    """Update an existing campaign"""
+    if campaign_id not in campaigns_db:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    
+    campaign = campaigns_db[campaign_id]
+    
+    # Update basic fields
+    campaign.update({
+        "name": name,
+        "client_id": client_id,
+        "max_attempts": max_attempts,
+        "retry_interval": retry_interval,
+        "country_code": country_code
+    })
+    
+    # Update file if provided
+    if file and file.filename:
+        if not (file.filename.endswith('.csv') or file.filename.endswith('.xlsx')):
+            raise HTTPException(status_code=400, detail="Please upload a CSV or XLSX file.")
+        
+        file_content = await file.read()
+        campaign["file_name"] = file.filename
+        campaign["file_data"] = file_content
+    
+    campaigns_db[campaign_id] = campaign
+    return {"success": True, "message": "Campaign updated successfully"}
+
 @app.post("/start_campaign/{campaign_id}")
-async def start_campaign(campaign_id: str, file: UploadFile = File(...)):
-    """Start a campaign by processing the uploaded CSV/Excel file"""
+async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
+    """Start a campaign using stored file or new upload"""
     api_key = get_api_key()
 
     if not api_key:
@@ -577,15 +641,22 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(...)):
 
     client = clients_db[client_id]
 
-    # Check if file is CSV or XLSX
-    if not file.filename or not (file.filename.endswith('.csv') or file.filename.endswith('.xlsx')):
-        raise HTTPException(status_code=400, detail="Please upload a CSV or XLSX file.")
-
     try:
-        # Read file content based on format
-        content = await file.read()
+        # Use stored file or new upload
+        if file and file.filename:
+            # New file uploaded
+            if not (file.filename.endswith('.csv') or file.filename.endswith('.xlsx')):
+                raise HTTPException(status_code=400, detail="Please upload a CSV or XLSX file.")
+            content = await file.read()
+            filename = file.filename
+        else:
+            # Use stored file
+            if not campaign.get('file_data') or not campaign.get('file_name'):
+                raise HTTPException(status_code=400, detail="No file found for this campaign. Please upload a file.")
+            content = campaign['file_data']
+            filename = campaign['file_name']
 
-        if file.filename.endswith('.xlsx'):
+        if filename.endswith('.xlsx'):
             # Read Excel file
             df = pd.read_excel(io.BytesIO(content))
             rows = df.to_dict('records')

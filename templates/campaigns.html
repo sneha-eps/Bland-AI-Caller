@@ -521,6 +521,27 @@
             box-shadow: 0 6px 15px rgba(245, 158, 11, 0.3);
         }
 
+        .btn-edit-campaign {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #7c3aed 100%);
+            color: white;
+            padding: 0.5rem 1rem;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.875rem;
+            flex: 1;
+        }
+
+        .btn-edit-campaign:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 15px rgba(79, 70, 229, 0.3);
+        }
+
         .empty-state {
             text-align: center;
             padding: 4rem 2rem;
@@ -720,6 +741,10 @@
                         <i class="fas fa-chart-bar"></i>
                         View Results
                     </button>
+                    <button class="btn-edit-campaign" onclick="editCampaign('{{ campaign.id }}')">
+                        <i class="fas fa-edit"></i>
+                        Edit
+                    </button>
                 </div>
             </div>
             {% endfor %}
@@ -756,16 +781,10 @@
                     </div>
                     
                     <div class="form-group">
-                        <label for="campaignCsvFile">Upload CSV/Excel File with Contact Data</label>
-                        <div class="file-input-wrapper">
-                            <input type="file" id="campaignCsvFile" name="file" accept=".csv,.xlsx" required>
-                            <div class="file-input-display" id="campaignFileDisplay">
-                                <i class="fas fa-cloud-upload-alt"></i>
-                                <div>
-                                    <strong>Click to select CSV or Excel file</strong><br>
-                                    <span>File should contain: phone_number, patient_name, date, time, provider_name, office_location</span>
-                                </div>
-                            </div>
+                        <label>Note</label>
+                        <div style="padding: 1rem; background: var(--bg-secondary); border-radius: 8px; border: 1px solid var(--border-color);">
+                            <i class="fas fa-info-circle" style="color: var(--primary-color);"></i>
+                            This campaign will use the CSV/Excel file that was uploaded when the campaign was created. If you need to use a different file, please edit the campaign first.
                         </div>
                     </div>
                     
@@ -778,8 +797,112 @@
         </div>
     </div>
 
+    <!-- Edit Campaign Modal -->
+    <div id="editCampaignModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-edit"></i> Edit Campaign</h3>
+                <button class="modal-close" onclick="closeEditCampaignModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="editCampaignForm">
+                    <input type="hidden" id="editCampaignId" name="campaign_id">
+                    
+                    <div class="form-group">
+                        <label for="editCampaignName">Campaign Name</label>
+                        <input type="text" id="editCampaignName" name="name" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="editClientSelect">Client</label>
+                        <select id="editClientSelect" name="client_id" required>
+                            <option value="">Select a client</option>
+                            {% for client in clients %}
+                            <option value="{{ client.id }}">{{ client.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="editMaxAttempts">Max Attempts</label>
+                        <input type="number" id="editMaxAttempts" name="max_attempts" min="1" max="10" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="editRetryInterval">Retry Interval (minutes)</label>
+                        <input type="number" id="editRetryInterval" name="retry_interval" min="5" max="1440" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="editCountryCode">Country Code</label>
+                        <select id="editCountryCode" name="country_code" required>
+                            <option value="">Choose country code...</option>
+                            <option value="+1">🇺🇸 United States (+1)</option>
+                            <option value="+1">🇨🇦 Canada (+1)</option>
+                            <option value="+91">🇮🇳 India (+91)</option>
+                            <option value="+44">🇬🇧 United Kingdom (+44)</option>
+                            <option value="+61">🇦🇺 Australia (+61)</option>
+                            <option value="+81">🇯🇵 Japan (+81)</option>
+                            <option value="+49">🇩🇪 Germany (+49)</option>
+                            <option value="+33">🇫🇷 France (+33)</option>
+                            <option value="+86">🇨🇳 China (+86)</option>
+                            <option value="+55">🇧🇷 Brazil (+55)</option>
+                            <option value="+52">🇲🇽 Mexico (+52)</option>
+                            <option value="+7">🇷🇺 Russia (+7)</option>
+                            <option value="+82">🇰🇷 South Korea (+82)</option>
+                            <option value="+39">🇮🇹 Italy (+39)</option>
+                            <option value="+34">🇪🇸 Spain (+34)</option>
+                            <option value="+31">🇳🇱 Netherlands (+31)</option>
+                            <option value="+46">🇸🇪 Sweden (+46)</option>
+                            <option value="+47">🇳🇴 Norway (+47)</option>
+                            <option value="+45">🇩🇰 Denmark (+45)</option>
+                            <option value="+41">🇨🇭 Switzerland (+41)</option>
+                            <option value="+43">🇦🇹 Austria (+43)</option>
+                            <option value="+32">🇧🇪 Belgium (+32)</option>
+                            <option value="+48">🇵🇱 Poland (+48)</option>
+                            <option value="+351">🇵🇹 Portugal (+351)</option>
+                            <option value="+30">🇬🇷 Greece (+30)</option>
+                            <option value="+90">🇹🇷 Turkey (+90)</option>
+                            <option value="+27">🇿🇦 South Africa (+27)</option>
+                            <option value="+20">🇪🇬 Egypt (+20)</option>
+                            <option value="+971">🇦🇪 UAE (+971)</option>
+                            <option value="+966">🇸🇦 Saudi Arabia (+966)</option>
+                            <option value="+65">🇸🇬 Singapore (+65)</option>
+                            <option value="+60">🇲🇾 Malaysia (+60)</option>
+                            <option value="+66">🇹🇭 Thailand (+66)</option>
+                            <option value="+84">🇻🇳 Vietnam (+84)</option>
+                            <option value="+63">🇵🇭 Philippines (+63)</option>
+                            <option value="+62">🇮🇩 Indonesia (+62)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="editCsvFile">Upload New CSV/Excel File (Optional)</label>
+                        <div class="file-input-wrapper">
+                            <input type="file" id="editCsvFile" name="file" accept=".csv,.xlsx">
+                            <div class="file-input-display" id="editFileDisplay">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <div>
+                                    <strong>Click to select new CSV or Excel file</strong><br>
+                                    <span>Leave empty to keep existing file</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn-submit">
+                        <i class="fas fa-save"></i>
+                        Update Campaign
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
     <!-- Create Campaign Modal -->
-    <div id="createCampaignModal" class="modal">
+    <div id="createCampaignModal" class="modal"></div>
         <div class="modal-content">
             <div class="modal-header">
                 <h3><i class="fas fa-bullhorn"></i> Create New Campaign</h3>
@@ -985,18 +1108,11 @@
             e.preventDefault();
             
             const formData = new FormData(e.target);
-            const campaignData = Object.fromEntries(formData.entries());
-            
-            // Remove file from campaign data for now (will be handled separately)
-            delete campaignData.file;
             
             try {
                 const response = await fetch('/add_campaign', {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(campaignData)
+                    body: formData
                 });
                 
                 const result = await response.json();
@@ -1048,18 +1164,80 @@
             }
         });
 
+        // Edit campaign functions
+        function editCampaign(campaignId) {
+            // Find campaign data
+            const campaigns = {{ campaigns | tojson }};
+            const campaign = campaigns.find(c => c.id === campaignId);
+            
+            if (campaign) {
+                document.getElementById('editCampaignId').value = campaignId;
+                document.getElementById('editCampaignName').value = campaign.name;
+                document.getElementById('editClientSelect').value = campaign.client_id;
+                document.getElementById('editMaxAttempts').value = campaign.max_attempts;
+                document.getElementById('editRetryInterval').value = campaign.retry_interval;
+                document.getElementById('editCountryCode').value = campaign.country_code;
+                
+                document.getElementById('editCampaignModal').style.display = 'block';
+            }
+        }
+
+        function closeEditCampaignModal() {
+            document.getElementById('editCampaignModal').style.display = 'none';
+            document.getElementById('editCampaignForm').reset();
+        }
+
+        // Edit campaign file upload handling
+        const editFileInput = document.getElementById('editCsvFile');
+        const editFileDisplay = document.getElementById('editFileDisplay');
+
+        editFileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                editFileDisplay.classList.add('has-file');
+                const fileIcon = file.name.endsWith('.xlsx') ? 'fa-file-excel' : 'fa-file-csv';
+                editFileDisplay.innerHTML = `
+                    <i class="fas ${fileIcon}"></i>
+                    <div>
+                        <strong>${file.name}</strong><br>
+                        <span>Ready to process (${(file.size / 1024).toFixed(1)} KB)</span>
+                    </div>
+                `;
+            }
+        });
+
+        // Edit campaign form submission
+        document.getElementById('editCampaignForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const campaignId = formData.get('campaign_id');
+            
+            try {
+                const response = await fetch(`/update_campaign/${campaignId}`, {
+                    method: 'PUT',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Campaign updated successfully!');
+                    window.location.reload();
+                } else {
+                    alert('Error updating campaign: ' + (result.detail || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error updating campaign: ' + error.message);
+            }
+        });
+
         // Start campaign form submission
         document.getElementById('startCampaignForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const formData = new FormData(e.target);
             const campaignId = formData.get('campaign_id');
-            const file = formData.get('file');
-            
-            if (!file) {
-                alert('Please select a CSV or Excel file');
-                return;
-            }
             
             try {
                 const response = await fetch(`/start_campaign/${campaignId}`, {
@@ -1084,11 +1262,15 @@
         window.onclick = function(event) {
             const createModal = document.getElementById('createCampaignModal');
             const startModal = document.getElementById('startCampaignModal');
+            const editModal = document.getElementById('editCampaignModal');
             if (event.target === createModal) {
                 closeCreateCampaignModal();
             }
             if (event.target === startModal) {
                 closeStartCampaignModal();
+            }
+            if (event.target === editModal) {
+                closeEditCampaignModal();
             }
         }
     </script>
