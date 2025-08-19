@@ -1,0 +1,935 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Campaigns - Bland AI Call Center</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #4f46e5;
+            --primary-hover: #4338ca;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+            --sidebar-width: 280px;
+            --header-height: 70px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Light theme variables */
+        [data-theme="light"] {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-tertiary: #f1f5f9;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --text-tertiary: #94a3b8;
+            --border-color: #e2e8f0;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Dark theme variables */
+        [data-theme="dark"] {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --text-tertiary: #94a3b8;
+            --border-color: #334155;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            transition: var(--transition);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            z-index: 1000;
+            transform: translateX(-100%);
+            transition: var(--transition);
+            overflow-y: auto;
+        }
+
+        .sidebar.open {
+            transform: translateX(0);
+        }
+
+        .sidebar-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+
+        .sidebar-logo i {
+            font-size: 1.5rem;
+        }
+
+        .sidebar-nav {
+            padding: 1rem 0;
+        }
+
+        .nav-section {
+            margin-bottom: 2rem;
+        }
+
+        .nav-section-title {
+            padding: 0.5rem 1.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-tertiary);
+            margin-bottom: 0.5rem;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0.75rem 1.5rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: var(--transition);
+            border-left: 3px solid transparent;
+        }
+
+        .nav-link:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .nav-link.active {
+            background: var(--bg-tertiary);
+            color: var(--primary-color);
+            border-left-color: var(--primary-color);
+        }
+
+        .nav-link i {
+            width: 20px;
+            text-align: center;
+        }
+
+        /* Header */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--header-height);
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border-color);
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1.5rem;
+            transition: var(--transition);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .sidebar-toggle {
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1.25rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 8px;
+            transition: var(--transition);
+        }
+
+        .sidebar-toggle:hover {
+            background: var(--bg-secondary);
+        }
+
+        .header-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .theme-toggle {
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1.25rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 8px;
+            transition: var(--transition);
+        }
+
+        .theme-toggle:hover {
+            background: var(--bg-secondary);
+        }
+
+        .status-badge {
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .status-connected {
+            background: var(--success-color);
+            color: white;
+        }
+        
+        .status-error {
+            background: var(--danger-color);
+            color: white;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-top: var(--header-height);
+            padding: 2rem;
+            transition: var(--transition);
+        }
+
+        .main-content.sidebar-open {
+            margin-left: var(--sidebar-width);
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .page-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #7c3aed 100%);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            text-decoration: none;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(79, 70, 229, 0.3);
+        }
+
+        .campaigns-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .campaign-card {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: var(--shadow-md);
+            border: 1px solid var(--border-color);
+            transition: var(--transition);
+        }
+
+        .campaign-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .campaign-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .campaign-name {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .campaign-info {
+            display: grid;
+            gap: 0.5rem;
+        }
+
+        .info-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .info-item i {
+            width: 16px;
+            text-align: center;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-content {
+            background: var(--bg-primary);
+            margin: 2% auto;
+            padding: 0;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 90vh;
+            overflow: hidden;
+            box-shadow: var(--shadow-xl);
+            border: 1px solid var(--border-color);
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #7c3aed 100%);
+            color: white;
+            padding: 1.5rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            opacity: 0.8;
+            transition: var(--transition);
+        }
+
+        .modal-close:hover {
+            opacity: 1;
+        }
+
+        .modal-body {
+            padding: 2rem;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .form-group input,
+        .form-group select {
+            width: 100%;
+            padding: 0.75rem;
+            border: 2px solid var(--border-color);
+            border-radius: 8px;
+            font-size: 1rem;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            transition: var(--transition);
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+
+        input[type="file"] {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .file-input-display {
+            background: var(--bg-primary);
+            border: 2px dashed var(--border-color);
+            border-radius: 12px;
+            padding: 2rem;
+            text-align: center;
+            transition: var(--transition);
+            cursor: pointer;
+        }
+
+        .file-input-display:hover {
+            border-color: var(--primary-color);
+            background: var(--bg-secondary);
+        }
+
+        .file-input-display i {
+            font-size: 2rem;
+            color: var(--text-tertiary);
+            margin-bottom: 0.5rem;
+        }
+
+        .file-input-display.has-file {
+            border-color: var(--success-color);
+            background: var(--bg-secondary);
+        }
+
+        .file-input-display.has-file i {
+            color: var(--success-color);
+        }
+
+        .btn-submit {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #7c3aed 100%);
+            color: white;
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            transition: var(--transition);
+        }
+
+        .btn-submit:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px rgba(79, 70, 229, 0.3);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 4rem 2rem;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .empty-state i {
+            font-size: 4rem;
+            color: var(--text-tertiary);
+            margin-bottom: 1rem;
+        }
+
+        .empty-state h3 {
+            font-size: 1.5rem;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .empty-state p {
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+        }
+
+        /* Overlay */
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            opacity: 0;
+            visibility: hidden;
+            transition: var(--transition);
+        }
+
+        .sidebar-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 1rem;
+            }
+
+            .page-header {
+                flex-direction: column;
+                gap: 1rem;
+                align-items: stretch;
+            }
+
+            .campaigns-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .sidebar {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: var(--sidebar-width);
+            }
+
+            .sidebar-overlay {
+                display: none;
+            }
+
+            .sidebar-toggle {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body data-theme="light">
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <a href="/" class="sidebar-logo">
+                <i class="fas fa-phone-alt"></i>
+                <span>Bland AI</span>
+            </a>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-section-title">Main</div>
+                <a href="/" class="nav-link">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/clients" class="nav-link">
+                    <i class="fas fa-users"></i>
+                    <span>Clients</span>
+                </a>
+                <a href="/campaigns" class="nav-link active">
+                    <i class="fas fa-bullhorn"></i>
+                    <span>Campaigns</span>
+                </a>
+                <a href="/upload" class="nav-link">
+                    <i class="fas fa-upload"></i>
+                    <span>Upload CSV</span>
+                </a>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title">Analytics</div>
+                <a href="#" class="nav-link" onclick="alert('Feature coming soon!')">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>Reports</span>
+                </a>
+                <a href="#" class="nav-link" onclick="alert('Feature coming soon!')">
+                    <i class="fas fa-history"></i>
+                    <span>Call History</span>
+                </a>
+            </div>
+        </nav>
+    </div>
+
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- Header -->
+    <div class="header">
+        <div class="header-left">
+            <button class="sidebar-toggle" id="sidebarToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            <h1 class="header-title">Campaigns</h1>
+        </div>
+        <div class="header-right">
+            <button class="theme-toggle" id="themeToggle" title="Toggle theme">
+                <i class="fas fa-moon"></i>
+            </button>
+            <div class="status-badge {% if has_api_key %}status-connected{% else %}status-error{% endif %}">
+                <i class="fas {% if has_api_key %}fa-check-circle{% else %}fa-exclamation-triangle{% endif %}"></i>
+                {% if has_api_key %}API Connected{% else %}API Not Configured{% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content" id="mainContent">
+        <div class="page-header">
+            <h1 class="page-title">
+                <i class="fas fa-bullhorn"></i>
+                Campaigns
+            </h1>
+            {% if clients %}
+            <button class="btn-primary" onclick="openCreateCampaignModal()">
+                <i class="fas fa-plus"></i>
+                Create Campaign
+            </button>
+            {% endif %}
+        </div>
+
+        {% if not clients %}
+        <div class="empty-state">
+            <i class="fas fa-users"></i>
+            <h3>No Clients Available</h3>
+            <p>You need to add clients before creating campaigns</p>
+            <a href="/clients" class="btn-primary">
+                <i class="fas fa-users"></i>
+                Go to Clients
+            </a>
+        </div>
+        {% elif campaigns %}
+        <div class="campaigns-grid">
+            {% for campaign in campaigns %}
+            <div class="campaign-card">
+                <div class="campaign-header">
+                    <div class="campaign-name">{{ campaign.name }}</div>
+                </div>
+                <div class="campaign-info">
+                    <div class="info-item">
+                        <i class="fas fa-user"></i>
+                        <span>Client: {{ campaign.client_id }}</span>
+                    </div>
+                    <div class="info-item">
+                        <i class="fas fa-redo"></i>
+                        <span>Max Attempts: {{ campaign.max_attempts }}</span>
+                    </div>
+                    <div class="info-item">
+                        <i class="fas fa-clock"></i>
+                        <span>Retry Interval: {{ campaign.retry_interval }} min</span>
+                    </div>
+                    <div class="info-item">
+                        <i class="fas fa-globe"></i>
+                        <span>Country: {{ campaign.country_code }}</span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <i class="fas fa-bullhorn"></i>
+            <h3>No Campaigns Yet</h3>
+            <p>Create your first campaign to start making automated calls</p>
+            <button class="btn-primary" onclick="openCreateCampaignModal()">
+                <i class="fas fa-plus"></i>
+                Create Your First Campaign
+            </button>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Create Campaign Modal -->
+    <div id="createCampaignModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-bullhorn"></i> Create New Campaign</h3>
+                <button class="modal-close" onclick="closeCreateCampaignModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="createCampaignForm">
+                    <div class="form-group">
+                        <label for="campaignName">Campaign Name</label>
+                        <input type="text" id="campaignName" name="name" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="clientSelect">Client</label>
+                        <select id="clientSelect" name="client_id" required>
+                            <option value="">Select a client</option>
+                            {% for client in clients %}
+                            <option value="{{ client.id }}">{{ client.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="maxAttempts">Max Attempts</label>
+                        <input type="number" id="maxAttempts" name="max_attempts" min="1" max="10" value="3" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="retryInterval">Retry Interval (minutes)</label>
+                        <input type="number" id="retryInterval" name="retry_interval" min="5" max="1440" value="30" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="countryCode">Country Code</label>
+                        <select id="countryCode" name="country_code" required>
+                            <option value="">Choose country code...</option>
+                            <option value="+1">🇺🇸 United States (+1)</option>
+                            <option value="+1">🇨🇦 Canada (+1)</option>
+                            <option value="+91" selected>🇮🇳 India (+91)</option>
+                            <option value="+44">🇬🇧 United Kingdom (+44)</option>
+                            <option value="+61">🇦🇺 Australia (+61)</option>
+                            <option value="+81">🇯🇵 Japan (+81)</option>
+                            <option value="+49">🇩🇪 Germany (+49)</option>
+                            <option value="+33">🇫🇷 France (+33)</option>
+                            <option value="+86">🇨🇳 China (+86)</option>
+                            <option value="+55">🇧🇷 Brazil (+55)</option>
+                            <option value="+52">🇲🇽 Mexico (+52)</option>
+                            <option value="+7">🇷🇺 Russia (+7)</option>
+                            <option value="+82">🇰🇷 South Korea (+82)</option>
+                            <option value="+39">🇮🇹 Italy (+39)</option>
+                            <option value="+34">🇪🇸 Spain (+34)</option>
+                            <option value="+31">🇳🇱 Netherlands (+31)</option>
+                            <option value="+46">🇸🇪 Sweden (+46)</option>
+                            <option value="+47">🇳🇴 Norway (+47)</option>
+                            <option value="+45">🇩🇰 Denmark (+45)</option>
+                            <option value="+41">🇨🇭 Switzerland (+41)</option>
+                            <option value="+43">🇦🇹 Austria (+43)</option>
+                            <option value="+32">🇧🇪 Belgium (+32)</option>
+                            <option value="+48">🇵🇱 Poland (+48)</option>
+                            <option value="+351">🇵🇹 Portugal (+351)</option>
+                            <option value="+30">🇬🇷 Greece (+30)</option>
+                            <option value="+90">🇹🇷 Turkey (+90)</option>
+                            <option value="+27">🇿🇦 South Africa (+27)</option>
+                            <option value="+20">🇪🇬 Egypt (+20)</option>
+                            <option value="+971">🇦🇪 UAE (+971)</option>
+                            <option value="+966">🇸🇦 Saudi Arabia (+966)</option>
+                            <option value="+65">🇸🇬 Singapore (+65)</option>
+                            <option value="+60">🇲🇾 Malaysia (+60)</option>
+                            <option value="+66">🇹🇭 Thailand (+66)</option>
+                            <option value="+84">🇻🇳 Vietnam (+84)</option>
+                            <option value="+63">🇵🇭 Philippines (+63)</option>
+                            <option value="+62">🇮🇩 Indonesia (+62)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="csvFile">Upload CSV/Excel File</label>
+                        <div class="file-input-wrapper">
+                            <input type="file" id="csvFile" name="file" accept=".csv,.xlsx" required>
+                            <div class="file-input-display" id="fileDisplay">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <div>
+                                    <strong>Click to select CSV or Excel file</strong><br>
+                                    <span>or drag and drop your file here</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn-submit">
+                        <i class="fas fa-rocket"></i>
+                        Create Campaign
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Theme management
+        const themeToggle = document.getElementById('themeToggle');
+        const body = document.body;
+        const themeIcon = themeToggle.querySelector('i');
+
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        body.setAttribute('data-theme', savedTheme);
+        updateThemeIcon(savedTheme);
+
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = body.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+            
+            body.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeIcon(newTheme);
+        });
+
+        function updateThemeIcon(theme) {
+            themeIcon.className = theme === 'light' ? 'fas fa-moon' : 'fas fa-sun';
+        }
+
+        // Sidebar management
+        const sidebar = document.getElementById('sidebar');
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+        const mainContent = document.getElementById('mainContent');
+
+        sidebarToggle.addEventListener('click', toggleSidebar);
+        sidebarOverlay.addEventListener('click', closeSidebar);
+
+        function toggleSidebar() {
+            sidebar.classList.toggle('open');
+            sidebarOverlay.classList.toggle('active');
+            mainContent.classList.toggle('sidebar-open');
+        }
+
+        function closeSidebar() {
+            sidebar.classList.remove('open');
+            sidebarOverlay.classList.remove('active');
+            mainContent.classList.remove('sidebar-open');
+        }
+
+        window.addEventListener('resize', () => {
+            if (window.innerWidth >= 1024) {
+                closeSidebar();
+            }
+        });
+
+        // Modal management
+        function openCreateCampaignModal() {
+            document.getElementById('createCampaignModal').style.display = 'block';
+        }
+
+        function closeCreateCampaignModal() {
+            document.getElementById('createCampaignModal').style.display = 'none';
+            document.getElementById('createCampaignForm').reset();
+        }
+
+        // File upload handling
+        const fileInput = document.getElementById('csvFile');
+        const fileDisplay = document.getElementById('fileDisplay');
+
+        fileInput.addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                fileDisplay.classList.add('has-file');
+                const fileIcon = file.name.endsWith('.xlsx') ? 'fa-file-excel' : 'fa-file-csv';
+                fileDisplay.innerHTML = `
+                    <i class="fas ${fileIcon}"></i>
+                    <div>
+                        <strong>${file.name}</strong><br>
+                        <span>Ready to process (${(file.size / 1024).toFixed(1)} KB)</span>
+                    </div>
+                `;
+            }
+        });
+
+        // Drag and drop functionality
+        fileDisplay.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            fileDisplay.classList.add('dragover');
+        });
+
+        fileDisplay.addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            fileDisplay.classList.remove('dragover');
+        });
+
+        fileDisplay.addEventListener('drop', function(e) {
+            e.preventDefault();
+            fileDisplay.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                fileInput.files = files;
+                fileInput.dispatchEvent(new Event('change'));
+            }
+        });
+
+        // Form submission
+        document.getElementById('createCampaignForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(e.target);
+            const campaignData = Object.fromEntries(formData.entries());
+            
+            // Remove file from campaign data for now (will be handled separately)
+            delete campaignData.file;
+            
+            try {
+                const response = await fetch('/add_campaign', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(campaignData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Campaign created successfully!');
+                    window.location.reload();
+                } else {
+                    alert('Error creating campaign: ' + (result.detail || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error creating campaign: ' + error.message);
+            }
+        });
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('createCampaignModal');
+            if (event.target === modal) {
+                closeCreateCampaignModal();
+            }
+        }
+    </script>
+</body>
+</html>

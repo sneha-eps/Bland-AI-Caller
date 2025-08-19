@@ -33,6 +33,10 @@ app = FastAPI(title="Bland AI Call Center",
               description="Make automated calls using Bland AI")
 templates = Jinja2Templates(directory="templates")
 
+# In-memory storage (in production, use a database)
+clients_db = {}
+campaigns_db = {}
+
 # Add number formatting filter
 def number_format(value):
     """Format numbers with commas"""
@@ -216,6 +220,26 @@ class CallResult(BaseModel):
     error: Optional[str] = None
     patient_name: str
     phone_number: str
+
+
+class Client(BaseModel):
+    id: Optional[str] = None
+    name: str
+    phone_number: str
+    email: str
+    website_url: str
+    language: str
+    call_type: str
+    voice: str
+
+
+class Campaign(BaseModel):
+    id: Optional[str] = None
+    name: str
+    client_id: str
+    max_attempts: int
+    retry_interval: int
+    country_code: str
 
 
 def format_phone_number(phone_number: str, country_code: str) -> str:
@@ -464,12 +488,11 @@ async def make_call(call_request: CallRequest, country_code: str = "+1"):
 async def dashboard(request: Request):
     """Dashboard showing key metrics"""
     api_key = get_api_key()
-    # In a real application, you would fetch these metrics from a database
-    # For now, we'll show zeros since no campaigns have been created yet
+    # Get actual counts from in-memory storage
     metrics = {
-        "total_clients": 0,
-        "total_campaigns": 0,
-        "total_calls": 0,
+        "total_clients": len(clients_db),
+        "total_campaigns": len(campaigns_db),
+        "total_calls": 0,  # This would be calculated from actual call data
         "total_duration": "0h 0m"  # This would be calculated from actual call data
     }
     return templates.TemplateResponse("dashboard.html", {
@@ -486,6 +509,66 @@ async def upload_page(request: Request):
         "request": request,
         "has_api_key": bool(api_key)
     })
+
+
+@app.get("/clients", response_class=HTMLResponse)
+async def clients_page(request: Request):
+    """Clients management page"""
+    api_key = get_api_key()
+    return templates.TemplateResponse("clients.html", {
+        "request": request,
+        "has_api_key": bool(api_key),
+        "clients": list(clients_db.values())
+    })
+
+
+@app.get("/campaigns", response_class=HTMLResponse)
+async def campaigns_page(request: Request):
+    """Campaigns management page"""
+    api_key = get_api_key()
+    return templates.TemplateResponse("campaigns.html", {
+        "request": request,
+        "has_api_key": bool(api_key),
+        "campaigns": list(campaigns_db.values()),
+        "clients": list(clients_db.values())
+    })
+
+
+@app.post("/add_client")
+async def add_client(client: Client):
+    """Add a new client"""
+    import uuid
+    client_id = str(uuid.uuid4())
+    client.id = client_id
+    clients_db[client_id] = client.dict()
+    return {"success": True, "client_id": client_id, "message": "Client added successfully"}
+
+
+@app.post("/add_campaign")
+async def add_campaign(campaign: Campaign):
+    """Add a new campaign"""
+    import uuid
+    campaign_id = str(uuid.uuid4())
+    campaign.id = campaign_id
+    campaigns_db[campaign_id] = campaign.dict()
+    return {"success": True, "campaign_id": campaign_id, "message": "Campaign created successfully"}
+
+
+@app.get("/voice_preview/{voice_id}")
+async def voice_preview(voice_id: str):
+    """Get voice preview audio URL"""
+    # In a real implementation, you would have actual preview audio URLs
+    preview_urls = {
+        "61507da3-4abd-49b6-983f-9ce659fd9e91": "https://example.com/preview/male_professional.mp3",
+        "70f05206-71ab-4b39-b238-ed1bf17b365a": "https://example.com/preview/female_professional.mp3",
+        "2f9fdbc7-4bf2-4792-8a18-21ce3c93978f": "https://example.com/preview/female_warm.mp3",
+        "17e8f694-d230-4b64-b040-6108088d9e6c": "https://example.com/preview/female_clear.mp3",
+        "bbeabae6-ec8d-444f-92ad-c8e620d3de8d": "https://example.com/preview/female_friendly.mp3",
+        "a3d43393-dacb-43d3-91d7-b4cb913a5908": "https://example.com/preview/male_casual.mp3",
+        "90295ec4-f0fe-4783-ab33-8b997ddc3ae4": "https://example.com/preview/male_warm.mp3",
+        "37b3f1c8-a01e-4d70-b251-294733f08371": "https://example.com/preview/male_clear.mp3"
+    }
+    return {"preview_url": preview_urls.get(voice_id, "")}
 
 
 @app.post("/process_csv")
