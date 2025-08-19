@@ -602,6 +602,240 @@
             }
         }
 
+        /* Score Cards */
+        .score-cards-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .score-card {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #7c3aed 100%);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            box-shadow: var(--shadow-lg);
+            transition: var(--transition);
+        }
+
+        .score-card:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-xl);
+        }
+
+        .score-card:nth-child(2) {
+            background: linear-gradient(135deg, var(--success-color) 0%, #059669 100%);
+        }
+
+        .score-card:nth-child(3) {
+            background: linear-gradient(135deg, var(--warning-color) 0%, #d97706 100%);
+        }
+
+        .score-card:nth-child(4) {
+            background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+        }
+
+        .score-card-icon {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 1rem;
+            border-radius: 50%;
+            font-size: 1.5rem;
+        }
+
+        .score-card-content {
+            flex: 1;
+        }
+
+        .score-card-title {
+            font-size: 0.875rem;
+            opacity: 0.9;
+            margin-bottom: 0.25rem;
+        }
+
+        .score-card-value {
+            font-size: 2rem;
+            font-weight: 700;
+        }
+
+        /* Status Summary */
+        .status-summary {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .status-indicator.confirmed {
+            background: var(--success-color);
+        }
+
+        .status-indicator.cancelled {
+            background: var(--danger-color);
+        }
+
+        .status-indicator.rescheduled {
+            background: var(--warning-color);
+        }
+
+        .status-indicator.busy {
+            background: #6b7280;
+        }
+
+        .status-indicator.voicemail {
+            background: var(--primary-color);
+        }
+
+        /* Calls Table */
+        .calls-table-container {
+            max-height: 400px;
+            overflow-y: auto;
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            background: var(--bg-primary);
+        }
+
+        .calls-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .calls-table th,
+        .calls-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .calls-table th {
+            background: var(--bg-secondary);
+            font-weight: 600;
+            color: var(--text-primary);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .calls-table td {
+            color: var(--text-secondary);
+        }
+
+        .call-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.025em;
+        }
+
+        .call-status.confirmed {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success-color);
+        }
+
+        .call-status.cancelled {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger-color);
+        }
+
+        .call-status.rescheduled {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning-color);
+        }
+
+        .call-status.busy {
+            background: rgba(107, 114, 128, 0.1);
+            color: #6b7280;
+        }
+
+        .call-status.voicemail {
+            background: rgba(79, 70, 229, 0.1);
+            color: var(--primary-color);
+        }
+
+        .call-status.pending {
+            background: rgba(156, 163, 175, 0.1);
+            color: #9ca3af;
+        }
+
+        .transcript-preview {
+            max-width: 200px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .transcript-full {
+            display: none;
+            max-width: 300px;
+            white-space: pre-wrap;
+            font-size: 0.8rem;
+            line-height: 1.4;
+            background: var(--bg-secondary);
+            padding: 0.75rem;
+            border-radius: 8px;
+            margin-top: 0.5rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .transcript-toggle {
+            background: none;
+            border: none;
+            color: var(--primary-color);
+            cursor: pointer;
+            font-size: 0.75rem;
+            text-decoration: underline;
+            margin-top: 0.25rem;
+        }
+
+        .transcript-toggle:hover {
+            color: var(--primary-hover);
+        }
+
+        @media (max-width: 768px) {
+            .score-cards-container {
+                grid-template-columns: 1fr;
+            }
+
+            .status-summary {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .calls-table-container {
+                overflow-x: auto;
+            }
+
+            .calls-table {
+                min-width: 800px;
+            }
+        }
+
         @media (min-width: 1024px) {
             .sidebar {
                 transform: translateX(0);
@@ -793,6 +1027,108 @@
                         Start Campaign Calls
                     </button>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Campaign Results Modal -->
+    <div id="campaignResultsModal" class="modal">
+        <div class="modal-content" style="max-width: 1200px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-chart-bar"></i> Campaign Analytics</h3>
+                <button class="modal-close" onclick="closeCampaignResultsModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <!-- Score Cards -->
+                <div class="score-cards-container">
+                    <div class="score-card">
+                        <div class="score-card-icon">
+                            <i class="fas fa-phone-alt"></i>
+                        </div>
+                        <div class="score-card-content">
+                            <div class="score-card-title">Total Calls</div>
+                            <div class="score-card-value" id="totalCalls">0</div>
+                        </div>
+                    </div>
+                    <div class="score-card">
+                        <div class="score-card-icon">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="score-card-content">
+                            <div class="score-card-title">Total Duration</div>
+                            <div class="score-card-value" id="totalDuration">0m</div>
+                        </div>
+                    </div>
+                    <div class="score-card">
+                        <div class="score-card-icon">
+                            <i class="fas fa-redo"></i>
+                        </div>
+                        <div class="score-card-content">
+                            <div class="score-card-title">Runs</div>
+                            <div class="score-card-value" id="campaignRuns">0</div>
+                        </div>
+                    </div>
+                    <div class="score-card">
+                        <div class="score-card-icon">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div class="score-card-content">
+                            <div class="score-card-title">Success Rate</div>
+                            <div class="score-card-value" id="successRate">0%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status Summary -->
+                <div class="status-summary">
+                    <div class="status-item">
+                        <div class="status-indicator confirmed"></div>
+                        <span>Confirmed: <strong id="confirmedCount">0</strong></span>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-indicator cancelled"></div>
+                        <span>Cancelled: <strong id="cancelledCount">0</strong></span>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-indicator rescheduled"></div>
+                        <span>Rescheduled: <strong id="rescheduledCount">0</strong></span>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-indicator busy"></div>
+                        <span>Busy/No Answer: <strong id="busyCount">0</strong></span>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-indicator voicemail"></div>
+                        <span>Voicemail: <strong id="voicemailCount">0</strong></span>
+                    </div>
+                </div>
+
+                <!-- Calls Table -->
+                <div class="calls-table-container">
+                    <table class="calls-table">
+                        <thead>
+                            <tr>
+                                <th>Patient Name</th>
+                                <th>Phone Number</th>
+                                <th>Status</th>
+                                <th>Duration</th>
+                                <th>Date/Time</th>
+                                <th>Transcript</th>
+                            </tr>
+                        </thead>
+                        <tbody id="callsTableBody">
+                            <!-- Call rows will be populated here -->
+                        </tbody>
+                    </table>
+                </div>
+
+                <div id="noCallsMessage" class="empty-state" style="display: none;">
+                    <i class="fas fa-phone-slash"></i>
+                    <h3>No Call Data Available</h3>
+                    <p>This campaign hasn't been run yet or no call data is available.</p>
+                </div>
             </div>
         </div>
     </div>
@@ -1141,8 +1477,160 @@
         }
 
         function viewCampaignResults(campaignId) {
-            // For now, show an alert - this can be expanded to show detailed results
-            alert('Campaign results feature coming soon! Campaign ID: ' + campaignId);
+            // Show the campaign results modal
+            document.getElementById('campaignResultsModal').style.display = 'block';
+            
+            // Load campaign analytics data
+            loadCampaignAnalytics(campaignId);
+        }
+
+        function closeCampaignResultsModal() {
+            document.getElementById('campaignResultsModal').style.display = 'none';
+        }
+
+        async function loadCampaignAnalytics(campaignId) {
+            try {
+                // Show loading state
+                document.getElementById('totalCalls').textContent = 'Loading...';
+                document.getElementById('totalDuration').textContent = 'Loading...';
+                document.getElementById('campaignRuns').textContent = 'Loading...';
+                document.getElementById('successRate').textContent = 'Loading...';
+                
+                const response = await fetch(`/campaign_analytics/${campaignId}`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    // Update score cards
+                    document.getElementById('totalCalls').textContent = data.analytics.total_calls.toLocaleString();
+                    document.getElementById('totalDuration').textContent = formatDuration(data.analytics.total_duration);
+                    document.getElementById('campaignRuns').textContent = data.analytics.campaign_runs;
+                    document.getElementById('successRate').textContent = data.analytics.success_rate + '%';
+                    
+                    // Update status counts
+                    document.getElementById('confirmedCount').textContent = data.analytics.status_counts.confirmed;
+                    document.getElementById('cancelledCount').textContent = data.analytics.status_counts.cancelled;
+                    document.getElementById('rescheduledCount').textContent = data.analytics.status_counts.rescheduled;
+                    document.getElementById('busyCount').textContent = data.analytics.status_counts.busy;
+                    document.getElementById('voicemailCount').textContent = data.analytics.status_counts.voicemail;
+                    
+                    // Populate calls table
+                    populateCallsTable(data.analytics.calls);
+                    
+                    // Hide no calls message
+                    document.getElementById('noCallsMessage').style.display = 'none';
+                } else {
+                    // Show no calls message
+                    document.getElementById('noCallsMessage').style.display = 'block';
+                    document.querySelector('.calls-table-container').style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error loading campaign analytics:', error);
+                // Show error state
+                document.getElementById('totalCalls').textContent = 'Error';
+                document.getElementById('totalDuration').textContent = 'Error';
+                document.getElementById('campaignRuns').textContent = 'Error';
+                document.getElementById('successRate').textContent = 'Error';
+            }
+        }
+
+        function populateCallsTable(calls) {
+            const tbody = document.getElementById('callsTableBody');
+            tbody.innerHTML = '';
+            
+            if (!calls || calls.length === 0) {
+                document.getElementById('noCallsMessage').style.display = 'block';
+                document.querySelector('.calls-table-container').style.display = 'none';
+                return;
+            }
+            
+            document.querySelector('.calls-table-container').style.display = 'block';
+            
+            calls.forEach((call, index) => {
+                const row = document.createElement('tr');
+                
+                // Determine call status from transcript or error
+                let callStatus = 'pending';
+                let statusIcon = 'fa-clock';
+                
+                if (call.success === false) {
+                    callStatus = 'busy';
+                    statusIcon = 'fa-phone-slash';
+                } else if (call.transcript) {
+                    const transcript = call.transcript.toLowerCase();
+                    if (transcript.includes('confirm') || transcript.includes('yes') || transcript.includes('see you then')) {
+                        callStatus = 'confirmed';
+                        statusIcon = 'fa-check-circle';
+                    } else if (transcript.includes('reschedule') || transcript.includes('different time')) {
+                        callStatus = 'rescheduled';
+                        statusIcon = 'fa-calendar-alt';
+                    } else if (transcript.includes('cancel') || transcript.includes("can't make it")) {
+                        callStatus = 'cancelled';
+                        statusIcon = 'fa-times-circle';
+                    } else if (transcript.includes('voicemail') || transcript.includes('leave a message')) {
+                        callStatus = 'voicemail';
+                        statusIcon = 'fa-voicemail';
+                    } else if (transcript.includes('busy') || transcript.includes('hang up')) {
+                        callStatus = 'busy';
+                        statusIcon = 'fa-phone-slash';
+                    }
+                }
+                
+                // Create transcript preview
+                const transcriptPreview = call.transcript 
+                    ? (call.transcript.length > 50 ? call.transcript.substring(0, 50) + '...' : call.transcript)
+                    : (call.error || 'No transcript available');
+                
+                row.innerHTML = `
+                    <td>${call.patient_name || 'Unknown'}</td>
+                    <td>${call.phone_number || 'Unknown'}</td>
+                    <td>
+                        <span class="call-status ${callStatus}">
+                            <i class="fas ${statusIcon}"></i>
+                            ${callStatus.charAt(0).toUpperCase() + callStatus.slice(1)}
+                        </span>
+                    </td>
+                    <td>${formatDuration(call.duration || 0)}</td>
+                    <td>${call.created_at ? new Date(call.created_at).toLocaleString() : 'N/A'}</td>
+                    <td>
+                        <div class="transcript-preview">${transcriptPreview}</div>
+                        ${call.transcript && call.transcript.length > 50 ? `
+                            <button class="transcript-toggle" onclick="toggleTranscript(${index})">Show More</button>
+                            <div class="transcript-full" id="transcript-${index}">${call.transcript}</div>
+                        ` : ''}
+                    </td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+        }
+
+        function toggleTranscript(index) {
+            const fullTranscript = document.getElementById(`transcript-${index}`);
+            const toggleButton = fullTranscript.previousElementSibling;
+            
+            if (fullTranscript.style.display === 'none' || !fullTranscript.style.display) {
+                fullTranscript.style.display = 'block';
+                toggleButton.textContent = 'Show Less';
+            } else {
+                fullTranscript.style.display = 'none';
+                toggleButton.textContent = 'Show More';
+            }
+        }
+
+        function formatDuration(seconds) {
+            if (!seconds) return '0s';
+            
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+            
+            if (hours > 0) {
+                return `${hours}h ${minutes}m`;
+            } else if (minutes > 0) {
+                return `${minutes}m ${secs}s`;
+            } else {
+                return `${secs}s`;
+            }
         }
 
         // Handle campaign file upload
@@ -1263,6 +1751,7 @@
             const createModal = document.getElementById('createCampaignModal');
             const startModal = document.getElementById('startCampaignModal');
             const editModal = document.getElementById('editCampaignModal');
+            const resultsModal = document.getElementById('campaignResultsModal');
             if (event.target === createModal) {
                 closeCreateCampaignModal();
             }
@@ -1271,6 +1760,9 @@
             }
             if (event.target === editModal) {
                 closeEditCampaignModal();
+            }
+            if (event.target === resultsModal) {
+                closeCampaignResultsModal();
             }
         }
     </script>

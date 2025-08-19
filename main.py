@@ -884,6 +884,115 @@ async def process_csv(file: UploadFile = File(...),
                             detail=f"Error processing CSV: {str(e)}")
 
 
+@app.get("/campaign_analytics/{campaign_id}")
+async def get_campaign_analytics(campaign_id: str):
+    """Get campaign analytics including performance metrics and call details"""
+    api_key = get_api_key()
+
+    if not api_key:
+        raise HTTPException(status_code=400,
+                            detail="BLAND_API_KEY not found in Secrets.")
+
+    try:
+        # Get campaign results from in-memory storage (in production, use a database)
+        if hasattr(start_campaign, 'results_db') and campaign_id in start_campaign.results_db:
+            campaign_results = start_campaign.results_db[campaign_id]
+            
+            # Get detailed call information for each call
+            calls_with_details = []
+            total_duration = 0
+            status_counts = {
+                'confirmed': 0,
+                'cancelled': 0,
+                'rescheduled': 0,
+                'busy': 0,
+                'voicemail': 0
+            }
+            
+            for result in campaign_results['results']:
+                call_details = {
+                    'patient_name': result['patient_name'],
+                    'phone_number': result['phone_number'],
+                    'success': result['success'],
+                    'error': result.get('error'),
+                    'call_id': result.get('call_id'),
+                    'transcript': None,
+                    'duration': 0,
+                    'created_at': campaign_results['started_at']
+                }
+                
+                # If call was successful and has call_id, try to get detailed info
+                if result['success'] and result.get('call_id'):
+                    try:
+                        call_response = requests.get(
+                            f"https://api.bland.ai/v1/calls/{result['call_id']}",
+                            headers={"Authorization": f"Bearer {api_key}"},
+                            timeout=10
+                        )
+                        
+                        if call_response.status_code == 200:
+                            call_data = call_response.json()
+                            call_details['transcript'] = call_data.get('transcript', '')
+                            call_details['duration'] = call_data.get('duration', 0)
+                            call_details['created_at'] = call_data.get('created_at', campaign_results['started_at'])
+                            
+                            # Add to total duration
+                            total_duration += call_details['duration']
+                            
+                            # Analyze transcript for status
+                            transcript = call_details['transcript'].lower() if call_details['transcript'] else ''
+                            if any(word in transcript for word in ["confirm", "yes", "see you then", "i'll be there"]):
+                                status_counts['confirmed'] += 1
+                            elif any(word in transcript for word in ["reschedule", "different time", "change"]):
+                                status_counts['rescheduled'] += 1
+                            elif any(word in transcript for word in ["cancel", "can't make it", "won't be available"]):
+                                status_counts['cancelled'] += 1
+                            elif "voicemail" in transcript or "leave a message" in transcript:
+                                status_counts['voicemail'] += 1
+                            elif any(word in transcript for word in ["busy", "hang up", "ended call"]):
+                                status_counts['busy'] += 1
+                        else:
+                            status_counts['busy'] += 1
+                    except:
+                        # If we can't get call details, count as busy
+                        status_counts['busy'] += 1
+                else:
+                    # Failed calls count as busy
+                    status_counts['busy'] += 1
+                
+                calls_with_details.append(call_details)
+            
+            # Calculate analytics
+            total_calls = len(campaign_results['results'])
+            successful_calls = sum(1 for call in calls_with_details if call['success'])
+            success_rate = round((successful_calls / total_calls * 100) if total_calls > 0 else 0, 1)
+            
+            analytics = {
+                'total_calls': total_calls,
+                'total_duration': total_duration,
+                'campaign_runs': 1,  # For now, each entry represents one run
+                'success_rate': success_rate,
+                'status_counts': status_counts,
+                'calls': calls_with_details
+            }
+            
+            return {
+                "success": True,
+                "campaign_id": campaign_id,
+                "campaign_name": campaign_results['campaign_name'],
+                "analytics": analytics
+            }
+        else:
+            return {
+                "success": False,
+                "message": "No analytics data available for this campaign"
+            }
+            
+    except Exception as e:
+        raise HTTPException(status_code=500,
+                            detail=f"Error fetching campaign analytics: {str(e)}")
+
+
 @app.get("/call_details/{call_id}")
 async def get_call_details(call_id: str):
     """Get detailed call information including transcript"""
