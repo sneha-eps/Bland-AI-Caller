@@ -1343,31 +1343,23 @@
         // Theme management
         const themeToggle = document.getElementById('themeToggle');
         const body = document.body;
-        let themeIcon = null;
-        
-        if (themeToggle) {
-            themeIcon = themeToggle.querySelector('i');
-        }
+        const themeIcon = themeToggle.querySelector('i');
 
         const savedTheme = localStorage.getItem('theme') || 'light';
         body.setAttribute('data-theme', savedTheme);
         updateThemeIcon(savedTheme);
 
-        if (themeToggle) {
-            themeToggle.addEventListener('click', () => {
+        themeToggle.addEventListener('click', () => {
             const currentTheme = body.getAttribute('data-theme');
             const newTheme = currentTheme === 'light' ? 'dark' : 'light';
             
             body.setAttribute('data-theme', newTheme);
             localStorage.setItem('theme', newTheme);
             updateThemeIcon(newTheme);
-            });
-        }
+        });
 
         function updateThemeIcon(theme) {
-            if (themeIcon) {
-                themeIcon.className = theme === 'light' ? 'fas fa-moon' : 'fas fa-sun';
-            }
+            themeIcon.className = theme === 'light' ? 'fas fa-moon' : 'fas fa-sun';
         }
 
         // Sidebar management
@@ -1376,12 +1368,8 @@
         const sidebarOverlay = document.getElementById('sidebarOverlay');
         const mainContent = document.getElementById('mainContent');
 
-        if (sidebarToggle) {
-            sidebarToggle.addEventListener('click', toggleSidebar);
-        }
-        if (sidebarOverlay) {
-            sidebarOverlay.addEventListener('click', closeSidebar);
-        }
+        sidebarToggle.addEventListener('click', toggleSidebar);
+        sidebarOverlay.addEventListener('click', closeSidebar);
 
         function toggleSidebar() {
             sidebar.classList.toggle('open');
