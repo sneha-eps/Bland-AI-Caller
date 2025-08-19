@@ -249,8 +249,13 @@ class Campaign(BaseModel):
 
 def format_phone_number(phone_number: str, country_code: str) -> str:
     """Format phone number with the selected country code"""
+    if phone_number is None:
+        phone_number = ''
+    if country_code is None:
+        country_code = '+1'
+    
     # Remove all non-digit characters
-    cleaned = re.sub(r'[^\d]', '', phone_number.strip())
+    cleaned = re.sub(r'[^\d]', '', str(phone_number).strip())
 
     # Add the selected country code
     return f"{country_code}{cleaned}"
@@ -749,18 +754,18 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
                 continue
 
             # Format phone number with campaign's country code
-            phone_number_str = str(row['phone_number']).strip()
+            phone_number_str = str(row.get('phone_number', '')).strip() if row.get('phone_number') is not None else ''
             formatted_phone = format_phone_number(phone_number_str, campaign['country_code'])
             print(f"📞 Campaign {campaign['name']}: {phone_number_str} -> Formatted: {formatted_phone} (Country Code: {campaign['country_code']})")
 
             # Create call request
             call_request = CallRequest(
                 phone_number=formatted_phone,
-                patient_name=str(row['patient_name']).strip(),
-                provider_name=str(row['provider_name']).strip(),
-                appointment_date=str(row['date']).strip(),
-                appointment_time=str(row['time']).strip(),
-                office_location=str(row['office_location']).strip())
+                patient_name=str(row.get('patient_name', '')).strip() if row.get('patient_name') is not None else '',
+                provider_name=str(row.get('provider_name', '')).strip() if row.get('provider_name') is not None else '',
+                appointment_date=str(row.get('date', '')).strip() if row.get('date') is not None else '',
+                appointment_time=str(row.get('time', '')).strip() if row.get('time') is not None else '',
+                office_location=str(row.get('office_location', '')).strip() if row.get('office_location') is not None else '')
             call_requests.append(call_request)
 
         # Process all valid calls concurrently (max 10 at a time)
@@ -891,7 +896,7 @@ async def process_csv(file: UploadFile = File(...),
                 continue
 
             # Format phone number with selected country code
-            phone_number_str = str(row['phone_number']).strip()
+            phone_number_str = str(row.get('phone_number', '')).strip() if row.get('phone_number') is not None else ''
             formatted_phone = format_phone_number(phone_number_str, country_code)
             print(
                 f"📞 CSV Row: {phone_number_str} -> Formatted: {formatted_phone} (Country Code: {country_code})"
@@ -900,11 +905,11 @@ async def process_csv(file: UploadFile = File(...),
             # Create call request
             call_request = CallRequest(
                 phone_number=formatted_phone,
-                patient_name=str(row['patient_name']).strip(),
-                provider_name=str(row['provider_name']).strip(),
-                appointment_date=str(row['date']).strip(),
-                appointment_time=str(row['time']).strip(),
-                office_location=str(row['office_location']).strip())
+                patient_name=str(row.get('patient_name', '')).strip() if row.get('patient_name') is not None else '',
+                provider_name=str(row.get('provider_name', '')).strip() if row.get('provider_name') is not None else '',
+                appointment_date=str(row.get('date', '')).strip() if row.get('date') is not None else '',
+                appointment_time=str(row.get('time', '')).strip() if row.get('time') is not None else '',
+                office_location=str(row.get('office_location', '')).strip() if row.get('office_location') is not None else '')
             call_requests.append(call_request)
 
         # Process all valid calls concurrently (max 10 at a time)
