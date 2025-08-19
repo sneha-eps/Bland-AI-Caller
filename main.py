@@ -740,8 +740,9 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
                 continue
 
             # Format phone number with campaign's country code
-            formatted_phone = format_phone_number(row['phone_number'].strip(), campaign['country_code'])
-            print(f"📞 Campaign {campaign['name']}: {row['phone_number'].strip()} -> Formatted: {formatted_phone} (Country Code: {campaign['country_code']})")
+            phone_number_str = str(row['phone_number']).strip()
+            formatted_phone = format_phone_number(phone_number_str, campaign['country_code'])
+            print(f"📞 Campaign {campaign['name']}: {phone_number_str} -> Formatted: {formatted_phone} (Country Code: {campaign['country_code']})")
 
             # Create call request
             call_request = CallRequest(
@@ -883,10 +884,10 @@ async def process_csv(file: UploadFile = File(...),
                 continue
 
             # Format phone number with selected country code
-            formatted_phone = format_phone_number(row['phone_number'].strip(),
-                                                  country_code)
+            phone_number_str = str(row['phone_number']).strip()
+            formatted_phone = format_phone_number(phone_number_str, country_code)
             print(
-                f"📞 CSV Row: {row['phone_number'].strip()} -> Formatted: {formatted_phone} (Country Code: {country_code})"
+                f"📞 CSV Row: {phone_number_str} -> Formatted: {formatted_phone} (Country Code: {country_code})"
             )
 
             # Create call request
