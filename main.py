@@ -73,7 +73,7 @@ def get_voice_id(name="female_professional") -> str:
         VOICE_MAP["female_professional"])  # Default to female_professional
 
 
-def get_call_prompt(clinic_address: str = "",
+def get_call_prompt(office_location: str = "",
         patient_name: str = "[patient name]",
         appointment_date: str = "[date]",
         appointment_time: str = "[time]",
@@ -88,7 +88,7 @@ def get_call_prompt(clinic_address: str = "",
     • Phone: 2 1 0 7 4 2 6 5 5 5
     • Email: live oak office @ hill side primary care dot com
     • Hours: 8 a.m. to 5 p.m., Monday to Friday
-    • Address: {clinic_address if clinic_address else '[address]'}
+    • Address: {office_location if office_location else '[address]'}
 
     DELIVERY RULES
     • Speak naturally like a real person having a conversation - don't sound like you're reading a script
@@ -125,7 +125,7 @@ def get_call_prompt(clinic_address: str = "",
     • If identity confirmed: proceed.
 
     3) APPOINTMENT CONFIRMATION QUESTION
-    Say: "Perfect! The reason for my call is to confirm your upcoming appointment on {appointment_date} at {appointment_time} with {provider_name} at our clinic located at {clinic_address}. Will you be able to make it to your appointment?"
+    Say: "Perfect! The reason for my call is to confirm your upcoming appointment on {appointment_date} at {appointment_time} with {provider_name} at our clinic located at {office_location}. Will you be able to make it to your appointment?"
     Then stop and wait.
 
     ⚠️ CRITICAL CANCELLATION RULE ⚠️
@@ -201,7 +201,7 @@ class CallRequest(BaseModel):
     provider_name: str
     appointment_date: str
     appointment_time: str
-    clinic_address: Optional[str] = None # Added clinic_address field
+    office_location: str
 
 
 class CallResult(BaseModel):
@@ -244,7 +244,7 @@ async def make_single_call_async(call_request: CallRequest, api_key: str,
             payload = {
                 "phone_number": call_request.phone_number,
                 "task": get_call_prompt(
-                    clinic_address=call_request.clinic_address or "",
+                    office_location=call_request.office_location,
                     patient_name=call_request.patient_name,
                     appointment_date=call_request.appointment_date,
                     appointment_time=call_request.appointment_time,
@@ -342,7 +342,7 @@ def make_single_call(call_request: CallRequest, api_key: str) -> CallResult:
         payload = {
             "phone_number": call_request.phone_number,
             "task": get_call_prompt(
-                clinic_address=call_request.clinic_address or "",
+                office_location=call_request.office_location,
                 patient_name=call_request.patient_name,
                 appointment_date=call_request.appointment_date,
                 appointment_time=call_request.appointment_time,
@@ -489,8 +489,7 @@ async def upload_page(request: Request):
 
 @app.post("/process_csv")
 async def process_csv(file: UploadFile = File(...),
-                      country_code: str = Form("+1"),
-                      clinic_address: str = Form("")): # Added clinic_address field
+                      country_code: str = Form("+1")):
     """Process CSV file and make calls for all rows"""
     api_key = get_api_key()
 
@@ -520,7 +519,7 @@ async def process_csv(file: UploadFile = File(...),
             row_count += 1
             # Validate required fields
             required_fields = [
-                'phone_number', 'patient_name', 'date', 'time', 'provider_name'
+                'phone_number', 'patient_name', 'date', 'time', 'provider_name', 'office_location'
             ]
             missing_fields = [
                 field for field in required_fields
@@ -551,7 +550,7 @@ async def process_csv(file: UploadFile = File(...),
                 provider_name=row['provider_name'].strip(),
                 appointment_date=row['date'].strip(),
                 appointment_time=row['time'].strip(),
-                clinic_address=clinic_address) # Pass clinic_address
+                office_location=row['office_location'].strip())
             call_requests.append(call_request)
 
         # Process all valid calls concurrently (max 10 at a time)
