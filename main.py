@@ -556,29 +556,53 @@ async def add_campaign(
     file: UploadFile = File(...)
 ):
     """Add a new campaign with file"""
-    import uuid
-    
-    # Validate file type
-    if not file.filename or not (file.filename.endswith('.csv') or file.filename.endswith('.xlsx')):
-        raise HTTPException(status_code=400, detail="Please upload a CSV or XLSX file.")
-    
-    # Read and store file data
-    file_content = await file.read()
-    
-    campaign_id = str(uuid.uuid4())
-    campaign_data = {
-        "id": campaign_id,
-        "name": name,
-        "client_id": client_id,
-        "max_attempts": max_attempts,
-        "retry_interval": retry_interval,
-        "country_code": country_code,
-        "file_name": file.filename,
-        "file_data": file_content
-    }
-    
-    campaigns_db[campaign_id] = campaign_data
-    return {"success": True, "campaign_id": campaign_id, "message": "Campaign created successfully"}
+    try:
+        import uuid
+        
+        # Validate required fields
+        if not name or not name.strip():
+            raise HTTPException(status_code=400, detail="Campaign name is required.")
+        
+        if not client_id or client_id not in clients_db:
+            raise HTTPException(status_code=400, detail="Valid client is required.")
+        
+        # Validate file type
+        if not file.filename or not (file.filename.endswith('.csv') or file.filename.endswith('.xlsx')):
+            raise HTTPException(status_code=400, detail="Please upload a CSV or XLSX file.")
+        
+        # Validate file size (max 10MB)
+        file_content = await file.read()
+        if len(file_content) > 10 * 1024 * 1024:  # 10MB limit
+            raise HTTPException(status_code=400, detail="File size too large. Maximum 10MB allowed.")
+        
+        # Validate numeric fields
+        if max_attempts < 1 or max_attempts > 10:
+            raise HTTPException(status_code=400, detail="Max attempts must be between 1 and 10.")
+            
+        if retry_interval < 5 or retry_interval > 1440:
+            raise HTTPException(status_code=400, detail="Retry interval must be between 5 and 1440 minutes.")
+        
+        campaign_id = str(uuid.uuid4())
+        campaign_data = {
+            "id": campaign_id,
+            "name": name.strip(),
+            "client_id": client_id,
+            "max_attempts": max_attempts,
+            "retry_interval": retry_interval,
+            "country_code": country_code,
+            "file_name": file.filename,
+            "file_data": file_content
+        }
+        
+        campaigns_db[campaign_id] = campaign_data
+        print(f"✅ Campaign '{name}' created successfully with ID: {campaign_id}")
+        return {"success": True, "campaign_id": campaign_id, "message": "Campaign created successfully"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"❌ Error creating campaign: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error creating campaign: {str(e)}")
 
 
 @app.put("/update_campaign/{campaign_id}")
