@@ -98,4 +98,4 @@ if __name__ == "__main__":
     # Example template files:
     # templates/index.html, templates/campaigns.html, templates/error.html
     # static/style.css (optional)
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=5000)
