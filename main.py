@@ -1008,34 +1008,31 @@ async def process_csv(file: UploadFile = File(...),
 
 def analyze_call_transcript(transcript: str) -> str:
     """Analyze transcript to determine call status"""
-    if not transcript:
+    if not transcript or transcript.strip() == "":
         return 'failed'
 
     transcript_lower = transcript.lower()
 
-    # Check for busy/voicemail indicators
-    busy_voicemail_indicators = [
-        "busy", "no answer", "disconnected", "line busy", "call ended",
-        "hung up", "voicemail", "leave a message", "after the beep",
-        "not available", "please leave", "can't come to the phone", "mailbox",
-        "voice message"
-    ]
-    if any(indicator in transcript_lower for indicator in busy_voicemail_indicators):
-        return 'busy_voicemail' # Consolidated status
-
-    # Check for confirmation indicators
+    # Check for confirmation indicators first (more specific)
     confirmation_indicators = [
+        "yes, i'll be there", "yes i will be there", "yes that works", "yes that's fine",
         "confirm", "yes", "see you then", "i'll be there", "sounds good",
         "that works", "perfect", "okay", "sure", "will be there",
-        "looking forward", "thank you"
+        "looking forward", "great", "excellent", "wonderful"
     ]
-    if any(indicator in transcript_lower for indicator in confirmation_indicators):
-        return 'confirmed'
+    
+    # Check for strong confirmation patterns
+    strong_confirmations = ["yes", "confirm", "i'll be there", "see you then", "that works", "sounds good"]
+    if any(indicator in transcript_lower for indicator in strong_confirmations):
+        # Make sure it's not a cancellation disguised as confirmation
+        if not any(cancel in transcript_lower for cancel in ["cancel", "can't make it", "won't be available"]):
+            return 'confirmed'
 
-    # Check for rescheduling indicators
+    # Check for rescheduling indicators (should come before cancellation)
     reschedule_indicators = [
-        "reschedule", "different time", "change", "move", "another time",
-        "can we schedule", "find a new time", "not that time", "different day"
+        "reschedule", "different time", "change the time", "move the appointment", "another time",
+        "can we schedule", "find a new time", "not that time", "different day",
+        "schedule for", "what about", "how about", "prefer", "better time"
     ]
     if any(indicator in transcript_lower for indicator in reschedule_indicators):
         return 'rescheduled'
@@ -1043,13 +1040,27 @@ def analyze_call_transcript(transcript: str) -> str:
     # Check for cancellation indicators
     cancellation_indicators = [
         "cancel", "can't make it", "won't be available", "not coming",
-        "unable to", "won't be able", "have to cancel", "need to cancel"
+        "unable to", "won't be able", "have to cancel", "need to cancel",
+        "don't need", "no longer need"
     ]
     if any(indicator in transcript_lower for indicator in cancellation_indicators):
         return 'cancelled'
 
-    # If we have a transcript but can't categorize it, mark as completed
-    return 'completed'
+    # Check for busy/voicemail indicators
+    busy_voicemail_indicators = [
+        "busy", "no answer", "disconnected", "line busy", "call ended immediately",
+        "hung up", "voicemail", "leave a message", "after the beep",
+        "not available", "please leave", "can't come to the phone", "mailbox",
+        "voice message", "recording", "dial tone"
+    ]
+    if any(indicator in transcript_lower for indicator in busy_voicemail_indicators):
+        return 'busy'
+
+    # If we have a meaningful transcript but can't categorize it, mark as completed
+    if len(transcript.strip()) > 10:  # At least some meaningful content
+        return 'completed'
+    
+    return 'failed'
 
 
 def get_voicemail_prompt(patient_name: str = "[patient name]",
@@ -1236,10 +1247,8 @@ async def get_campaign_analytics(campaign_id: str):
                 'cancelled': 0,
                 'rescheduled': 0,
                 'busy': 0,
-                'voicemail': 0,
                 'completed': 0,
-                'failed': 0,
-                'busy_voicemail': 0 # Added for the new consolidated status
+                'failed': 0
             }
 
             for result in campaign_results['results']:
@@ -1262,44 +1271,66 @@ async def get_campaign_analytics(campaign_id: str):
                         call_response = requests.get(
                             f"https://api.bland.ai/v1/calls/{result['call_id']}",
                             headers={"Authorization": f"Bearer {api_key}"},
-                            timeout=15
+                            timeout=30  # Increased timeout
                         )
 
                         if call_response.status_code == 200:
                             call_data = call_response.json()
-                            call_details['transcript'] = call_data.get('transcript', '')
-                            call_details['duration'] = call_data.get('duration', 0)
+                            
+                            # Get transcript and other details
+                            transcript = call_data.get('transcript', '')
+                            call_details['transcript'] = transcript
                             call_details['created_at'] = call_data.get('created_at', campaign_results['started_at'])
-
-                            # Add to total duration (convert to seconds if needed)
-                            duration = call_details['duration']
-                            if isinstance(duration, str):
-                                # If duration is in format like "1m 30s", convert to seconds
+                            
+                            # Parse duration more robustly
+                            raw_duration = call_data.get('duration', 0)
+                            duration_seconds = 0
+                            
+                            if isinstance(raw_duration, (int, float)):
+                                duration_seconds = int(raw_duration)
+                            elif isinstance(raw_duration, str) and raw_duration:
                                 try:
-                                    if 'm' in duration and 's' in duration:
-                                        parts = duration.replace('s', '').split('m')
-                                        minutes = int(parts[0]) if parts[0] else 0
-                                        seconds = int(parts[1]) if len(parts) > 1 and parts[1] else 0
-                                        duration = minutes * 60 + seconds
-                                    elif 's' in duration:
-                                        duration = int(duration.replace('s', ''))
-                                    elif 'm' in duration:
-                                        duration = int(duration.replace('m', '')) * 60
-                                    else:
-                                        duration = 0
-                                except:
-                                    duration = 0
-
-                            total_duration += duration
-                            call_details['duration'] = duration
+                                    # Handle various duration formats
+                                    duration_str = raw_duration.lower().strip()
+                                    if 'm' in duration_str and 's' in duration_str:
+                                        # Format: "2m 30s" or "2m30s"
+                                        import re
+                                        match = re.search(r'(\d+)m\s*(\d+)?s?', duration_str)
+                                        if match:
+                                            minutes = int(match.group(1))
+                                            seconds = int(match.group(2)) if match.group(2) else 0
+                                            duration_seconds = minutes * 60 + seconds
+                                    elif 's' in duration_str:
+                                        # Format: "150s"
+                                        duration_seconds = int(duration_str.replace('s', ''))
+                                    elif 'm' in duration_str:
+                                        # Format: "2m"
+                                        duration_seconds = int(duration_str.replace('m', '')) * 60
+                                    elif duration_str.isdigit():
+                                        # Just a number, assume seconds
+                                        duration_seconds = int(duration_str)
+                                except Exception as e:
+                                    print(f"⚠️ Could not parse duration '{raw_duration}': {e}")
+                                    duration_seconds = 0
+                            
+                            call_details['duration'] = duration_seconds
+                            total_duration += duration_seconds
 
                             # Analyze transcript for status using our improved function
-                            call_details['call_status'] = analyze_call_transcript(call_details['transcript'])
-                            status_counts[call_details['call_status']] += 1
+                            call_status = analyze_call_transcript(transcript)
+                            call_details['call_status'] = call_status
+                            
+                            # Make sure the status exists in our counts dictionary
+                            if call_status in status_counts:
+                                status_counts[call_status] += 1
+                            else:
+                                # Fallback for unexpected statuses
+                                status_counts['failed'] += 1
+                                call_details['call_status'] = 'failed'
 
-                            print(f"✅ Call details retrieved for {result['patient_name']}: Status={call_details['call_status']}, Duration={duration}s")
+                            print(f"✅ Call details retrieved for {result['patient_name']}: Status={call_details['call_status']}, Duration={duration_seconds}s, Transcript length={len(transcript)}")
                         else:
-                            print(f"❌ Failed to get call details: Status {call_response.status_code}")
+                            print(f"❌ Failed to get call details: Status {call_response.status_code}, Response: {call_response.text}")
                             call_details['call_status'] = 'failed'
                             status_counts['failed'] += 1
                     except Exception as e:
@@ -1376,22 +1407,34 @@ async def get_call_details(call_id: str):
             transcript = call_data.get("transcript", "")
             call_status = analyze_call_transcript(transcript)
 
-            # Handle duration formatting
-            duration = call_data.get("duration", 0)
-            if isinstance(duration, str):
+            # Handle duration formatting consistently
+            raw_duration = call_data.get("duration", 0)
+            duration = 0
+            
+            if isinstance(raw_duration, (int, float)):
+                duration = int(raw_duration)
+            elif isinstance(raw_duration, str) and raw_duration:
                 try:
-                    if 'm' in duration and 's' in duration:
-                        parts = duration.replace('s', '').split('m')
-                        minutes = int(parts[0]) if parts[0] else 0
-                        seconds = int(parts[1]) if len(parts) > 1 and parts[1] else 0
-                        duration = minutes * 60 + seconds
-                    elif 's' in duration:
-                        duration = int(duration.replace('s', ''))
-                    elif 'm' in duration:
-                        duration = int(duration.replace('m', '')) * 60
-                    else:
-                        duration = 0
-                except:
+                    duration_str = raw_duration.lower().strip()
+                    if 'm' in duration_str and 's' in duration_str:
+                        # Format: "2m 30s" or "2m30s"
+                        import re
+                        match = re.search(r'(\d+)m\s*(\d+)?s?', duration_str)
+                        if match:
+                            minutes = int(match.group(1))
+                            seconds = int(match.group(2)) if match.group(2) else 0
+                            duration = minutes * 60 + seconds
+                    elif 's' in duration_str:
+                        # Format: "150s"
+                        duration = int(duration_str.replace('s', ''))
+                    elif 'm' in duration_str:
+                        # Format: "2m"
+                        duration = int(duration_str.replace('m', '')) * 60
+                    elif duration_str.isdigit():
+                        # Just a number, assume seconds
+                        duration = int(duration_str)
+                except Exception as e:
+                    print(f"⚠️ Could not parse duration '{raw_duration}': {e}")
                     duration = 0
 
             return {

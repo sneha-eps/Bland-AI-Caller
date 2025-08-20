@@ -1888,15 +1888,14 @@
                     case 'rescheduled':
                         statusIcon = 'fa-calendar-alt';
                         break;
-                    case 'voicemail':
-                        statusIcon = 'fa-voicemail';
-                        break;
                     case 'busy':
-                    case 'failed':
                         statusIcon = 'fa-phone-slash';
                         break;
                     case 'completed':
                         statusIcon = 'fa-check';
+                        break;
+                    case 'failed':
+                        statusIcon = 'fa-exclamation-triangle';
                         break;
                     default:
                         statusIcon = 'fa-clock';
