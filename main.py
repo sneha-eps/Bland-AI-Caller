@@ -22,8 +22,8 @@ def load_campaigns():
     ]
 
 def get_api_key():
-    # Placeholder for getting API key
-    return "dummy_api_key"
+    # Get API key from environment variables (Replit Secrets)
+    return os.getenv("BLAND_API_KEY")
 
 # Initialize FastAPI app
 app = FastAPI()
