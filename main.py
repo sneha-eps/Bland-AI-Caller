@@ -42,7 +42,8 @@ templates = Jinja2Templates(directory="templates")
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
     """Display the main page"""
-    return templates.TemplateResponse("index.html", {"request": request})
+    has_api_key = bool(get_api_key())
+    return templates.TemplateResponse("index.html", {"request": request, "has_api_key": has_api_key})
 
 @app.get("/campaigns", response_class=HTMLResponse)
 async def campaigns_page(request: Request, client_id: Optional[str] = None, client_name: Optional[str] = None):
