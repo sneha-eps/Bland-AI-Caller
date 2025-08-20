@@ -70,7 +70,11 @@ async def make_call_with_bland_ai(phone_number: str, patient_name: str, appointm
     """Make a call using Bland AI API"""
     api_key = get_api_key()
     if not api_key:
+        print("ERROR: No API key found")
         return {"success": False, "error": "API key not configured"}
+    
+    print(f"DEBUG: Making call to {phone_number} for {patient_name}")
+    print(f"DEBUG: API Key present: {bool(api_key)} (length: {len(api_key) if api_key else 0})")
     
     # Create the script with appointment details
     script = f"""
@@ -104,27 +108,48 @@ async def make_call_with_bland_ai(phone_number: str, patient_name: str, appointm
         "amd": True
     }
     
+    print(f"DEBUG: Payload: {payload}")
+    
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(url, json=payload, headers=headers) as response:
+                response_text = await response.text()
+                print(f"DEBUG: Bland AI Response Status: {response.status}")
+                print(f"DEBUG: Bland AI Response: {response_text}")
+                
                 if response.status == 200:
-                    result = await response.json()
+                    result = await response.json() if response_text else {}
                     call_id = result.get("call_id")
+                    print(f"DEBUG: Call initiated with ID: {call_id}")
+                    
+                    if not call_id:
+                        return {
+                            "success": False,
+                            "error": f"No call ID returned: {result}",
+                            "patient_name": patient_name,
+                            "phone_number": phone_number
+                        }
                     
                     # Wait a moment then get call details
-                    await asyncio.sleep(2)
+                    await asyncio.sleep(5)  # Increased wait time
                     
                     # Get call details
                     details_url = f"https://api.bland.ai/v1/calls/{call_id}"
                     async with session.get(details_url, headers=headers) as details_response:
+                        details_text = await details_response.text()
+                        print(f"DEBUG: Call details response: {details_response.status} - {details_text}")
+                        
                         if details_response.status == 200:
-                            call_details = await details_response.json()
+                            call_details = await details_response.json() if details_text else {}
                             
                             # Analyze transcript for status
                             transcript = call_details.get("transcript", "")
                             duration = call_details.get("call_length", 0)
+                            call_status = call_details.get("status", "unknown")
                             
-                            status = analyze_call_status(transcript)
+                            print(f"DEBUG: Call status: {call_status}, Duration: {duration}, Transcript length: {len(transcript) if transcript else 0}")
+                            
+                            status = analyze_call_status(transcript) if transcript else call_status
                             
                             return {
                                 "success": True,
@@ -133,24 +158,25 @@ async def make_call_with_bland_ai(phone_number: str, patient_name: str, appointm
                                 "duration": duration,
                                 "transcript": transcript,
                                 "patient_name": patient_name,
-                                "phone_number": phone_number
+                                "phone_number": phone_number,
+                                "raw_call_details": call_details  # For debugging
                             }
                         else:
                             return {
                                 "success": False,
-                                "error": f"Failed to get call details: {details_response.status}",
+                                "error": f"Failed to get call details: {details_response.status} - {details_text}",
                                 "patient_name": patient_name,
                                 "phone_number": phone_number
                             }
                 else:
-                    error_text = await response.text()
                     return {
                         "success": False,
-                        "error": f"Call failed: {response.status} - {error_text}",
+                        "error": f"Call failed: {response.status} - {response_text}",
                         "patient_name": patient_name,
                         "phone_number": phone_number
                     }
     except Exception as e:
+        print(f"ERROR: Exception during call: {str(e)}")
         return {
             "success": False,
             "error": f"Exception during call: {str(e)}",
@@ -325,6 +351,53 @@ async def add_campaign(
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Error processing file: {str(e)}")
 
+@app.put("/update_campaign/{campaign_id}")
+async def update_campaign(
+    campaign_id: str,
+    name: str = Form(...),
+    client_id: str = Form(...),
+    max_attempts: int = Form(3),
+    retry_interval: int = Form(30),
+    country_code: str = Form("+1"),
+    file: UploadFile = File(None)
+):
+    """Update an existing campaign"""
+    if campaign_id not in campaigns_db:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    
+    try:
+        campaign = campaigns_db[campaign_id]
+        
+        # Update basic fields
+        campaign.update({
+            "name": name,
+            "client_id": client_id,
+            "max_attempts": max_attempts,
+            "retry_interval": retry_interval,
+            "country_code": country_code
+        })
+        
+        # Process new file if uploaded
+        if file and file.filename:
+            file_content = await file.read()
+            
+            # Parse CSV or Excel file
+            if file.filename.endswith('.csv'):
+                df = pd.read_csv(io.StringIO(file_content.decode('utf-8')))
+            elif file.filename.endswith(('.xlsx', '.xls')):
+                df = pd.read_excel(io.BytesIO(file_content))
+            else:
+                raise HTTPException(status_code=400, detail="Unsupported file format")
+            
+            # Update contacts
+            campaign["contacts"] = df.to_dict('records')
+        
+        campaigns_db[campaign_id] = campaign
+        return {"success": True, "campaign": campaign}
+        
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error updating campaign: {str(e)}")
+
 @app.post("/start_campaign/{campaign_id}")
 async def start_campaign(campaign_id: str):
     """Start a campaign and make calls"""
@@ -350,6 +423,19 @@ async def start_campaign(campaign_id: str):
         # Extract contact information
         patient_name = str(contact.get("patient_name", contact.get("name", "Unknown")))
         phone_number = str(contact.get("phone_number", contact.get("phone", "")))
+        
+        # Clean and validate phone number
+        if phone_number:
+            # Remove any non-digit characters except +
+            import re
+            phone_number = re.sub(r'[^\d+]', '', phone_number)
+            
+            # Add country code if not present
+            if not phone_number.startswith('+'):
+                country_code = campaign.get("country_code", "+1")
+                phone_number = country_code + phone_number
+                
+            print(f"DEBUG: Formatted phone number: {phone_number}")
         
         if not phone_number:
             failed_calls += 1
