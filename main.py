@@ -29,8 +29,10 @@ def get_api_key():
 app = FastAPI()
 
 # Mount static files (e.g., for HTML templates)
-# Assuming you have a 'static' folder with an 'index.html' and a 'campaigns.html'
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Only mount if static directory exists
+import os
+if os.path.exists("static"):
+    app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Initialize Jinja2 templates
 # Assuming your templates are in a 'templates' folder
