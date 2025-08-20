@@ -198,13 +198,25 @@ async def read_root(request: Request):
     successful_calls = len([call for call in all_calls if call.get("status") == "confirmed"])
     success_rate = (successful_calls / total_calls * 100) if total_calls > 0 else 0
     
-    return templates.TemplateResponse("index.html", {
+    return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "has_api_key": has_api_key,
-        "total_clients": total_clients,
-        "total_campaigns": total_campaigns,
-        "total_calls": total_calls,
-        "success_rate": round(success_rate, 1)
+        "metrics": {
+            "total_clients": total_clients,
+            "total_campaigns": total_campaigns,
+            "total_calls": total_calls,
+            "success_rate": round(success_rate, 1)
+        }
+    })
+
+@app.get("/upload", response_class=HTMLResponse)
+async def upload_page(request: Request):
+    """Display the CSV upload page"""
+    has_api_key = bool(get_api_key())
+    
+    return templates.TemplateResponse("index.html", {
+        "request": request,
+        "has_api_key": has_api_key
     })
 
 @app.get("/clients", response_class=HTMLResponse)
