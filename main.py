@@ -4,6 +4,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 from typing import Optional
+import os
 
 # Assume these functions are defined elsewhere and handle data loading and API key retrieval
 # For demonstration purposes, they are defined here with placeholder logic:
