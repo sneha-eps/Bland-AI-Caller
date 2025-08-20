@@ -813,7 +813,7 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
                                     call_status = analyze_call_transcript(transcript)
 
                                     # If call resulted in busy/voicemail, send automatic voicemail
-                                    if call_status == 'busy' or call_status == 'voicemail': # Modified to include busy
+                                    if call_status in ['busy', 'voicemail', 'failed']:
                                         print(f"📞 Call to {call_requests[i].patient_name} resulted in {call_status}, sending automatic voicemail...")
                                         voicemail_task = send_automatic_voicemail(call_requests[i], api_key)
                                         voicemail_tasks.append(voicemail_task)
@@ -1009,7 +1009,7 @@ async def process_csv(file: UploadFile = File(...),
 def analyze_call_transcript(transcript: str) -> str:
     """Analyze transcript to determine call status"""
     if not transcript or transcript.strip() == "":
-        return 'failed'
+        return 'busy_voicemail'
 
     transcript_lower = transcript.lower()
 
@@ -1054,13 +1054,13 @@ def analyze_call_transcript(transcript: str) -> str:
         "voice message", "recording", "dial tone"
     ]
     if any(indicator in transcript_lower for indicator in busy_voicemail_indicators):
-        return 'busy'
+        return 'busy_voicemail'
 
     # If we have a meaningful transcript but can't categorize it, mark as completed
     if len(transcript.strip()) > 10:  # At least some meaningful content
-        return 'completed'
+        return 'confirmed'  # Default to confirmed if we have a real conversation
     
-    return 'failed'
+    return 'busy_voicemail'
 
 
 def get_voicemail_prompt(patient_name: str = "[patient name]",
@@ -1246,7 +1246,7 @@ async def get_campaign_analytics(campaign_id: str):
                 'confirmed': 0,
                 'cancelled': 0,
                 'rescheduled': 0,
-                'busy': 0,
+                'busy_voicemail': 0,
                 'completed': 0,
                 'failed': 0
             }
@@ -1320,13 +1320,18 @@ async def get_campaign_analytics(campaign_id: str):
                             call_status = analyze_call_transcript(transcript)
                             call_details['call_status'] = call_status
                             
+                            # Handle legacy 'busy' status by converting to 'busy_voicemail'
+                            if call_status == 'busy':
+                                call_status = 'busy_voicemail'
+                                call_details['call_status'] = 'busy_voicemail'
+                            
                             # Make sure the status exists in our counts dictionary
                             if call_status in status_counts:
                                 status_counts[call_status] += 1
                             else:
                                 # Fallback for unexpected statuses
-                                status_counts['failed'] += 1
-                                call_details['call_status'] = 'failed'
+                                status_counts['busy_voicemail'] += 1
+                                call_details['call_status'] = 'busy_voicemail'
 
                             print(f"✅ Call details retrieved for {result['patient_name']}: Status={call_details['call_status']}, Duration={duration_seconds}s, Transcript length={len(transcript)}")
                         else:
@@ -1339,9 +1344,9 @@ async def get_campaign_analytics(campaign_id: str):
                         status_counts['failed'] += 1
                         print(f"❌ Error getting call details for {result.get('call_id')}: {str(e)}")
                 else:
-                    # Failed calls count as failed
-                    call_details['call_status'] = 'failed'
-                    status_counts['failed'] += 1
+                    # Failed calls count as busy_voicemail (no connection made)
+                    call_details['call_status'] = 'busy_voicemail'
+                    status_counts['busy_voicemail'] += 1
 
                 calls_with_details.append(call_details)
 
