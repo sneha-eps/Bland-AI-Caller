@@ -232,16 +232,26 @@ async def clients_page(request: Request):
     })
 
 @app.post("/add_client")
-async def add_client(name: str = Form(...), description: str = Form("")):
+async def add_client(request: Request):
     """Add a new client"""
-    client_id = str(uuid.uuid4())
-    client = {
-        "id": client_id,
-        "name": name,
-        "description": description
-    }
-    clients_db[client_id] = client
-    return {"success": True, "client": client}
+    try:
+        data = await request.json()
+        client_id = str(uuid.uuid4())
+        client = {
+            "id": client_id,
+            "name": data.get("name"),
+            "phone_number": data.get("phone_number"),
+            "email": data.get("email"),
+            "website_url": data.get("website_url"),
+            "language": data.get("language"),
+            "call_type": data.get("call_type"),
+            "voice": data.get("voice"),
+            "description": data.get("description", "")
+        }
+        clients_db[client_id] = client
+        return {"success": True, "client": client}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Error adding client: {str(e)}")
 
 @app.get("/campaigns", response_class=HTMLResponse)
 async def campaigns_page(request: Request, client_id: Optional[str] = None):
