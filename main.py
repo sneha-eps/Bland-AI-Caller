@@ -1468,6 +1468,7 @@ async def get_campaign_analytics(campaign_id: str):
     try:
         # Get campaign details
         if campaign_id not in campaigns_db:
+            print(f"❌ Campaign {campaign_id} not found in campaigns_db")
             return {
                 "success": False,
                 "message": "Campaign not found"
@@ -1475,64 +1476,37 @@ async def get_campaign_analytics(campaign_id: str):
 
         campaign = campaigns_db[campaign_id]
         campaign_name = campaign.get('name', 'Unknown Campaign')
+        print(f"🔍 Looking for analytics for campaign: {campaign_name} (ID: {campaign_id})")
 
         # First, try to get results from stored campaign results
         if campaign_id in campaign_results_db:
             campaign_results = campaign_results_db[campaign_id]
-            print(f"📊 Found stored results for campaign {campaign_name}")
+            print(f"📊 Found stored results for campaign {campaign_name} with {len(campaign_results.get('results', []))} calls")
         else:
-            # If no stored results, try to fetch calls from Bland AI API
-            print(f"🔍 No stored results found for campaign {campaign_name}, fetching from Bland AI API...")
+            print(f"🔍 No stored results found for campaign {campaign_name}. Available campaigns in results_db: {list(campaign_results_db.keys())}")
             
-            # Get all calls from Bland AI (this will include all calls made with the API key)
-            try:
-                async with aiohttp.ClientSession() as session:
-                    async with session.get(
-                        "https://api.bland.ai/v1/calls",
-                        headers={"Authorization": f"Bearer {api_key}"},
-                        timeout=aiohttp.ClientTimeout(total=30)
-                    ) as response:
-                        
-                        if response.status == 200:
-                            calls_data = await response.json()
-                            all_calls = calls_data.get('calls', [])
-                            
-                            # Filter calls that might belong to this campaign
-                            # Since we don't have a direct way to link calls to campaigns,
-                            # we'll show all recent calls and let the user know
-                            print(f"📞 Found {len(all_calls)} total calls from Bland AI")
-                            
-                            # Create a mock campaign_results structure
-                            campaign_results = {
-                                'campaign_id': campaign_id,
-                                'campaign_name': campaign_name,
-                                'total_calls': len(all_calls),
-                                'started_at': datetime.now().isoformat(),
-                                'results': []
-                            }
-                            
-                            # Convert API calls to our format
-                            for call in all_calls:
-                                call_result = {
-                                    'success': call.get('status') != 'failed',
-                                    'call_id': call.get('call_id', call.get('id')),
-                                    'patient_name': 'Unknown',  # We don't have this from the API
-                                    'phone_number': call.get('phone_number', 'Unknown')
-                                }
-                                campaign_results['results'].append(call_result)
-                                
-                        else:
-                            print(f"❌ Failed to fetch calls from Bland AI: Status {response.status}")
-                            return {
-                                "success": False,
-                                "message": f"Could not fetch call data from Bland AI API (Status: {response.status})"
-                            }
-            except Exception as e:
-                print(f"❌ Error fetching calls from Bland AI: {str(e)}")
-                return {
-                    "success": False,
-                    "message": f"Error fetching call data: {str(e)}"
+            # If no stored results, return empty analytics structure
+            return {
+                "success": True,
+                "campaign_id": campaign_id,
+                "campaign_name": campaign_name,
+                "analytics": {
+                    'total_calls': 0,
+                    'total_duration': 0,
+                    'formatted_duration': "0s",
+                    'campaign_runs': 0,
+                    'success_rate': 0,
+                    'status_counts': {
+                        'confirmed': 0,
+                        'cancelled': 0,
+                        'rescheduled': 0,
+                        'busy_voicemail': 0,
+                        'completed': 0,
+                        'failed': 0
+                    },
+                    'calls': []
                 }
+            }
 
         # Get detailed call information for each call
         calls_with_details = []
