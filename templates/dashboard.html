@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -53,7 +52,7 @@
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
             background: var(--bg-primary);
@@ -219,12 +218,12 @@
             align-items: center;
             gap: 8px;
         }
-        
+
         .status-connected {
             background: var(--success-color);
             color: white;
         }
-        
+
         .status-error {
             background: var(--danger-color);
             color: white;
@@ -250,26 +249,26 @@
             box-shadow: var(--shadow-lg);
             border: 1px solid var(--border-color);
         }
-        
+
         .dashboard-header h1 {
             font-size: 2.5rem;
             font-weight: 700;
             color: var(--primary-color);
             margin-bottom: 0.5rem;
         }
-        
+
         .dashboard-header p {
             font-size: 1.125rem;
             color: var(--text-secondary);
         }
-        
+
         .metrics-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
             gap: 2rem;
             margin-bottom: 2rem;
         }
-        
+
         .metric-card {
             background: var(--bg-secondary);
             border-radius: 16px;
@@ -280,7 +279,7 @@
             overflow: hidden;
             border: 1px solid var(--border-color);
         }
-        
+
         .metric-card:hover {
             transform: translateY(-4px);
             box-shadow: var(--shadow-xl);
@@ -299,7 +298,7 @@
         .metric-card.clickable:active {
             transform: translateY(-2px);
         }
-        
+
         .metric-card::before {
             content: '';
             position: absolute;
@@ -309,34 +308,34 @@
             height: 4px;
             background: linear-gradient(135deg, var(--card-color-1), var(--card-color-2));
         }
-        
+
         .metric-card.clients {
             --card-color-1: #4f46e5;
             --card-color-2: #7c3aed;
         }
-        
+
         .metric-card.campaigns {
             --card-color-1: #10b981;
             --card-color-2: #059669;
         }
-        
+
         .metric-card.calls {
             --card-color-1: #f59e0b;
             --card-color-2: #d97706;
         }
-        
+
         .metric-card.duration {
             --card-color-1: #ef4444;
             --card-color-2: #dc2626;
         }
-        
+
         .metric-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
             margin-bottom: 1.5rem;
         }
-        
+
         .metric-title {
             font-size: 1rem;
             font-weight: 600;
@@ -344,7 +343,7 @@
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
-        
+
         .metric-icon {
             width: 50px;
             height: 50px;
@@ -355,23 +354,23 @@
             color: white;
             font-size: 1.5rem;
         }
-        
+
         .metric-card.clients .metric-icon {
             background: linear-gradient(135deg, #4f46e5, #7c3aed);
         }
-        
+
         .metric-card.campaigns .metric-icon {
             background: linear-gradient(135deg, #10b981, #059669);
         }
-        
+
         .metric-card.calls .metric-icon {
             background: linear-gradient(135deg, #f59e0b, #d97706);
         }
-        
+
         .metric-card.duration .metric-icon {
             background: linear-gradient(135deg, #ef4444, #dc2626);
         }
-        
+
         .metric-value {
             font-size: 3rem;
             font-weight: 800;
@@ -379,7 +378,7 @@
             line-height: 1;
             margin-bottom: 0.5rem;
         }
-        
+
         .metric-change {
             display: flex;
             align-items: center;
@@ -387,19 +386,19 @@
             font-size: 0.875rem;
             font-weight: 600;
         }
-        
+
         .metric-change.positive {
             color: var(--success-color);
         }
-        
+
         .metric-change.negative {
             color: var(--danger-color);
         }
-        
+
         .metric-change.neutral {
             color: var(--text-secondary);
         }
-        
+
         .quick-actions {
             background: var(--bg-secondary);
             border-radius: 16px;
@@ -407,7 +406,7 @@
             box-shadow: var(--shadow-lg);
             border: 1px solid var(--border-color);
         }
-        
+
         .quick-actions h2 {
             color: var(--primary-color);
             font-size: 1.5rem;
@@ -417,7 +416,7 @@
             align-items: center;
             gap: 0.5rem;
         }
-        
+
         .actions-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -482,7 +481,7 @@
             max-height: 70vh;
             overflow-y: auto;
         }
-        
+
         .action-btn {
             background: linear-gradient(135deg, var(--primary-color) 0%, #7c3aed 100%);
             color: white;
@@ -497,13 +496,13 @@
             align-items: center;
             gap: 0.5rem;
         }
-        
+
         .action-btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 10px 25px rgba(79, 70, 229, 0.3);
             color: white;
         }
-        
+
         .action-btn i {
             font-size: 1.5rem;
             margin-bottom: 0.5rem;
@@ -527,26 +526,198 @@
             opacity: 1;
             visibility: visible;
         }
-        
+
+        /* List Styles */
+        .list-section {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border-color);
+            margin-bottom: 2rem;
+        }
+
+        .list-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .list-header h2 {
+            color: var(--primary-color);
+            font-size: 1.5rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .list-filter select {
+            padding: 0.5rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+        }
+
+        .btn-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 1.25rem;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .btn-close:hover {
+            color: var(--primary-color);
+        }
+
+        .clients-list-container, .campaigns-list-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 1rem;
+        }
+
+        .list-item {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: var(--transition);
+        }
+
+        .list-item:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-md);
+        }
+
+        .list-item-content {
+            flex-grow: 1;
+            margin-right: 1rem;
+        }
+
+        .list-item-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        .list-item-meta {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .list-item-meta span {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .list-item-actions {
+            display: flex;
+            align-items: center;
+        }
+
+        .btn-small {
+            padding: 0.5rem 1rem;
+            border-radius: 4px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            text-decoration: none;
+            transition: var(--transition);
+        }
+
+        .btn-small.btn-primary {
+            background: var(--primary-color);
+            color: white;
+        }
+
+        .btn-small.btn-primary:hover {
+            background: var(--primary-hover);
+            color: white;
+        }
+
+        .campaign-item .list-item-meta span i {
+            color: var(--primary-color);
+        }
+
+        .empty-list {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-secondary);
+            border: 1px dashed var(--border-color);
+            border-radius: 8px;
+        }
+
+        .empty-list i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .empty-list p {
+            margin-bottom: 1rem;
+        }
+
         @media (max-width: 768px) {
             .main-content {
                 padding: 1rem;
             }
-            
+
             .dashboard-header h1 {
                 font-size: 2rem;
             }
-            
+
             .metrics-grid {
                 grid-template-columns: 1fr;
                 gap: 1rem;
             }
-            
+
             .metric-value {
                 font-size: 2.5rem;
             }
-            
+
             .actions-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .list-section {
+                padding: 1.5rem;
+            }
+
+            .list-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+
+            .list-header h2 {
+                font-size: 1.25rem;
+            }
+
+            .list-filter {
+                width: 100%;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+            }
+
+            .list-filter select {
+                flex-grow: 1;
+                margin-right: 0.5rem;
+            }
+
+            .clients-list-container, .campaigns-list-container {
                 grid-template-columns: 1fr;
             }
         }
@@ -648,9 +819,9 @@
             <h1><i class="fas fa-chart-line"></i> Call Center Dashboard</h1>
             <p>Monitor your automated calling campaigns and track performance metrics</p>
         </div>
-        
+
         <div class="metrics-grid">
-            <div class="metric-card clients clickable" onclick="viewAllClients()">
+            <div class="metric-card clients" onclick="toggleClientsList()">
                 <div class="metric-header">
                     <div class="metric-title">Total Clients</div>
                     <div class="metric-icon">
@@ -659,12 +830,12 @@
                 </div>
                 <div class="metric-value">{{ metrics.total_clients | number_format }}</div>
                 <div class="metric-change neutral">
-                    <i class="fas fa-mouse-pointer"></i>
+                    <i class="fas fa-info-circle"></i>
                     <span>Click to view all clients</span>
                 </div>
             </div>
-            
-            <div class="metric-card campaigns clickable" onclick="viewAllCampaigns()">
+
+            <div class="metric-card campaigns" onclick="toggleCampaignsList()">
                 <div class="metric-header">
                     <div class="metric-title">Total Campaigns</div>
                     <div class="metric-icon">
@@ -673,11 +844,11 @@
                 </div>
                 <div class="metric-value">{{ metrics.total_campaigns }}</div>
                 <div class="metric-change neutral">
-                    <i class="fas fa-mouse-pointer"></i>
+                    <i class="fas fa-info-circle"></i>
                     <span>Click to view all campaigns</span>
                 </div>
             </div>
-            
+
             <div class="metric-card calls">
                 <div class="metric-header">
                     <div class="metric-title">Total Calls</div>
@@ -691,7 +862,7 @@
                     <span>No calls made yet</span>
                 </div>
             </div>
-            
+
             <div class="metric-card duration">
                 <div class="metric-header">
                     <div class="metric-title">Total Duration</div>
@@ -706,7 +877,101 @@
                 </div>
             </div>
         </div>
-        
+
+        <!-- Clients List Section -->
+        <div id="clientsListSection" style="display: none; margin-bottom: 2rem;">
+            <div class="list-section">
+                <div class="list-header">
+                    <h2>
+                        <i class="fas fa-users"></i>
+                        All Clients
+                    </h2>
+                    <button class="btn-close" onclick="toggleClientsList()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="clients-list-container">
+                    {% if clients %}
+                    <div class="clients-list">
+                        {% for client in clients %}
+                        <div class="list-item">
+                            <div class="list-item-content">
+                                <div class="list-item-title">{{ client.name }}</div>
+                                <div class="list-item-meta">
+                                    <span><i class="fas fa-phone"></i> {{ client.phone_number }}</span>
+                                    <span><i class="fas fa-envelope"></i> {{ client.email }}</span>
+                                </div>
+                            </div>
+                            <div class="list-item-actions">
+                                <button class="btn-small btn-primary" onclick="window.location.href='/campaigns?client_id={{ client.id }}&client_name={{ client.name | urlencode }}'">
+                                    View Campaigns
+                                </button>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="empty-list">
+                        <i class="fas fa-users"></i>
+                        <p>No clients added yet</p>
+                        <a href="/clients" class="btn-primary btn-small">Add First Client</a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Campaigns List Section -->
+        <div id="campaignsListSection" style="display: none; margin-bottom: 2rem;">
+            <div class="list-section">
+                <div class="list-header">
+                    <h2>
+                        <i class="fas fa-bullhorn"></i>
+                        All Campaigns
+                    </h2>
+                    <div class="list-filter">
+                        <select id="clientFilter" onchange="filterCampaigns()">
+                            <option value="">All Clients</option>
+                            {% for client in clients %}
+                            <option value="{{ client.id }}">{{ client.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <button class="btn-close" onclick="toggleCampaignsList()">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                </div>
+                <div class="campaigns-list-container">
+                    {% if campaigns %}
+                    <div class="campaigns-list">
+                        {% for campaign in campaigns %}
+                        <div class="list-item campaign-item" data-client-id="{{ campaign.client_id }}">
+                            <div class="list-item-content">
+                                <div class="list-item-title">{{ campaign.name }}</div>
+                                <div class="list-item-meta">
+                                    <span><i class="fas fa-user"></i> 
+                                        {% for client in clients %}
+                                            {% if client.id == campaign.client_id %}{{ client.name }}{% endif %}
+                                        {% endfor %}
+                                    </span>
+                                    <span><i class="fas fa-redo"></i> {{ campaign.max_attempts }} attempts</span>
+                                    <span><i class="fas fa-clock"></i> {{ campaign.retry_interval }}min retry</span>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="empty-list">
+                        <i class="fas fa-bullhorn"></i>
+                        <p>No campaigns created yet</p>
+                        <a href="/campaigns" class="btn-primary btn-small">Create First Campaign</a>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
         <div class="quick-actions">
             <h2>
                 <i class="fas fa-bolt"></i>
@@ -791,7 +1056,7 @@
         themeToggle.addEventListener('click', () => {
             const currentTheme = body.getAttribute('data-theme');
             const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-            
+
             body.setAttribute('data-theme', newTheme);
             localStorage.setItem('theme', newTheme);
             updateThemeIcon(newTheme);
@@ -835,12 +1100,26 @@
         let allClients = [];
         let allCampaigns = [];
 
-        // Function to view all clients
+        // Function to toggle client list visibility
+        function toggleClientsList() {
+            const clientsListSection = document.getElementById('clientsListSection');
+            const isVisible = clientsListSection.style.display === 'block';
+            clientsListSection.style.display = isVisible ? 'none' : 'block';
+        }
+
+        // Function to toggle campaign list visibility
+        function toggleCampaignsList() {
+            const campaignsListSection = document.getElementById('campaignsListSection');
+            const isVisible = campaignsListSection.style.display === 'block';
+            campaignsListSection.style.display = isVisible ? 'none' : 'block';
+        }
+
+        // Function to view all clients (for modal, if needed, but not used in the current toggle logic)
         async function viewAllClients() {
             try {
                 const response = await fetch('/api/clients');
                 const data = await response.json();
-                
+
                 if (data.success) {
                     allClients = data.clients;
                     displayClientsList(allClients);
@@ -854,24 +1133,24 @@
             }
         }
 
-        // Function to view all campaigns
+        // Function to view all campaigns (for modal, if needed, but not used in the current toggle logic)
         async function viewAllCampaigns() {
             try {
                 const [clientsResponse, campaignsResponse] = await Promise.all([
                     fetch('/api/clients'),
                     fetch('/api/campaigns')
                 ]);
-                
+
                 const clientsData = await clientsResponse.json();
                 const campaignsData = await campaignsResponse.json();
-                
+
                 if (clientsData.success && campaignsData.success) {
                     allClients = clientsData.clients;
                     allCampaigns = campaignsData.campaigns;
-                    
+
                     // Populate client filter dropdown
                     populateClientFilter();
-                    
+
                     // Display all campaigns initially
                     displayCampaignsList(allCampaigns);
                     document.getElementById('campaignsListModal').style.display = 'block';
@@ -884,10 +1163,10 @@
             }
         }
 
-        // Function to display clients list
+        // Function to display clients list in modal (not used by toggleClientsList)
         function displayClientsList(clients) {
             const container = document.getElementById('clientsListContent');
-            
+
             if (clients.length === 0) {
                 container.innerHTML = `
                     <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
@@ -933,11 +1212,11 @@
             container.innerHTML = html;
         }
 
-        // Function to populate client filter dropdown
+        // Function to populate client filter dropdown (for modal, not used by toggleCampaignsList)
         function populateClientFilter() {
             const select = document.getElementById('clientFilter');
             select.innerHTML = '<option value="">All Clients</option>';
-            
+
             allClients.forEach(client => {
                 const option = document.createElement('option');
                 option.value = client.id;
@@ -946,10 +1225,10 @@
             });
         }
 
-        // Function to filter campaigns
+        // Function to filter campaigns (for modal, not used by toggleCampaignsList)
         function filterCampaigns() {
             const selectedClientId = document.getElementById('clientFilter').value;
-            
+
             if (selectedClientId === '') {
                 displayCampaignsList(allCampaigns);
             } else {
@@ -958,14 +1237,14 @@
             }
         }
 
-        // Function to display campaigns list
+        // Function to display campaigns list in modal (not used by toggleCampaignsList)
         function displayCampaignsList(campaigns) {
             const container = document.getElementById('campaignsListContent');
-            
+
             if (campaigns.length === 0) {
                 const selectedClientId = document.getElementById('clientFilter').value;
                 const isFiltered = selectedClientId !== '';
-                
+
                 container.innerHTML = `
                     <div style="text-align: center; padding: 2rem; color: var(--text-secondary);">
                         <i class="fas fa-bullhorn" style="font-size: 3rem; margin-bottom: 1rem; opacity: 0.5;"></i>
@@ -1022,7 +1301,7 @@
         window.onclick = function(event) {
             const clientsModal = document.getElementById('clientsListModal');
             const campaignsModal = document.getElementById('campaignsListModal');
-            
+
             if (event.target === clientsModal) {
                 closeClientsListModal();
             }

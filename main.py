@@ -493,23 +493,34 @@ async def make_call(call_request: CallRequest, country_code: str = "+1"):
         raise HTTPException(status_code=500,
                             detail=f"Error making call: {str(e)}")
 
-
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
-    """Dashboard showing key metrics"""
+    """Main dashboard interface"""
     api_key = get_api_key()
-    # Get actual counts from in-memory storage
+
+    # Load clients and campaigns data for dashboard
+    clients = load_clients()
+    campaigns = load_campaigns()
+
+    # Calculate metrics
+    total_clients = len(clients)
+    total_campaigns = len(campaigns)
+
     metrics = {
-        "total_clients": len(clients_db),
-        "total_campaigns": len(campaigns_db),
-        "total_calls": 0,  # This would be calculated from actual call data
-        "total_duration": "0h 0m"  # This would be calculated from actual call data
+        "total_clients": total_clients,
+        "total_campaigns": total_campaigns,
+        "total_calls": 0,
+        "total_duration": "0:00"
     }
+
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
         "has_api_key": bool(api_key),
-        "metrics": metrics
+        "metrics": metrics,
+        "clients": clients,
+        "campaigns": campaigns
     })
+
 
 @app.get("/upload", response_class=HTMLResponse)
 async def upload_page(request: Request):
@@ -777,7 +788,7 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
         if call_requests:
             max_attempts = campaign.get('max_attempts', 3)
             retry_interval_minutes = campaign.get('retry_interval', 30)
-            
+
             print(f"🚀 Starting campaign '{campaign['name']}' with retry logic - Max attempts: {max_attempts}, Retry interval: {retry_interval_minutes} min")
 
             # Process calls with retry logic
@@ -826,7 +837,7 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
 async def process_calls_with_retry(call_requests, api_key, max_attempts, retry_interval_minutes, campaign_name):
     """Process calls with retry logic and send voicemail after max attempts"""
     final_results = []
-    
+
     # Track retry status for each call
     retry_tracker = {}
     for i, call_request in enumerate(call_requests):
@@ -836,110 +847,110 @@ async def process_calls_with_retry(call_requests, api_key, max_attempts, retry_i
             'call_request': call_request,
             'final_result': None
         }
-    
+
     # Create semaphore to limit concurrent calls
     semaphore = asyncio.Semaphore(10)
-    
+
     while True:
         # Find calls that need retry attempts
         pending_calls = []
         pending_indices = []
-        
+
         for i, tracker in retry_tracker.items():
             if not tracker['completed'] and tracker['attempts'] < max_attempts:
                 pending_calls.append(tracker['call_request'])
                 pending_indices.append(i)
-        
+
         if not pending_calls:
             break  # All calls completed or exhausted retries
-        
+
         current_attempt = max(retry_tracker[i]['attempts'] for i in pending_indices) + 1
         print(f"🔄 Campaign '{campaign_name}' - Starting attempt {current_attempt} for {len(pending_calls)} calls")
-        
+
         # Execute current batch of calls
         tasks = [
             make_single_call_async(call_request, api_key, semaphore)
             for call_request in pending_calls
         ]
-        
+
         batch_results = await asyncio.gather(*tasks)
-        
+
         # Process results and check call status
         for idx, result in enumerate(batch_results):
             tracker_idx = pending_indices[idx]
             call_request = pending_calls[idx]
             retry_tracker[tracker_idx]['attempts'] += 1
-            
+
             # Check if call was successful and determine actual status
             call_status = 'failed'
             if result.success and result.call_id:
                 try:
                     # Wait for call to complete and get status
                     await asyncio.sleep(3)
-                    
+
                     async with aiohttp.ClientSession() as session:
                         async with session.get(
                             f"https://api.bland.ai/v1/calls/{result.call_id}",
                             headers={"Authorization": f"Bearer {api_key}"},
                             timeout=aiohttp.ClientTimeout(total=15)
                         ) as call_response:
-                            
+
                             if call_response.status == 200:
                                 call_data = await call_response.json()
                                 transcript = call_data.get('transcript', '')
                                 call_status = analyze_call_transcript(transcript)
-                                
+
                                 # Update result with transcript and status
                                 result.transcript = transcript
                                 result.call_status = call_status
                             else:
                                 call_status = 'busy_voicemail'
-                                
+
                 except Exception as e:
                     print(f"❌ Error checking call status for {call_request.patient_name}: {str(e)}")
                     call_status = 'busy_voicemail'
             else:
                 call_status = 'failed'
-            
+
             # Check if call is completed successfully (patient answered and responded)
             if call_status in ['confirmed', 'cancelled', 'rescheduled']:
                 # Call completed successfully
                 retry_tracker[tracker_idx]['completed'] = True
                 retry_tracker[tracker_idx]['final_result'] = result
                 print(f"✅ Call to {call_request.patient_name} completed with status: {call_status}")
-            
+
             elif retry_tracker[tracker_idx]['attempts'] >= max_attempts:
                 # Max attempts reached, send voicemail
                 retry_tracker[tracker_idx]['completed'] = True
                 retry_tracker[tracker_idx]['final_result'] = result
-                
+
                 print(f"📞 Max attempts ({max_attempts}) reached for {call_request.patient_name}, sending voicemail...")
-                
+
                 # Send voicemail after all attempts exhausted
                 try:
                     await send_final_voicemail(call_request, api_key)
                     print(f"📬 Final voicemail sent to {call_request.patient_name}")
                 except Exception as e:
                     print(f"❌ Error sending final voicemail to {call_request.patient_name}: {str(e)}")
-            
+
             else:
                 # Call needs retry
                 remaining_attempts = max_attempts - retry_tracker[tracker_idx]['attempts']
                 print(f"⏳ Call to {call_request.patient_name} will be retried (Status: {call_status}, Remaining attempts: {remaining_attempts})")
-        
+
         # If there are more attempts needed, wait for retry interval
         pending_retries = [i for i, tracker in retry_tracker.items() 
                           if not tracker['completed'] and tracker['attempts'] < max_attempts]
-        
+
         if pending_retries:
             print(f"⏰ Waiting {retry_interval_minutes} minutes before next retry attempt...")
             await asyncio.sleep(retry_interval_minutes * 60)  # Convert minutes to seconds
-    
+
     # Collect all final results
     for tracker in retry_tracker.values():
         if tracker['final_result']:
             final_results.append(tracker['final_result'])
-    
+
     return final_results
 
 
@@ -1107,7 +1118,7 @@ async def voice_preview(voice_name: str):
     except asyncio.TimeoutError:
         return {"success": False, "error": "Request timeout. Please try again."}
     except Exception as e:
-        print(f"❌ Exception generating voice sample: {str(e)}")
+        print(f"💥 Exception generating voice sample: {str(e)}")
         return {"success": False, "error": f"Error generating voice sample: {str(e)}"}
 
 
@@ -1706,7 +1717,7 @@ async def get_campaigns_api():
             if 'file_data' in campaign_copy:
                 del campaign_copy['file_data']
             campaigns.append(campaign_copy)
-        
+
         return {
             "success": True,
             "campaigns": campaigns
