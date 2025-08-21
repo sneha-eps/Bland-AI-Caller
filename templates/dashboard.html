@@ -1413,8 +1413,9 @@
         if (logoutBtn) {
             logoutBtn.addEventListener('click', async () => {
                 try {
-                    const response = await fetch('/logout', { method: 'POST' });
-                    if (response.ok) {
+                    const response = await fetch('/api/logout', { method: 'POST' });
+                    const data = await response.json();
+                    if (data.success) {
                         window.location.href = '/login'; // Redirect to login page
                     } else {
                         alert('Logout failed. Please try again.');

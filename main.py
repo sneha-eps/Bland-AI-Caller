@@ -662,7 +662,18 @@ async def login(request: Request, username: str = Form(...), password: str = For
         # Create session
         session_token = create_session(user["id"])
         
-        response = {"success": True, "message": "Login successful", "user": user}
+        # Create response with session cookie
+        from fastapi.responses import JSONResponse
+        response_data = {"success": True, "message": "Login successful", "redirect_url": "/"}
+        response = JSONResponse(content=response_data)
+        response.set_cookie(
+            key="session_token",
+            value=session_token,
+            httponly=True,
+            secure=False,  # Set to True in production with HTTPS
+            samesite="lax",
+            max_age=24 * 60 * 60  # 24 hours
+        )
         return response
     except Exception as e:
         return {"success": False, "message": f"Login error: {str(e)}"}
@@ -692,7 +703,19 @@ async def signup(request: Request, user_data: UserCreate):
         # Create session
         session_token = create_session(user_id)
         
-        return {"success": True, "message": "Account created successfully", "user": new_user}
+        # Create response with session cookie
+        from fastapi.responses import JSONResponse
+        response_data = {"success": True, "message": "Account created successfully", "redirect_url": "/"}
+        response = JSONResponse(content=response_data)
+        response.set_cookie(
+            key="session_token",
+            value=session_token,
+            httponly=True,
+            secure=False,  # Set to True in production with HTTPS
+            samesite="lax",
+            max_age=24 * 60 * 60  # 24 hours
+        )
+        return response
     except Exception as e:
         return {"success": False, "message": f"Signup error: {str(e)}"}
 
@@ -703,7 +726,11 @@ async def logout(request: Request):
     if session_token and session_token in sessions_db:
         del sessions_db[session_token]
     
-    return {"success": True, "message": "Logged out successfully"}
+    # Create response that clears the session cookie
+    from fastapi.responses import JSONResponse
+    response = JSONResponse(content={"success": True, "message": "Logged out successfully"})
+    response.delete_cookie(key="session_token", httponly=True, samesite="lax")
+    return response
 
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):

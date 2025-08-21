@@ -315,18 +315,16 @@
                 if (data.success) {
                     showMessage(data.message, 'success');
                     
-                    // Set session cookie if login successful
                     if (isLoginMode) {
                         // Redirect to dashboard after successful login
                         setTimeout(() => {
-                            window.location.href = '/';
+                            window.location.href = data.redirect_url || '/';
                         }, 1000);
                     } else {
-                        // Switch to login mode after successful signup
+                        // Redirect to dashboard after successful signup
                         setTimeout(() => {
-                            switchLink.click();
-                            showMessage('Account created! Please login.', 'success');
-                        }, 1500);
+                            window.location.href = data.redirect_url || '/';
+                        }, 1000);
                     }
                 } else {
                     showMessage(data.message, 'error');
