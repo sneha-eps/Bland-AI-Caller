@@ -502,16 +502,47 @@ async def dashboard(request: Request):
     clients = load_clients()
     campaigns = load_campaigns()
 
-    # Calculate metrics
+    # Calculate metrics from actual campaign results
     total_clients = len(clients)
     total_campaigns = len(campaigns)
+    total_calls = 0
+    total_duration_seconds = 0
+
+    # Aggregate data from all campaign results
+    for campaign_id, campaign_results in campaign_results_db.items():
+        if 'results' in campaign_results:
+            total_calls += len(campaign_results['results'])
+            
+            # Calculate duration from individual call results if available
+            for result in campaign_results['results']:
+                if result.get('success') and result.get('call_id'):
+                    # Try to get call duration from stored data or API
+                    # For now, we'll estimate based on successful calls
+                    # This could be enhanced to fetch actual durations
+                    if result.get('success'):
+                        total_duration_seconds += 60  # Estimate 1 minute per successful call
+
+    # Format total duration
+    hours = total_duration_seconds // 3600
+    minutes = (total_duration_seconds % 3600) // 60
+    seconds = total_duration_seconds % 60
+    
+    if hours > 0:
+        formatted_duration = f"{hours}h {minutes}m"
+    elif minutes > 0:
+        formatted_duration = f"{minutes}m {seconds}s"
+    else:
+        formatted_duration = f"{seconds}s"
 
     metrics = {
         "total_clients": total_clients,
         "total_campaigns": total_campaigns,
-        "total_calls": 0,
-        "total_duration": "0:00"
+        "total_calls": total_calls,
+        "total_duration": formatted_duration
     }
+
+    print(f"📊 Dashboard metrics calculated: {metrics}")
+    print(f"📊 Available campaign results: {list(campaign_results_db.keys())}")
 
     return templates.TemplateResponse("dashboard.html", {
         "request": request,
@@ -819,6 +850,7 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
 
         # Store in the global results database
         campaign_results_db[campaign_id] = campaign_results
+        print(f"✅ Stored campaign results for {campaign_id}. Total campaigns with results: {len(campaign_results_db)}")
 
         return {
             "success": True,
@@ -1475,14 +1507,24 @@ async def get_campaign_analytics(campaign_id: str):
         # Get campaign details
         if campaign_id not in campaigns_db:
             print(f"❌ Campaign {campaign_id} not found in campaigns_db")
+            print(f"📊 Available campaigns: {list(campaigns_db.keys())}")
             return {
                 "success": False,
-                "message": "Campaign not found"
+                "message": f"Campaign not found. Available campaigns: {len(campaigns_db)}"
             }
 
         campaign = campaigns_db[campaign_id]
         campaign_name = campaign.get('name', 'Unknown Campaign')
         print(f"🔍 Looking for analytics for campaign: {campaign_name} (ID: {campaign_id})")
+        
+        # Debug: Print all available campaign result IDs
+        print(f"🔍 All campaign result IDs: {list(campaign_results_db.keys())}")
+        print(f"🔍 Campaign ID being searched: {campaign_id}")
+        print(f"🔍 Campaign ID type: {type(campaign_id)}")
+        
+        # Check if any stored results have mismatched ID types
+        for stored_id in campaign_results_db.keys():
+            print(f"🔍 Stored ID: {stored_id} (type: {type(stored_id)})")
 
         # First, try to get results from stored campaign results
         if campaign_id in campaign_results_db:
@@ -1775,6 +1817,56 @@ async def get_campaigns_api():
         return {
             "success": False,
             "message": f"Error loading campaigns: {str(e)}"
+        }
+
+@app.get("/api/dashboard_metrics")
+async def get_dashboard_metrics():
+    """Get updated dashboard metrics"""
+    try:
+        # Calculate metrics from actual campaign results
+        clients = load_clients()
+        campaigns = load_campaigns()
+        
+        total_clients = len(clients)
+        total_campaigns = len(campaigns)
+        total_calls = 0
+        total_duration_seconds = 0
+
+        # Aggregate data from all campaign results
+        for campaign_id, campaign_results in campaign_results_db.items():
+            if 'results' in campaign_results:
+                total_calls += len(campaign_results['results'])
+                
+                # Calculate duration from individual call results if available
+                for result in campaign_results['results']:
+                    if result.get('success'):
+                        total_duration_seconds += 60  # Estimate 1 minute per successful call
+
+        # Format total duration
+        hours = total_duration_seconds // 3600
+        minutes = (total_duration_seconds % 3600) // 60
+        seconds = total_duration_seconds % 60
+        
+        if hours > 0:
+            formatted_duration = f"{hours}h {minutes}m"
+        elif minutes > 0:
+            formatted_duration = f"{minutes}m {seconds}s"
+        else:
+            formatted_duration = f"{seconds}s"
+
+        return {
+            "success": True,
+            "metrics": {
+                "total_clients": total_clients,
+                "total_campaigns": total_campaigns,
+                "total_calls": total_calls,
+                "total_duration": formatted_duration
+            }
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Error calculating metrics: {str(e)}"
         }
 
 @app.get("/docs")

@@ -1095,6 +1095,12 @@
         });
 
         console.log('Dashboard loaded successfully');
+        
+        // Refresh metrics every 30 seconds to show updated data
+        setInterval(refreshDashboardMetrics, 30000);
+        
+        // Also refresh metrics when page gains focus (user comes back to tab)
+        window.addEventListener('focus', refreshDashboardMetrics);
 
         // Global variables to store data
         let allClients = [];
@@ -1295,6 +1301,51 @@
 
         function closeCampaignsListModal() {
             document.getElementById('campaignsListModal').style.display = 'none';
+        }
+
+        // Function to refresh dashboard metrics
+        async function refreshDashboardMetrics() {
+            try {
+                const response = await fetch('/api/dashboard_metrics');
+                const data = await response.json();
+                
+                if (data.success) {
+                    const metrics = data.metrics;
+                    
+                    // Update metric cards
+                    const totalClientsCard = document.querySelector('.metric-card.clients .metric-value');
+                    const totalCampaignsCard = document.querySelector('.metric-card.campaigns .metric-value');
+                    const totalCallsCard = document.querySelector('.metric-card.calls .metric-value');
+                    const totalDurationCard = document.querySelector('.metric-card.duration .metric-value');
+                    
+                    if (totalClientsCard) totalClientsCard.textContent = metrics.total_clients.toLocaleString();
+                    if (totalCampaignsCard) totalCampaignsCard.textContent = metrics.total_campaigns.toLocaleString();
+                    if (totalCallsCard) totalCallsCard.textContent = metrics.total_calls.toLocaleString();
+                    if (totalDurationCard) totalDurationCard.textContent = metrics.total_duration;
+                    
+                    // Update status text for calls and duration
+                    const callsStatus = document.querySelector('.metric-card.calls .metric-change span');
+                    const durationStatus = document.querySelector('.metric-card.duration .metric-change span');
+                    
+                    if (callsStatus) {
+                        callsStatus.textContent = metrics.total_calls > 0 ? 
+                            `${metrics.total_calls} calls made` : 
+                            'No calls made yet';
+                    }
+                    
+                    if (durationStatus) {
+                        durationStatus.textContent = metrics.total_calls > 0 ? 
+                            `Total call time: ${metrics.total_duration}` : 
+                            'No call time recorded';
+                    }
+                    
+                    console.log('Dashboard metrics refreshed:', metrics);
+                } else {
+                    console.error('Failed to refresh metrics:', data.message);
+                }
+            } catch (error) {
+                console.error('Error refreshing dashboard metrics:', error);
+            }
         }
 
         // Close modals when clicking outside
