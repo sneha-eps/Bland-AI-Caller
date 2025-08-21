@@ -1206,7 +1206,7 @@
                         <i class="fas fa-play"></i>
                         Start Campaign
                     </button>
-                    <button class="btn-view-results" onclick="viewCampaignResults('{{ campaign.id }}')">
+                    <button class="btn-view-results" onclick="loadCampaignAnalytics('{{ campaign.id }}')">
                         <i class="fas fa-chart-bar"></i>
                         View Results
                     </button>
@@ -1820,6 +1820,8 @@
 
         async function loadCampaignAnalytics(campaignId) {
             try {
+                console.log('Loading analytics for campaign:', campaignId);
+                
                 // Show loading state
                 document.getElementById('totalCalls').textContent = 'Loading...';
                 document.getElementById('totalDuration').textContent = 'Loading...';
@@ -1827,33 +1829,52 @@
                 document.getElementById('successRate').textContent = 'Loading...';
 
                 const response = await fetch(`/campaign_analytics/${campaignId}`);
+                console.log('Analytics response status:', response.status);
+                
                 const data = await response.json();
+                console.log('Analytics data:', data);
 
                 if (data.success) {
                     // Update score cards
                     document.getElementById('totalCalls').textContent = data.analytics.total_calls.toLocaleString();
-                    document.getElementById('totalDuration').textContent = formatDuration(data.analytics.total_duration);
+                    document.getElementById('totalDuration').textContent = data.analytics.formatted_duration || formatDuration(data.analytics.total_duration);
                     document.getElementById('campaignRuns').textContent = data.analytics.campaign_runs;
                     document.getElementById('successRate').textContent = data.analytics.success_rate + '%';
 
                     // Update status counts
-                    document.getElementById('confirmedCount').textContent = data.analytics.status_counts.confirmed;
-                    document.getElementById('cancelledCount').textContent = data.analytics.status_counts.cancelled;
-                    document.getElementById('rescheduledCount').textContent = data.analytics.status_counts.rescheduled;
-                    document.getElementById('busyVoicemailCount').textContent = data.analytics.status_counts.busy_voicemail;
+                    document.getElementById('confirmedCount').textContent = data.analytics.status_counts.confirmed || 0;
+                    document.getElementById('cancelledCount').textContent = data.analytics.status_counts.cancelled || 0;
+                    document.getElementById('rescheduledCount').textContent = data.analytics.status_counts.rescheduled || 0;
+                    document.getElementById('busyVoicemailCount').textContent = data.analytics.status_counts.busy_voicemail || 0;
 
                     // Populate calls table
                     populateCallsTable(data.analytics.calls);
 
-                    // Hide no calls message
+                    // Hide no calls message and show table
                     document.getElementById('noCallsMessage').style.display = 'none';
+                    document.querySelector('.calls-table-container').style.display = 'block';
+
+                    console.log('Analytics loaded successfully');
                 } else {
+                    console.log('No analytics data available:', data.message);
                     // Show no calls message
                     document.getElementById('noCallsMessage').style.display = 'block';
                     document.querySelector('.calls-table-container').style.display = 'none';
+                    
+                    // Reset score cards to zero
+                    document.getElementById('totalCalls').textContent = '0';
+                    document.getElementById('totalDuration').textContent = '0s';
+                    document.getElementById('campaignRuns').textContent = '0';
+                    document.getElementById('successRate').textContent = '0%';
+                    document.getElementById('confirmedCount').textContent = '0';
+                    document.getElementById('cancelledCount').textContent = '0';
+                    document.getElementById('rescheduledCount').textContent = '0';
+                    document.getElementById('busyVoicemailCount').textContent = '0';
                 }
             } catch (error) {
                 console.error('Error loading campaign analytics:', error);
+                alert('Error loading campaign analytics: ' + error.message);
+                
                 // Show error state
                 document.getElementById('totalCalls').textContent = 'Error';
                 document.getElementById('totalDuration').textContent = 'Error';

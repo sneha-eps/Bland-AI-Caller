@@ -1482,6 +1482,8 @@ async def get_campaign_analytics(campaign_id: str):
                 'failed': 0
             }
 
+            print(f"🔍 Processing {len(campaign_results['results'])} calls for analytics")
+
             for result in campaign_results['results']:
                 call_details = {
                     'patient_name': result['patient_name'],
@@ -1499,76 +1501,80 @@ async def get_campaign_analytics(campaign_id: str):
                 if result['success'] and result.get('call_id'):
                     try:
                         print(f"🔍 Fetching call details for call_id: {result.get('call_id')}")
-                        call_response = requests.get(
-                            f"https://api.bland.ai/v1/calls/{result['call_id']}",
-                            headers={"Authorization": f"Bearer {api_key}"},
-                            timeout=30  # Increased timeout
-                        )
+                        
+                        async with aiohttp.ClientSession() as session:
+                            async with session.get(
+                                f"https://api.bland.ai/v1/calls/{result['call_id']}",
+                                headers={"Authorization": f"Bearer {api_key}"},
+                                timeout=aiohttp.ClientTimeout(total=30)
+                            ) as call_response:
 
-                        if call_response.status_code == 200:
-                            call_data = call_response.json()
+                                if call_response.status == 200:
+                                    call_data = await call_response.json()
 
-                            # Get transcript and other details
-                            transcript = call_data.get('transcript', '')
-                            call_details['transcript'] = transcript
-                            call_details['created_at'] = call_data.get('created_at', campaign_results['started_at'])
+                                    # Get transcript and other details
+                                    transcript = call_data.get('transcript', '')
+                                    call_details['transcript'] = transcript
+                                    call_details['created_at'] = call_data.get('created_at', campaign_results['started_at'])
 
-                            # Parse duration more robustly
-                            raw_duration = call_data.get('duration', 0)
-                            duration_seconds = 0
-
-                            if isinstance(raw_duration, (int, float)):
-                                duration_seconds = int(raw_duration)
-                            elif isinstance(raw_duration, str) and raw_duration:
-                                try:
-                                    # Handle various duration formats
-                                    duration_str = raw_duration.lower().strip()
-                                    if 'm' in duration_str and 's' in duration_str:
-                                        # Format: "2m 30s" or "2m30s"
-                                        import re
-                                        match = re.search(r'(\d+)m\s*(\d+)?s?', duration_str)
-                                        if match:
-                                            minutes = int(match.group(1))
-                                            seconds = int(match.group(2)) if match.group(2) else 0
-                                            duration_seconds = minutes * 60 + seconds
-                                    elif 's' in duration_str:
-                                        # Format: "150s"
-                                        duration_seconds = int(duration_str.replace('s', ''))
-                                    elif 'm' in duration_str:
-                                        # Format: "2m"
-                                        duration_seconds = int(duration_str.replace('m', '')) * 60
-                                    elif duration_str.isdigit():
-                                        # Just a number, assume seconds
-                                        duration_seconds = int(duration_str)
-                                except Exception as e:
-                                    print(f"⚠️ Could not parse duration '{raw_duration}': {e}")
+                                    # Parse duration more robustly
+                                    raw_duration = call_data.get('duration', 0)
                                     duration_seconds = 0
 
-                            call_details['duration'] = duration_seconds
-                            total_duration += duration_seconds
+                                    if isinstance(raw_duration, (int, float)):
+                                        duration_seconds = int(raw_duration)
+                                    elif isinstance(raw_duration, str) and raw_duration:
+                                        try:
+                                            # Handle various duration formats
+                                            duration_str = raw_duration.lower().strip()
+                                            if 'm' in duration_str and 's' in duration_str:
+                                                # Format: "2m 30s" or "2m30s"
+                                                import re
+                                                match = re.search(r'(\d+)m\s*(\d+)?s?', duration_str)
+                                                if match:
+                                                    minutes = int(match.group(1))
+                                                    seconds = int(match.group(2)) if match.group(2) else 0
+                                                    duration_seconds = minutes * 60 + seconds
+                                            elif 's' in duration_str:
+                                                # Format: "150s"
+                                                duration_seconds = int(duration_str.replace('s', ''))
+                                            elif 'm' in duration_str:
+                                                # Format: "2m"
+                                                duration_seconds = int(duration_str.replace('m', '')) * 60
+                                            elif duration_str.isdigit():
+                                                # Just a number, assume seconds
+                                                duration_seconds = int(duration_str)
+                                        except Exception as e:
+                                            print(f"⚠️ Could not parse duration '{raw_duration}': {e}")
+                                            duration_seconds = 0
 
-                            # Analyze transcript for status using our improved function
-                            call_status = analyze_call_transcript(transcript)
-                            call_details['call_status'] = call_status
+                                    call_details['duration'] = duration_seconds
+                                    total_duration += duration_seconds
 
-                            # Handle legacy 'busy' status by converting to 'busy_voicemail'
-                            if call_status == 'busy':
-                                call_status = 'busy_voicemail'
-                                call_details['call_status'] = 'busy_voicemail'
+                                    # Analyze transcript for status using our improved function
+                                    call_status = analyze_call_transcript(transcript)
+                                    call_details['call_status'] = call_status
 
-                            # Make sure the status exists in our counts dictionary
-                            if call_status in status_counts:
-                                status_counts[call_status] += 1
-                            else:
-                                # Fallback for unexpected statuses
-                                status_counts['busy_voicemail'] += 1
-                                call_details['call_status'] = 'busy_voicemail'
+                                    # Handle legacy 'busy' status by converting to 'busy_voicemail'
+                                    if call_status == 'busy':
+                                        call_status = 'busy_voicemail'
+                                        call_details['call_status'] = 'busy_voicemail'
 
-                            print(f"✅ Call details retrieved for {result['patient_name']}: Status={call_details['call_status']}, Duration={duration_seconds}s, Transcript length={len(transcript)}")
-                        else:
-                            print(f"❌ Failed to get call details: Status {call_response.status_code}, Response: {call_response.text}")
-                            call_details['call_status'] = 'failed'
-                            status_counts['failed'] += 1
+                                    # Make sure the status exists in our counts dictionary
+                                    if call_status in status_counts:
+                                        status_counts[call_status] += 1
+                                    else:
+                                        # Fallback for unexpected statuses
+                                        status_counts['busy_voicemail'] += 1
+                                        call_details['call_status'] = 'busy_voicemail'
+
+                                    print(f"✅ Call details retrieved for {result['patient_name']}: Status={call_details['call_status']}, Duration={duration_seconds}s, Transcript length={len(transcript)}")
+                                else:
+                                    response_text = await call_response.text()
+                                    print(f"❌ Failed to get call details: Status {call_response.status}, Response: {response_text}")
+                                    call_details['call_status'] = 'failed'
+                                    status_counts['failed'] += 1
+
                     except Exception as e:
                         # If we can't get call details, count as failed
                         call_details['call_status'] = 'failed'
@@ -1602,6 +1608,8 @@ async def get_campaign_analytics(campaign_id: str):
                 'calls': calls_with_details
             }
 
+            print(f"📊 Analytics generated: {total_calls} calls, {len([c for c in calls_with_details if c['transcript']])} with transcripts")
+
             return {
                 "success": True,
                 "campaign_id": campaign_id,
@@ -1609,6 +1617,8 @@ async def get_campaign_analytics(campaign_id: str):
                 "analytics": analytics
             }
         else:
+            print(f"❌ No campaign results found for campaign_id: {campaign_id}")
+            print(f"Available campaign IDs: {list(campaign_results_db.keys())}")
             return {
                 "success": False,
                 "message": "No analytics data available for this campaign"
