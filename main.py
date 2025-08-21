@@ -911,23 +911,49 @@ async def voice_preview(voice_name: str):
             ) as response:
 
                 if response.status == 200:
-                    # The response should contain the audio file or a URL to it
-                    response_data = await response.json()
-
-                    # Bland AI might return different response formats, handle accordingly
-                    if 'audio_url' in response_data:
-                        audio_url = response_data['audio_url']
-                    elif 'url' in response_data:
-                        audio_url = response_data['url']
-                    elif 'sample_url' in response_data:
-                        audio_url = response_data['sample_url']
+                    # Check content type to determine how to handle the response
+                    content_type = response.headers.get('content-type', '').lower()
+                    
+                    if 'audio' in content_type or 'wav' in content_type or 'mp3' in content_type:
+                        # Direct audio response - convert to base64 data URL
+                        audio_data = await response.read()
+                        import base64
+                        
+                        # Determine MIME type
+                        if 'wav' in content_type:
+                            mime_type = 'audio/wav'
+                        elif 'mp3' in content_type:
+                            mime_type = 'audio/mpeg'
+                        else:
+                            mime_type = 'audio/wav'  # Default to wav
+                        
+                        # Create data URL
+                        audio_base64 = base64.b64encode(audio_data).decode('utf-8')
+                        audio_url = f"data:{mime_type};base64,{audio_base64}"
+                        
+                        print(f"✅ Voice sample audio generated for {voice_name} ({len(audio_data)} bytes)")
+                        return {"success": True, "preview_url": audio_url}
                     else:
-                        # If response format is different, try to get the audio data directly
-                        print(f"✅ Voice sample generated for {voice_name}")
-                        return {"success": True, "audio_data": response_data}
+                        # JSON response with URL
+                        try:
+                            response_data = await response.json()
+                            
+                            # Bland AI might return different response formats, handle accordingly
+                            if 'audio_url' in response_data:
+                                audio_url = response_data['audio_url']
+                            elif 'url' in response_data:
+                                audio_url = response_data['url']
+                            elif 'sample_url' in response_data:
+                                audio_url = response_data['sample_url']
+                            else:
+                                print(f"✅ Voice sample generated for {voice_name}")
+                                return {"success": True, "audio_data": response_data}
 
-                    print(f"✅ Voice sample URL generated for {voice_name}: {audio_url}")
-                    return {"success": True, "preview_url": audio_url}
+                            print(f"✅ Voice sample URL generated for {voice_name}: {audio_url}")
+                            return {"success": True, "preview_url": audio_url}
+                        except Exception as json_error:
+                            print(f"❌ Failed to parse JSON response: {json_error}")
+                            return {"success": False, "error": "Invalid response format from voice API"}
 
                 elif response.status == 404:
                     return {"success": False, "error": f"Voice ID '{voice_id}' not found in Bland AI"}
