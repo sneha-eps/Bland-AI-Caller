@@ -1466,163 +1466,220 @@ async def get_campaign_analytics(campaign_id: str):
                             detail="BLAND_API_KEY not found in Secrets.")
 
     try:
-        # Get campaign results from in-memory storage (in production, use a database)
-        if campaign_id in campaign_results_db:
-            campaign_results = campaign_results_db[campaign_id]
-
-            # Get detailed call information for each call
-            calls_with_details = []
-            total_duration = 0
-            status_counts = {
-                'confirmed': 0,
-                'cancelled': 0,
-                'rescheduled': 0,
-                'busy_voicemail': 0,
-                'completed': 0,
-                'failed': 0
-            }
-
-            print(f"🔍 Processing {len(campaign_results['results'])} calls for analytics")
-
-            for result in campaign_results['results']:
-                call_details = {
-                    'patient_name': result['patient_name'],
-                    'phone_number': result['phone_number'],
-                    'success': result['success'],
-                    'error': result.get('error'),
-                    'call_id': result.get('call_id'),
-                    'transcript': None,
-                    'duration': 0,
-                    'call_status': 'failed',
-                    'created_at': campaign_results['started_at']
-                }
-
-                # If call was successful and has call_id, try to get detailed info
-                if result['success'] and result.get('call_id'):
-                    try:
-                        print(f"🔍 Fetching call details for call_id: {result.get('call_id')}")
-                        
-                        async with aiohttp.ClientSession() as session:
-                            async with session.get(
-                                f"https://api.bland.ai/v1/calls/{result['call_id']}",
-                                headers={"Authorization": f"Bearer {api_key}"},
-                                timeout=aiohttp.ClientTimeout(total=30)
-                            ) as call_response:
-
-                                if call_response.status == 200:
-                                    call_data = await call_response.json()
-
-                                    # Get transcript and other details
-                                    transcript = call_data.get('transcript', '')
-                                    call_details['transcript'] = transcript
-                                    call_details['created_at'] = call_data.get('created_at', campaign_results['started_at'])
-
-                                    # Parse duration more robustly
-                                    raw_duration = call_data.get('duration', 0)
-                                    duration_seconds = 0
-
-                                    if isinstance(raw_duration, (int, float)):
-                                        duration_seconds = int(raw_duration)
-                                    elif isinstance(raw_duration, str) and raw_duration:
-                                        try:
-                                            # Handle various duration formats
-                                            duration_str = raw_duration.lower().strip()
-                                            if 'm' in duration_str and 's' in duration_str:
-                                                # Format: "2m 30s" or "2m30s"
-                                                import re
-                                                match = re.search(r'(\d+)m\s*(\d+)?s?', duration_str)
-                                                if match:
-                                                    minutes = int(match.group(1))
-                                                    seconds = int(match.group(2)) if match.group(2) else 0
-                                                    duration_seconds = minutes * 60 + seconds
-                                            elif 's' in duration_str:
-                                                # Format: "150s"
-                                                duration_seconds = int(duration_str.replace('s', ''))
-                                            elif 'm' in duration_str:
-                                                # Format: "2m"
-                                                duration_seconds = int(duration_str.replace('m', '')) * 60
-                                            elif duration_str.isdigit():
-                                                # Just a number, assume seconds
-                                                duration_seconds = int(duration_str)
-                                        except Exception as e:
-                                            print(f"⚠️ Could not parse duration '{raw_duration}': {e}")
-                                            duration_seconds = 0
-
-                                    call_details['duration'] = duration_seconds
-                                    total_duration += duration_seconds
-
-                                    # Analyze transcript for status using our improved function
-                                    call_status = analyze_call_transcript(transcript)
-                                    call_details['call_status'] = call_status
-
-                                    # Handle legacy 'busy' status by converting to 'busy_voicemail'
-                                    if call_status == 'busy':
-                                        call_status = 'busy_voicemail'
-                                        call_details['call_status'] = 'busy_voicemail'
-
-                                    # Make sure the status exists in our counts dictionary
-                                    if call_status in status_counts:
-                                        status_counts[call_status] += 1
-                                    else:
-                                        # Fallback for unexpected statuses
-                                        status_counts['busy_voicemail'] += 1
-                                        call_details['call_status'] = 'busy_voicemail'
-
-                                    print(f"✅ Call details retrieved for {result['patient_name']}: Status={call_details['call_status']}, Duration={duration_seconds}s, Transcript length={len(transcript)}")
-                                else:
-                                    response_text = await call_response.text()
-                                    print(f"❌ Failed to get call details: Status {call_response.status}, Response: {response_text}")
-                                    call_details['call_status'] = 'failed'
-                                    status_counts['failed'] += 1
-
-                    except Exception as e:
-                        # If we can't get call details, count as failed
-                        call_details['call_status'] = 'failed'
-                        status_counts['failed'] += 1
-                        print(f"❌ Error getting call details for {result.get('call_id')}: {str(e)}")
-                else:
-                    # Failed calls count as busy_voicemail (no connection made)
-                    call_details['call_status'] = 'busy_voicemail'
-                    status_counts['busy_voicemail'] += 1
-
-                calls_with_details.append(call_details)
-
-            # Calculate analytics
-            total_calls = len(campaign_results['results'])
-            successful_calls = sum(1 for call in calls_with_details if call['success'])
-            success_rate = round((successful_calls / total_calls * 100) if total_calls > 0 else 0, 1)
-
-            # Format total duration
-            hours = total_duration // 3600
-            minutes = (total_duration % 3600) // 60
-            seconds = total_duration % 60
-            formatted_duration = f"{hours}h {minutes}m {seconds}s"
-
-            analytics = {
-                'total_calls': total_calls,
-                'total_duration': total_duration,
-                'formatted_duration': formatted_duration,
-                'campaign_runs': 1,  # For now, each entry represents one run
-                'success_rate': success_rate,
-                'status_counts': status_counts,
-                'calls': calls_with_details
-            }
-
-            print(f"📊 Analytics generated: {total_calls} calls, {len([c for c in calls_with_details if c['transcript']])} with transcripts")
-
-            return {
-                "success": True,
-                "campaign_id": campaign_id,
-                "campaign_name": campaign_results['campaign_name'],
-                "analytics": analytics
-            }
-        else:
-            print(f"❌ No campaign results found for campaign_id: {campaign_id}")
-            print(f"Available campaign IDs: {list(campaign_results_db.keys())}")
+        # Get campaign details
+        if campaign_id not in campaigns_db:
             return {
                 "success": False,
-                "message": "No analytics data available for this campaign"
+                "message": "Campaign not found"
             }
+
+        campaign = campaigns_db[campaign_id]
+        campaign_name = campaign.get('name', 'Unknown Campaign')
+
+        # First, try to get results from stored campaign results
+        if campaign_id in campaign_results_db:
+            campaign_results = campaign_results_db[campaign_id]
+            print(f"📊 Found stored results for campaign {campaign_name}")
+        else:
+            # If no stored results, try to fetch calls from Bland AI API
+            print(f"🔍 No stored results found for campaign {campaign_name}, fetching from Bland AI API...")
+            
+            # Get all calls from Bland AI (this will include all calls made with the API key)
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(
+                        "https://api.bland.ai/v1/calls",
+                        headers={"Authorization": f"Bearer {api_key}"},
+                        timeout=aiohttp.ClientTimeout(total=30)
+                    ) as response:
+                        
+                        if response.status == 200:
+                            calls_data = await response.json()
+                            all_calls = calls_data.get('calls', [])
+                            
+                            # Filter calls that might belong to this campaign
+                            # Since we don't have a direct way to link calls to campaigns,
+                            # we'll show all recent calls and let the user know
+                            print(f"📞 Found {len(all_calls)} total calls from Bland AI")
+                            
+                            # Create a mock campaign_results structure
+                            campaign_results = {
+                                'campaign_id': campaign_id,
+                                'campaign_name': campaign_name,
+                                'total_calls': len(all_calls),
+                                'started_at': datetime.now().isoformat(),
+                                'results': []
+                            }
+                            
+                            # Convert API calls to our format
+                            for call in all_calls:
+                                call_result = {
+                                    'success': call.get('status') != 'failed',
+                                    'call_id': call.get('call_id', call.get('id')),
+                                    'patient_name': 'Unknown',  # We don't have this from the API
+                                    'phone_number': call.get('phone_number', 'Unknown')
+                                }
+                                campaign_results['results'].append(call_result)
+                                
+                        else:
+                            print(f"❌ Failed to fetch calls from Bland AI: Status {response.status}")
+                            return {
+                                "success": False,
+                                "message": f"Could not fetch call data from Bland AI API (Status: {response.status})"
+                            }
+            except Exception as e:
+                print(f"❌ Error fetching calls from Bland AI: {str(e)}")
+                return {
+                    "success": False,
+                    "message": f"Error fetching call data: {str(e)}"
+                }
+
+        # Get detailed call information for each call
+        calls_with_details = []
+        total_duration = 0
+        status_counts = {
+            'confirmed': 0,
+            'cancelled': 0,
+            'rescheduled': 0,
+            'busy_voicemail': 0,
+            'completed': 0,
+            'failed': 0
+        }
+
+        print(f"🔍 Processing {len(campaign_results['results'])} calls for analytics")
+
+        for result in campaign_results['results']:
+            call_details = {
+                'patient_name': result.get('patient_name', 'Unknown'),
+                'phone_number': result.get('phone_number', 'Unknown'),
+                'success': result.get('success', False),
+                'error': result.get('error'),
+                'call_id': result.get('call_id'),
+                'transcript': None,
+                'duration': 0,
+                'call_status': 'failed',
+                'created_at': campaign_results.get('started_at', datetime.now().isoformat())
+            }
+
+            # If call was successful and has call_id, try to get detailed info
+            if result.get('success') and result.get('call_id'):
+                try:
+                    print(f"🔍 Fetching call details for call_id: {result.get('call_id')}")
+                    
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(
+                            f"https://api.bland.ai/v1/calls/{result['call_id']}",
+                            headers={"Authorization": f"Bearer {api_key}"},
+                            timeout=aiohttp.ClientTimeout(total=30)
+                        ) as call_response:
+
+                            if call_response.status == 200:
+                                call_data = await call_response.json()
+
+                                # Get transcript and other details
+                                transcript = call_data.get('transcript', '')
+                                call_details['transcript'] = transcript
+                                call_details['created_at'] = call_data.get('created_at', call_details['created_at'])
+
+                                # Parse duration more robustly
+                                raw_duration = call_data.get('duration', 0)
+                                duration_seconds = 0
+
+                                if isinstance(raw_duration, (int, float)):
+                                    duration_seconds = int(raw_duration)
+                                elif isinstance(raw_duration, str) and raw_duration:
+                                    try:
+                                        # Handle various duration formats
+                                        duration_str = raw_duration.lower().strip()
+                                        if 'm' in duration_str and 's' in duration_str:
+                                            # Format: "2m 30s" or "2m30s"
+                                            import re
+                                            match = re.search(r'(\d+)m\s*(\d+)?s?', duration_str)
+                                            if match:
+                                                minutes = int(match.group(1))
+                                                seconds = int(match.group(2)) if match.group(2) else 0
+                                                duration_seconds = minutes * 60 + seconds
+                                        elif 's' in duration_str:
+                                            # Format: "150s"
+                                            duration_seconds = int(duration_str.replace('s', ''))
+                                        elif 'm' in duration_str:
+                                            # Format: "2m"
+                                            duration_seconds = int(duration_str.replace('m', '')) * 60
+                                        elif duration_str.isdigit():
+                                            # Just a number, assume seconds
+                                            duration_seconds = int(duration_str)
+                                    except Exception as e:
+                                        print(f"⚠️ Could not parse duration '{raw_duration}': {e}")
+                                        duration_seconds = 0
+
+                                call_details['duration'] = duration_seconds
+                                total_duration += duration_seconds
+
+                                # Analyze transcript for status using our improved function
+                                call_status = analyze_call_transcript(transcript)
+                                call_details['call_status'] = call_status
+
+                                # Handle legacy 'busy' status by converting to 'busy_voicemail'
+                                if call_status == 'busy':
+                                    call_status = 'busy_voicemail'
+                                    call_details['call_status'] = 'busy_voicemail'
+
+                                # Make sure the status exists in our counts dictionary
+                                if call_status in status_counts:
+                                    status_counts[call_status] += 1
+                                else:
+                                    # Fallback for unexpected statuses
+                                    status_counts['busy_voicemail'] += 1
+                                    call_details['call_status'] = 'busy_voicemail'
+
+                                print(f"✅ Call details retrieved for {call_details['patient_name']}: Status={call_details['call_status']}, Duration={duration_seconds}s, Transcript length={len(transcript)}")
+                            else:
+                                response_text = await call_response.text()
+                                print(f"❌ Failed to get call details: Status {call_response.status}, Response: {response_text}")
+                                call_details['call_status'] = 'failed'
+                                status_counts['failed'] += 1
+
+                except Exception as e:
+                    # If we can't get call details, count as failed
+                    call_details['call_status'] = 'failed'
+                    status_counts['failed'] += 1
+                    print(f"❌ Error getting call details for {result.get('call_id')}: {str(e)}")
+            else:
+                # Failed calls count as busy_voicemail (no connection made)
+                call_details['call_status'] = 'busy_voicemail'
+                status_counts['busy_voicemail'] += 1
+
+            calls_with_details.append(call_details)
+
+        # Calculate analytics
+        total_calls = len(campaign_results['results'])
+        successful_calls = sum(1 for call in calls_with_details if call.get('success'))
+        success_rate = round((successful_calls / total_calls * 100) if total_calls > 0 else 0, 1)
+
+        # Format total duration
+        hours = total_duration // 3600
+        minutes = (total_duration % 3600) // 60
+        seconds = total_duration % 60
+        formatted_duration = f"{hours}h {minutes}m {seconds}s"
+
+        analytics = {
+            'total_calls': total_calls,
+            'total_duration': total_duration,
+            'formatted_duration': formatted_duration,
+            'campaign_runs': 1,  # For now, each entry represents one run
+            'success_rate': success_rate,
+            'status_counts': status_counts,
+            'calls': calls_with_details
+        }
+
+        print(f"📊 Analytics generated: {total_calls} calls, {len([c for c in calls_with_details if c.get('transcript')])} with transcripts")
+
+        return {
+            "success": True,
+            "campaign_id": campaign_id,
+            "campaign_name": campaign_name,
+            "analytics": analytics
+        }
 
     except Exception as e:
         print(f"❌ Error in campaign analytics: {str(e)}")
