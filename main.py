@@ -61,7 +61,6 @@ def get_api_key():
     except KeyError:
         return None
 
-
 VOICE_MAP = {
     "Ryan": "37b3f1c8-a01e-4d70-b251-294733f08371",
     "Paige": "70f05206-71ab-4b39-b238-ed1bf17b365a",
@@ -874,36 +873,36 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
 
 @app.get("/voice_preview/{voice_name}")
 async def voice_preview(voice_name: str):
-    """Get voice preview audio sample using Bland AI's voice sample API"""
+    """Generate voice sample using Bland AI"""
     api_key = get_api_key()
-
     if not api_key:
         return {"success": False, "error": "API key not configured"}
 
     try:
-        # Get the voice ID from the voice name
+        # Use the existing VOICE_MAP to get the voice ID
         voice_id = VOICE_MAP.get(voice_name)
         if not voice_id:
             return {"success": False, "error": f"Voice '{voice_name}' not found"}
 
-        # Sample text for voice preview
-        sample_text = "Hello! This is a preview of the voice you've selected for your calls. This professional voice will help you connect with your patients effectively."
+        print(f"🎤 Generating voice sample for {voice_name} (ID: {voice_id})")
 
-        # Prepare the request payload
+        # Bland AI voice sample API endpoint
+        url = f"https://api.bland.ai/v1/voices/{voice_id}/sample"
+
+        # Sample text for preview
+        sample_text = "Hello! This is a voice sample from your AI assistant. I'm here to help with your calls and appointments."
+
         payload = {
             "text": sample_text,
             "voice_settings": {},
             "language": "en"
         }
 
-        print(f"🎤 Generating voice sample for {voice_name} (ID: {voice_id})")
-
-        # Make request to Bland AI voice sample API
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                f"https://api.bland.ai/v1/voices/{voice_id}/sample",
+                url,
                 headers={
-                    "Authorization": f"Bearer {api_key}",
+                    "authorization": api_key,
                     "Content-Type": "application/json"
                 },
                 json=payload,
@@ -913,12 +912,12 @@ async def voice_preview(voice_name: str):
                 if response.status == 200:
                     # Check content type to determine how to handle the response
                     content_type = response.headers.get('content-type', '').lower()
-                    
+
                     if 'audio' in content_type or 'wav' in content_type or 'mp3' in content_type:
                         # Direct audio response - convert to base64 data URL
                         audio_data = await response.read()
                         import base64
-                        
+
                         # Determine MIME type
                         if 'wav' in content_type:
                             mime_type = 'audio/wav'
@@ -926,18 +925,18 @@ async def voice_preview(voice_name: str):
                             mime_type = 'audio/mpeg'
                         else:
                             mime_type = 'audio/wav'  # Default to wav
-                        
+
                         # Create data URL
                         audio_base64 = base64.b64encode(audio_data).decode('utf-8')
                         audio_url = f"data:{mime_type};base64,{audio_base64}"
-                        
+
                         print(f"✅ Voice sample audio generated for {voice_name} ({len(audio_data)} bytes)")
                         return {"success": True, "preview_url": audio_url}
                     else:
                         # JSON response with URL
                         try:
                             response_data = await response.json()
-                            
+
                             # Bland AI might return different response formats, handle accordingly
                             if 'audio_url' in response_data:
                                 audio_url = response_data['audio_url']
