@@ -1462,10 +1462,16 @@ async def get_campaign_analytics(campaign_id: str):
     api_key = get_api_key()
 
     if not api_key:
-        raise HTTPException(status_code=400,
-                            detail="BLAND_API_KEY not found in Secrets.")
+        return {
+            "success": False,
+            "message": "BLAND_API_KEY not found in Secrets."
+        }
 
     try:
+        print(f"🔍 Campaign analytics requested for ID: {campaign_id}")
+        print(f"📊 Available campaigns in campaigns_db: {list(campaigns_db.keys())}")
+        print(f"📊 Available campaigns in results_db: {list(campaign_results_db.keys())}")
+        
         # Get campaign details
         if campaign_id not in campaigns_db:
             print(f"❌ Campaign {campaign_id} not found in campaigns_db")
@@ -1657,8 +1663,10 @@ async def get_campaign_analytics(campaign_id: str):
 
     except Exception as e:
         print(f"❌ Error in campaign analytics: {str(e)}")
-        raise HTTPException(status_code=500,
-                            detail=f"Error fetching campaign analytics: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Error fetching campaign analytics: {str(e)}"
+        }
 
 
 @app.get("/call_details/{call_id}")
