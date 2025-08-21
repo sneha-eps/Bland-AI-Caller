@@ -1680,6 +1680,43 @@ async def get_call_details(call_id: str):
                             detail=f"Error fetching call details: {str(e)}")
 
 
+@app.get("/api/clients")
+async def get_clients_api():
+    """Get all clients data for API usage"""
+    try:
+        clients = list(clients_db.values())
+        return {
+            "success": True,
+            "clients": clients
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Error loading clients: {str(e)}"
+        }
+
+@app.get("/api/campaigns")
+async def get_campaigns_api():
+    """Get all campaigns data for API usage"""
+    try:
+        campaigns = []
+        for campaign in campaigns_db.values():
+            # Create a copy without file data for API response
+            campaign_copy = campaign.copy()
+            if 'file_data' in campaign_copy:
+                del campaign_copy['file_data']
+            campaigns.append(campaign_copy)
+        
+        return {
+            "success": True,
+            "campaigns": campaigns
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Error loading campaigns: {str(e)}"
+        }
+
 @app.get("/docs")
 async def get_docs():
     """Access FastAPI automatic documentation"""
