@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -53,7 +52,7 @@
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
             background: var(--bg-primary);
@@ -219,12 +218,12 @@
             align-items: center;
             gap: 8px;
         }
-        
+
         .status-connected {
             background: var(--success-color);
             color: white;
         }
-        
+
         .status-error {
             background: var(--danger-color);
             color: white;
@@ -438,6 +437,23 @@
 
         .btn-preview:hover {
             background: #059669;
+        }
+
+        #voicePreviewAudio {
+            margin-top: 0.5rem;
+            width: 100%;
+            height: 40px;
+            border-radius: 6px;
+            background: var(--bg-tertiary);
+        }
+
+        .voice-preview {
+            margin-top: 0.5rem;
+        }
+
+        .btn-preview:disabled {
+            background: var(--text-tertiary);
+            cursor: not-allowed;
         }
 
         .btn-submit {
@@ -671,22 +687,22 @@
                         <label for="clientName">Client Name</label>
                         <input type="text" id="clientName" name="name" required>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="clientPhone">Phone Number</label>
                         <input type="tel" id="clientPhone" name="phone_number" required>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="clientEmail">Email Address</label>
                         <input type="email" id="clientEmail" name="email" required>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="clientWebsite">Website URL</label>
                         <input type="url" id="clientWebsite" name="website_url" required>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="clientLanguage">Language</label>
                         <select id="clientLanguage" name="language" required>
@@ -705,7 +721,7 @@
                             <option value="russian">Russian</option>
                         </select>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="callType">Call Type</label>
                         <select id="callType" name="call_type" required>
@@ -718,7 +734,7 @@
                             <option value="customer_service">Customer Service</option>
                         </select>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="voiceSelect">Voice Agent</label>
                         <select id="voiceSelect" name="voice" required>
@@ -740,7 +756,7 @@
                             <audio id="voicePreviewAudio" controls style="display: none;"></audio>
                         </div>
                     </div>
-                    
+
                     <button type="submit" class="btn-submit">
                         <i class="fas fa-save"></i>
                         Add Client
@@ -763,7 +779,7 @@
         themeToggle.addEventListener('click', () => {
             const currentTheme = body.getAttribute('data-theme');
             const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-            
+
             body.setAttribute('data-theme', newTheme);
             localStorage.setItem('theme', newTheme);
             updateThemeIcon(newTheme);
@@ -811,26 +827,72 @@
         }
 
         // Voice preview
-        function previewVoice() {
+        async function previewVoice() {
             const voiceSelect = document.getElementById('voiceSelect');
             const selectedVoice = voiceSelect.value;
-            
+            const audioElement = document.getElementById('voicePreviewAudio');
+            const previewButton = document.querySelector('.btn-preview');
+
             if (!selectedVoice) {
                 alert('Please select a voice first');
                 return;
             }
-            
-            // In a real implementation, you would play actual voice samples
-            alert(`Playing preview for ${selectedVoice} voice (Feature will be implemented with actual audio samples)`);
+
+            // Show loading state
+            const originalText = previewButton.innerHTML;
+            previewButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+            previewButton.disabled = true;
+
+            try {
+                // Fetch the voice preview from the server using Bland AI
+                const response = await fetch(`/voice_preview/${selectedVoice}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    if (data.preview_url) {
+                        // Set the audio source and show the audio element
+                        audioElement.src = data.preview_url;
+                        audioElement.style.display = 'block';
+
+                        // Play the audio
+                        audioElement.currentTime = 0;
+                        try {
+                            await audioElement.play();
+                            alert(`🎤 Playing voice sample for ${selectedVoice}. Use the audio controls to replay.`);
+                        } catch (playError) {
+                            // If autoplay is blocked, just show the controls so user can click play
+                            console.log('Autoplay blocked, showing audio controls');
+                            alert(`🎤 Voice sample loaded for ${selectedVoice}. Click the play button below to hear it.`);
+                        }
+                    } else if (data.audio_data) {
+                        // Handle direct audio data if URL not provided
+                        alert(`🎤 Voice sample generated for ${selectedVoice}, but playback format not supported in browser.`);
+                    } else {
+                        alert('❌ Voice sample generated but no playable audio received.');
+                    }
+                } else {
+                    // Show specific error message
+                    const errorMsg = data.error || 'Voice preview not available';
+                    alert(`❌ ${errorMsg}`);
+                    console.error('Voice preview error:', data.error);
+                }
+            } catch (error) {
+                console.error('Error loading voice preview:', error);
+                alert('❌ Network error loading voice preview. Please check your connection and try again.');
+            } finally {
+                // Restore button state
+                previewButton.innerHTML = originalText;
+                previewButton.disabled = false;
+            }
         }
 
         // Form submission
         document.getElementById('addClientForm').addEventListener('submit', async function(e) {
             e.preventDefault();
-            
+
             const formData = new FormData(e.target);
             const clientData = Object.fromEntries(formData.entries());
-            
+
             try {
                 const response = await fetch('/add_client', {
                     method: 'POST',
@@ -839,9 +901,9 @@
                     },
                     body: JSON.stringify(clientData)
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (result.success) {
                     alert('Client added successfully!');
                     window.location.reload();

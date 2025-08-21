@@ -872,24 +872,79 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
         raise HTTPException(status_code=500, detail=f"Error starting campaign: {str(e)}")
 
 
-@app.get("/voice_preview/{voice_id}")
-async def voice_preview(voice_id: str):
-    """Get voice preview audio URL"""
+@app.get("/voice_preview/{voice_name}")
+async def voice_preview(voice_name: str):
+    """Get voice preview audio sample using Bland AI's voice sample API"""
+    api_key = get_api_key()
+
+    if not api_key:
+        return {"success": False, "error": "API key not configured"}
+
     try:
-        # In a real implementation, you would have actual preview audio URLs
-        preview_urls = {
-            "61507da3-4abd-49b6-983f-9ce659fd9e91": "https://example.com/preview/male_professional.mp3",
-            "70f05206-71ab-4b39-b238-ed1bf17b365a": "https://example.com/preview/female_professional.mp3",
-            "2f9fdbc7-4bf2-4792-8a18-21ce3c93978f": "https://example.com/preview/female_warm.mp3",
-            "17e8f694-d230-4b64-b040-6108088d9e6c": "https://example.com/preview/female_clear.mp3",
-            "bbeabae6-ec8d-444f-92ad-c8e620d3de8d": "https://example.com/preview/female_friendly.mp3",
-            "a3d43393-dacb-43d3-91d7-b4cb913a5908": "https://example.com/preview/male_casual.mp3",
-            "90295ec4-f0fe-4783-ab33-8b997ddc3ae4": "https://example.com/preview/male_warm.mp3",
-            "37b3f1c8-a01e-4d70-b251-294733f08371": "https://example.com/preview/male_clear.mp3"
+        # Get the voice ID from the voice name
+        voice_id = VOICE_MAP.get(voice_name)
+        if not voice_id:
+            return {"success": False, "error": f"Voice '{voice_name}' not found"}
+
+        # Sample text for voice preview
+        sample_text = "Hello! This is a preview of the voice you've selected for your calls. This professional voice will help you connect with your patients effectively."
+
+        # Prepare the request payload
+        payload = {
+            "text": sample_text,
+            "voice_settings": {},
+            "language": "en"
         }
-        return {"success": True, "preview_url": preview_urls.get(voice_id, "")}
+
+        print(f"🎤 Generating voice sample for {voice_name} (ID: {voice_id})")
+
+        # Make request to Bland AI voice sample API
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"https://api.bland.ai/v1/voices/{voice_id}/sample",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json"
+                },
+                json=payload,
+                timeout=aiohttp.ClientTimeout(total=30)
+            ) as response:
+
+                if response.status == 200:
+                    # The response should contain the audio file or a URL to it
+                    response_data = await response.json()
+
+                    # Bland AI might return different response formats, handle accordingly
+                    if 'audio_url' in response_data:
+                        audio_url = response_data['audio_url']
+                    elif 'url' in response_data:
+                        audio_url = response_data['url']
+                    elif 'sample_url' in response_data:
+                        audio_url = response_data['sample_url']
+                    else:
+                        # If response format is different, try to get the audio data directly
+                        print(f"✅ Voice sample generated for {voice_name}")
+                        return {"success": True, "audio_data": response_data}
+
+                    print(f"✅ Voice sample URL generated for {voice_name}: {audio_url}")
+                    return {"success": True, "preview_url": audio_url}
+
+                elif response.status == 404:
+                    return {"success": False, "error": f"Voice ID '{voice_id}' not found in Bland AI"}
+                elif response.status == 401:
+                    return {"success": False, "error": "Invalid API key"}
+                elif response.status == 429:
+                    return {"success": False, "error": "Rate limit exceeded. Please try again later."}
+                else:
+                    error_text = await response.text()
+                    print(f"❌ Bland AI voice sample error: Status {response.status}, Response: {error_text}")
+                    return {"success": False, "error": f"API error: {error_text}"}
+
+    except asyncio.TimeoutError:
+        return {"success": False, "error": "Request timeout. Please try again."}
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error getting voice preview: {str(e)}")
+        print(f"❌ Exception generating voice sample: {str(e)}")
+        return {"success": False, "error": f"Error generating voice sample: {str(e)}"}
 
 
 @app.post("/process_csv")
@@ -1021,7 +1076,7 @@ def analyze_call_transcript(transcript: str) -> str:
         "that works", "perfect", "okay", "sure", "will be there",
         "looking forward", "great", "excellent", "wonderful"
     ]
-    
+
     # Check for strong confirmation patterns
     strong_confirmations = ["yes", "confirm", "i'll be there", "see you then", "that works", "sounds good"]
     if any(indicator in transcript_lower for indicator in strong_confirmations):
@@ -1060,7 +1115,7 @@ def analyze_call_transcript(transcript: str) -> str:
     # If we have a meaningful transcript but can't categorize it, mark as completed
     if len(transcript.strip()) > 10:  # At least some meaningful content
         return 'confirmed'  # Default to confirmed if we have a real conversation
-    
+
     return 'busy_voicemail'
 
 
@@ -1277,16 +1332,16 @@ async def get_campaign_analytics(campaign_id: str):
 
                         if call_response.status_code == 200:
                             call_data = call_response.json()
-                            
+
                             # Get transcript and other details
                             transcript = call_data.get('transcript', '')
                             call_details['transcript'] = transcript
                             call_details['created_at'] = call_data.get('created_at', campaign_results['started_at'])
-                            
+
                             # Parse duration more robustly
                             raw_duration = call_data.get('duration', 0)
                             duration_seconds = 0
-                            
+
                             if isinstance(raw_duration, (int, float)):
                                 duration_seconds = int(raw_duration)
                             elif isinstance(raw_duration, str) and raw_duration:
@@ -1313,19 +1368,19 @@ async def get_campaign_analytics(campaign_id: str):
                                 except Exception as e:
                                     print(f"⚠️ Could not parse duration '{raw_duration}': {e}")
                                     duration_seconds = 0
-                            
+
                             call_details['duration'] = duration_seconds
                             total_duration += duration_seconds
 
                             # Analyze transcript for status using our improved function
                             call_status = analyze_call_transcript(transcript)
                             call_details['call_status'] = call_status
-                            
+
                             # Handle legacy 'busy' status by converting to 'busy_voicemail'
                             if call_status == 'busy':
                                 call_status = 'busy_voicemail'
                                 call_details['call_status'] = 'busy_voicemail'
-                            
+
                             # Make sure the status exists in our counts dictionary
                             if call_status in status_counts:
                                 status_counts[call_status] += 1
@@ -1416,7 +1471,7 @@ async def get_call_details(call_id: str):
             # Handle duration formatting consistently
             raw_duration = call_data.get("duration", 0)
             duration = 0
-            
+
             if isinstance(raw_duration, (int, float)):
                 duration = int(raw_duration)
             elif isinstance(raw_duration, str) and raw_duration:
