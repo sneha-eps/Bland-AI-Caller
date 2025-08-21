@@ -682,7 +682,7 @@ async def update_campaign(
 
 @app.post("/start_campaign/{campaign_id}")
 async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
-    """Start a campaign using stored file or new upload"""
+    """Start a campaign using stored file or new upload with retry logic"""
     api_key = get_api_key()
 
     if not api_key:
@@ -773,69 +773,22 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
                 office_location=safe_str(row.get('office_location', '')))
             call_requests.append(call_request)
 
-        # Process all valid calls concurrently (max 10 at a time)
+        # Process all valid calls with retry logic
         if call_requests:
-            print(f"🚀 Starting campaign '{campaign['name']}' - Processing {len(call_requests)} calls concurrently (max 10 simultaneous)")
+            max_attempts = campaign.get('max_attempts', 3)
+            retry_interval_minutes = campaign.get('retry_interval', 30)
+            
+            print(f"🚀 Starting campaign '{campaign['name']}' with retry logic - Max attempts: {max_attempts}, Retry interval: {retry_interval_minutes} min")
 
-            # Create semaphore to limit concurrent calls to 10
-            semaphore = asyncio.Semaphore(10)
-
-            # Create tasks for all calls
-            tasks = [
-                make_single_call_async(call_request, api_key, semaphore)
-                for call_request in call_requests
-            ]
-
-            # Run all tasks concurrently
-            concurrent_results = await asyncio.gather(*tasks)
-            results.extend(concurrent_results)
-
-            # Send automatic voicemails for busy/unanswered calls
-            voicemail_tasks = []
-            for i, result in enumerate(concurrent_results):
-                if result.success and result.call_id:
-                    # Wait a bit for the call to complete, then check status
-                    await asyncio.sleep(2)  # Brief delay to allow call processing
-
-                    try:
-                        # Check call status to determine if voicemail is needed
-                        async with aiohttp.ClientSession() as session:
-                            async with session.get(
-                                f"https://api.bland.ai/v1/calls/{result.call_id}",
-                                headers={"Authorization": f"Bearer {api_key}"},
-                                timeout=aiohttp.ClientTimeout(total=15)
-                            ) as call_response:
-
-                                if call_response.status == 200:
-                                    call_data = await call_response.json()
-                                    transcript = call_data.get('transcript', '')
-                                    call_status = analyze_call_transcript(transcript)
-
-                                    # If call resulted in busy/voicemail, send automatic voicemail
-                                    if call_status in ['busy', 'voicemail', 'failed']:
-                                        print(f"📞 Call to {call_requests[i].patient_name} resulted in {call_status}, sending automatic voicemail...")
-                                        voicemail_task = send_automatic_voicemail(call_requests[i], api_key)
-                                        voicemail_tasks.append(voicemail_task)
-                                else:
-                                    # If we can't get call details, assume busy and send voicemail
-                                    print(f"📞 Cannot get call details for {call_requests[i].patient_name}, sending automatic voicemail...")
-                                    voicemail_task = send_automatic_voicemail(call_requests[i], api_key)
-                                    voicemail_tasks.append(voicemail_task)
-                    except Exception as e:
-                        print(f"❌ Error checking call status for {call_requests[i].patient_name}: {str(e)}")
-                        # On error, send voicemail as backup
-                        voicemail_task = send_automatic_voicemail(call_requests[i], api_key)
-                        voicemail_tasks.append(voicemail_task)
-                elif not result.success:
-                    # Failed calls get automatic voicemail
-                    print(f"📞 Call failed for {call_requests[i].patient_name}, sending automatic voicemail...")
-                    voicemail_task = send_automatic_voicemail(call_requests[i], api_key)
-                    voicemail_tasks.append(voicemail_task)
-
-            # Send all voicemails concurrently
-            if voicemail_tasks:
-                print(f"📬 Sending {len(voicemail_tasks)} automatic voicemails...")
-                await asyncio.gather(*voicemail_tasks)
+            # Process calls with retry logic
+            final_results = await process_calls_with_retry(
+                call_requests, 
+                api_key, 
+                max_attempts, 
+                retry_interval_minutes,
+                campaign['name']
+            )
+            results.extend(final_results)
 
         # Calculate summary
         successful_calls = sum(1 for r in results if r.success)
@@ -868,6 +821,193 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Error starting campaign: {str(e)}")
+
+
+async def process_calls_with_retry(call_requests, api_key, max_attempts, retry_interval_minutes, campaign_name):
+    """Process calls with retry logic and send voicemail after max attempts"""
+    final_results = []
+    
+    # Track retry status for each call
+    retry_tracker = {}
+    for i, call_request in enumerate(call_requests):
+        retry_tracker[i] = {
+            'attempts': 0,
+            'completed': False,
+            'call_request': call_request,
+            'final_result': None
+        }
+    
+    # Create semaphore to limit concurrent calls
+    semaphore = asyncio.Semaphore(10)
+    
+    while True:
+        # Find calls that need retry attempts
+        pending_calls = []
+        pending_indices = []
+        
+        for i, tracker in retry_tracker.items():
+            if not tracker['completed'] and tracker['attempts'] < max_attempts:
+                pending_calls.append(tracker['call_request'])
+                pending_indices.append(i)
+        
+        if not pending_calls:
+            break  # All calls completed or exhausted retries
+        
+        current_attempt = max(retry_tracker[i]['attempts'] for i in pending_indices) + 1
+        print(f"🔄 Campaign '{campaign_name}' - Starting attempt {current_attempt} for {len(pending_calls)} calls")
+        
+        # Execute current batch of calls
+        tasks = [
+            make_single_call_async(call_request, api_key, semaphore)
+            for call_request in pending_calls
+        ]
+        
+        batch_results = await asyncio.gather(*tasks)
+        
+        # Process results and check call status
+        for idx, result in enumerate(batch_results):
+            tracker_idx = pending_indices[idx]
+            call_request = pending_calls[idx]
+            retry_tracker[tracker_idx]['attempts'] += 1
+            
+            # Check if call was successful and determine actual status
+            call_status = 'failed'
+            if result.success and result.call_id:
+                try:
+                    # Wait for call to complete and get status
+                    await asyncio.sleep(3)
+                    
+                    async with aiohttp.ClientSession() as session:
+                        async with session.get(
+                            f"https://api.bland.ai/v1/calls/{result.call_id}",
+                            headers={"Authorization": f"Bearer {api_key}"},
+                            timeout=aiohttp.ClientTimeout(total=15)
+                        ) as call_response:
+                            
+                            if call_response.status == 200:
+                                call_data = await call_response.json()
+                                transcript = call_data.get('transcript', '')
+                                call_status = analyze_call_transcript(transcript)
+                                
+                                # Update result with transcript and status
+                                result.transcript = transcript
+                                result.call_status = call_status
+                            else:
+                                call_status = 'busy_voicemail'
+                                
+                except Exception as e:
+                    print(f"❌ Error checking call status for {call_request.patient_name}: {str(e)}")
+                    call_status = 'busy_voicemail'
+            else:
+                call_status = 'failed'
+            
+            # Check if call is completed successfully (patient answered and responded)
+            if call_status in ['confirmed', 'cancelled', 'rescheduled']:
+                # Call completed successfully
+                retry_tracker[tracker_idx]['completed'] = True
+                retry_tracker[tracker_idx]['final_result'] = result
+                print(f"✅ Call to {call_request.patient_name} completed with status: {call_status}")
+            
+            elif retry_tracker[tracker_idx]['attempts'] >= max_attempts:
+                # Max attempts reached, send voicemail
+                retry_tracker[tracker_idx]['completed'] = True
+                retry_tracker[tracker_idx]['final_result'] = result
+                
+                print(f"📞 Max attempts ({max_attempts}) reached for {call_request.patient_name}, sending voicemail...")
+                
+                # Send voicemail after all attempts exhausted
+                try:
+                    await send_final_voicemail(call_request, api_key)
+                    print(f"📬 Final voicemail sent to {call_request.patient_name}")
+                except Exception as e:
+                    print(f"❌ Error sending final voicemail to {call_request.patient_name}: {str(e)}")
+            
+            else:
+                # Call needs retry
+                remaining_attempts = max_attempts - retry_tracker[tracker_idx]['attempts']
+                print(f"⏳ Call to {call_request.patient_name} will be retried (Status: {call_status}, Remaining attempts: {remaining_attempts})")
+        
+        # If there are more attempts needed, wait for retry interval
+        pending_retries = [i for i, tracker in retry_tracker.items() 
+                          if not tracker['completed'] and tracker['attempts'] < max_attempts]
+        
+        if pending_retries:
+            print(f"⏰ Waiting {retry_interval_minutes} minutes before next retry attempt...")
+            await asyncio.sleep(retry_interval_minutes * 60)  # Convert minutes to seconds
+    
+    # Collect all final results
+    for tracker in retry_tracker.values():
+        if tracker['final_result']:
+            final_results.append(tracker['final_result'])
+    
+    return final_results
+
+
+async def send_final_voicemail(call_request: CallRequest, api_key: str):
+    """Send final voicemail using the updated template after all retry attempts"""
+    try:
+        selected_voice = VOICE_MAP.get("Paige", "default_voice_id")
+
+        # Updated voicemail template as per your request
+        voicemail_template = f"""
+        Hi Good Morning, I am calling from Hillside Medical Group. This call is for {call_request.patient_name} to remind him/her of an upcoming appointment on {call_request.appointment_date} at {call_request.appointment_time} with {call_request.provider_name} at {call_request.office_location}. Please make sure to arrive 15 minutes prior to your appointment. Also, Please make sure to email us your insurance information ASAP so that we can get it verified and avoid any delays on the day of your appointment. If you wish to cancel or reschedule your appointment, please inform us at least 24 hours in advance to avoid cancellation charge of $25.00. For more information, you can call us back on 210-742-6555 and press the prompt that says "Appointment Setters". Thank you and have a blessed day.
+        """
+
+        payload = {
+            "phone_number": call_request.phone_number,
+            "task": f"You are leaving a voicemail message. Speak clearly and deliver this message: {voicemail_template.strip()}",
+            "voice": selected_voice,
+            "request_data": {
+                "patient_name": call_request.patient_name,
+                "appointment_date": call_request.appointment_date,
+                "appointment_time": call_request.appointment_time,
+                "provider_name": call_request.provider_name,
+                "office_location": call_request.office_location,
+                "message_type": "final_voicemail"
+            }
+        }
+
+        print(f"🔄 Sending final voicemail to {call_request.phone_number} for {call_request.patient_name}")
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                    "https://api.bland.ai/v1/calls",
+                    headers={
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json"
+                    },
+                    json=payload,
+                    timeout=aiohttp.ClientTimeout(total=60)
+            ) as response:
+                if response.status == 200:
+                    resp_json = await response.json()
+                    print(f"✅ Final voicemail sent successfully for {call_request.patient_name}")
+                    return {
+                        "success": True,
+                        "call_id": resp_json.get("call_id", "N/A"),
+                        "status": resp_json.get("status", "N/A"),
+                        "message": "Final voicemail sent successfully",
+                        "patient_name": call_request.patient_name,
+                        "phone_number": call_request.phone_number
+                    }
+                else:
+                    error_msg = f"API error (Status {response.status}): {await response.text()}"
+                    print(f"❌ Error sending final voicemail for {call_request.patient_name}: {error_msg}")
+                    return {
+                        "success": False,
+                        "error": error_msg,
+                        "patient_name": call_request.patient_name,
+                        "phone_number": call_request.phone_number
+                    }
+
+    except Exception as e:
+        print(f"💥 Exception during final voicemail sending: {str(e)}")
+        return {
+            "success": False,
+            "error": str(e),
+            "patient_name": call_request.patient_name,
+            "phone_number": call_request.phone_number
+        }
 
 
 @app.get("/voice_preview/{voice_name}")
