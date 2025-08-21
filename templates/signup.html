@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - Bland AI Call Center</title>
+    <title>Sign Up - Bland AI Call Center</title>
     <style>
         * {
             margin: 0;
@@ -21,26 +21,26 @@
             justify-content: center;
         }
 
-        .auth-container {
+        .signup-container {
             background: white;
             padding: 2rem;
             border-radius: 10px;
             box-shadow: 0 10px 25px rgba(0,0,0,0.2);
             width: 100%;
-            max-width: 400px;
+            max-width: 450px;
         }
 
-        .auth-header {
+        .signup-header {
             text-align: center;
             margin-bottom: 2rem;
         }
 
-        .auth-header h1 {
+        .signup-header h1 {
             color: #333;
             margin-bottom: 0.5rem;
         }
 
-        .auth-header p {
+        .signup-header p {
             color: #666;
             font-size: 0.9rem;
         }
@@ -56,7 +56,7 @@
             font-weight: 500;
         }
 
-        .form-group input {
+        .form-group input, .form-group select {
             width: 100%;
             padding: 0.75rem;
             border: 1px solid #ddd;
@@ -64,12 +64,12 @@
             font-size: 1rem;
         }
 
-        .form-group input:focus {
+        .form-group input:focus, .form-group select:focus {
             outline: none;
             border-color: #667eea;
         }
 
-        .auth-btn {
+        .signup-btn {
             width: 100%;
             padding: 0.75rem;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -82,51 +82,29 @@
             margin-bottom: 1rem;
         }
 
-        .auth-btn:hover {
+        .signup-btn:hover {
             transform: translateY(-1px);
         }
 
-        .auth-btn:disabled {
+        .signup-btn:disabled {
             opacity: 0.6;
             cursor: not-allowed;
             transform: none;
         }
 
-        .auth-switch {
+        .login-link {
             text-align: center;
             margin-top: 1rem;
         }
 
-        .auth-switch a {
+        .login-link a {
             color: #667eea;
             text-decoration: none;
             font-weight: 500;
         }
 
-        .auth-switch a:hover {
+        .login-link a:hover {
             text-decoration: underline;
-        }
-
-        .user-types {
-            margin-top: 2rem;
-            padding: 1rem;
-            background: #f8f9fa;
-            border-radius: 5px;
-        }
-
-        .user-types h3 {
-            color: #333;
-            margin-bottom: 1rem;
-            font-size: 1rem;
-        }
-
-        .user-type {
-            margin-bottom: 0.5rem;
-            font-size: 0.9rem;
-        }
-
-        .user-type strong {
-            color: #667eea;
         }
 
         .error, .success {
@@ -169,32 +147,41 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+
+        .role-info {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 0.25rem;
+        }
     </style>
 </head>
 <body>
-    <div class="auth-container">
-        <div class="auth-header">
-            <h1>🤖 Bland AI Call Center</h1>
-            <p id="authTitle">Please login to continue</p>
+    <div class="signup-container">
+        <div class="signup-header">
+            <h1>🤖 Create Account</h1>
+            <p>Join Bland AI Call Center</p>
         </div>
 
-        <form id="authForm">
+        <form id="signupForm">
             <div class="form-group">
                 <label for="username">Username</label>
                 <input type="text" id="username" name="username" required>
             </div>
 
-            <div class="form-group" id="emailGroup" style="display: none;">
+            <div class="form-group">
                 <label for="email">Email</label>
-                <input type="email" id="email" name="email">
+                <input type="email" id="email" name="email" required>
             </div>
 
-            <div class="form-group" id="roleGroup" style="display: none;">
-                <label for="role">Role</label>
-                <select id="role" name="role">
-                    <option value="user">User</option>
-                    <option value="admin">Admin</option>
+            <div class="form-group">
+                <label for="role">Account Type</label>
+                <select id="role" name="role" required>
+                    <option value="user">User Account</option>
+                    <option value="admin">Admin Account</option>
                 </select>
+                <div class="role-info">
+                    Users can view campaigns, Admins can create and manage everything
+                </div>
             </div>
 
             <div class="form-group">
@@ -202,71 +189,30 @@
                 <input type="password" id="password" name="password" required>
             </div>
 
-            <button type="submit" class="auth-btn" id="authButton">Login</button>
+            <div class="form-group">
+                <label for="confirmPassword">Confirm Password</label>
+                <input type="password" id="confirmPassword" name="confirmPassword" required>
+            </div>
+
+            <button type="submit" class="signup-btn">Create Account</button>
             
             <div id="message" style="display: none;"></div>
             
             <div class="loading" id="loading">
                 <div class="spinner"></div>
-                Processing...
+                Creating account...
             </div>
         </form>
 
-        <div class="auth-switch">
-            <span id="switchText">Don't have an account?</span>
-            <a href="#" id="switchLink">Sign up</a>
-        </div>
-
-        <div class="user-types">
-            <h3>Demo Accounts:</h3>
-            <div class="user-type">
-                <strong>Admin:</strong> admin / admin123
-            </div>
-            <div class="user-type">
-                <strong>User:</strong> user / user123
-            </div>
+        <div class="login-link">
+            Already have an account? <a href="/login">Login here</a>
         </div>
     </div>
 
     <script>
-        let isLoginMode = true;
-        
-        const authForm = document.getElementById('authForm');
-        const authTitle = document.getElementById('authTitle');
-        const authButton = document.getElementById('authButton');
-        const switchText = document.getElementById('switchText');
-        const switchLink = document.getElementById('switchLink');
-        const emailGroup = document.getElementById('emailGroup');
-        const roleGroup = document.getElementById('roleGroup');
+        const signupForm = document.getElementById('signupForm');
         const messageDiv = document.getElementById('message');
         const loadingDiv = document.getElementById('loading');
-
-        // Switch between login and signup
-        switchLink.addEventListener('click', function(e) {
-            e.preventDefault();
-            isLoginMode = !isLoginMode;
-            
-            if (isLoginMode) {
-                authTitle.textContent = 'Please login to continue';
-                authButton.textContent = 'Login';
-                switchText.textContent = "Don't have an account?";
-                switchLink.textContent = 'Sign up';
-                emailGroup.style.display = 'none';
-                roleGroup.style.display = 'none';
-                document.getElementById('email').required = false;
-            } else {
-                authTitle.textContent = 'Create your account';
-                authButton.textContent = 'Sign Up';
-                switchText.textContent = 'Already have an account?';
-                switchLink.textContent = 'Login';
-                emailGroup.style.display = 'block';
-                roleGroup.style.display = 'block';
-                document.getElementById('email').required = true;
-            }
-            
-            // Clear any messages
-            showMessage('', '');
-        });
 
         function showMessage(message, type) {
             if (message) {
@@ -280,54 +226,54 @@
 
         function showLoading(show) {
             loadingDiv.style.display = show ? 'block' : 'none';
-            authButton.disabled = show;
+            document.querySelector('.signup-btn').disabled = show;
         }
 
-        authForm.addEventListener('submit', async function(e) {
+        signupForm.addEventListener('submit', async function(e) {
             e.preventDefault();
             
             const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
             const email = document.getElementById('email').value;
             const role = document.getElementById('role').value;
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirmPassword').value;
+            
+            // Validate passwords match
+            if (password !== confirmPassword) {
+                showMessage('Passwords do not match', 'error');
+                return;
+            }
+            
+            // Validate password length
+            if (password.length < 6) {
+                showMessage('Password must be at least 6 characters long', 'error');
+                return;
+            }
             
             showLoading(true);
             showMessage('', '');
             
             try {
-                const endpoint = isLoginMode ? '/api/login' : '/api/signup';
-                const payload = isLoginMode 
-                    ? { username, password }
-                    : { username, password, email, role };
-
-                const response = await fetch(endpoint, {
+                const response = await fetch('/api/signup', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': isLoginMode ? 'application/x-www-form-urlencoded' : 'application/json'
+                        'Content-Type': 'application/json'
                     },
-                    body: isLoginMode 
-                        ? new URLSearchParams(payload)
-                        : JSON.stringify(payload)
+                    body: JSON.stringify({
+                        username,
+                        email,
+                        role,
+                        password
+                    })
                 });
                 
                 const data = await response.json();
                 
                 if (data.success) {
-                    showMessage(data.message, 'success');
-                    
-                    // Set session cookie if login successful
-                    if (isLoginMode) {
-                        // Redirect to dashboard after successful login
-                        setTimeout(() => {
-                            window.location.href = '/';
-                        }, 1000);
-                    } else {
-                        // Switch to login mode after successful signup
-                        setTimeout(() => {
-                            switchLink.click();
-                            showMessage('Account created! Please login.', 'success');
-                        }, 1500);
-                    }
+                    showMessage('Account created successfully! Redirecting to login...', 'success');
+                    setTimeout(() => {
+                        window.location.href = '/login';
+                    }, 2000);
                 } else {
                     showMessage(data.message, 'error');
                 }

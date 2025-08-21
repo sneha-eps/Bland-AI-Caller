@@ -8,15 +8,18 @@ import time
 import asyncio
 import aiohttp
 import uuid
-from datetime import datetime
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form
+from datetime import datetime, timedelta
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form, Depends, status
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import importlib
 import importlib.util
 import re
+import hashlib
+import secrets
 
 # Check if 'blandai' package is available (optional since we're using requests directly)
 try:
@@ -39,6 +42,31 @@ templates = Jinja2Templates(directory="templates")
 clients_db = {}
 campaigns_db = {}
 campaign_results_db = {}
+
+# User authentication storage
+users_db = {
+    "admin": {
+        "id": "admin",
+        "username": "admin",
+        "password_hash": hashlib.sha256("admin123".encode()).hexdigest(),
+        "role": "admin",
+        "email": "admin@company.com",
+        "created_at": datetime.now().isoformat()
+    },
+    "user": {
+        "id": "user", 
+        "username": "user",
+        "password_hash": hashlib.sha256("user123".encode()).hexdigest(),
+        "role": "user",
+        "email": "user@company.com",
+        "created_at": datetime.now().isoformat()
+    }
+}
+
+# Session storage (in production, use proper session management)
+sessions_db = {}
+
+security = HTTPBasic()
 
 # Add number formatting filter
 def number_format(value):
@@ -245,6 +273,69 @@ class Campaign(BaseModel):
     file_name: Optional[str] = None
     file_data: Optional[bytes] = None
 
+class UserCreate(BaseModel):
+    username: str
+    password: str
+    email: str
+    role: str = "user"
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
+
+
+def hash_password(password: str) -> str:
+    """Hash a password for storage"""
+    return hashlib.sha256(password.encode()).hexdigest()
+
+def verify_password(password: str, hashed: str) -> bool:
+    """Verify a password against its hash"""
+    return hashlib.sha256(password.encode()).hexdigest() == hashed
+
+def create_session(user_id: str) -> str:
+    """Create a new session token"""
+    session_token = secrets.token_urlsafe(32)
+    sessions_db[session_token] = {
+        "user_id": user_id,
+        "created_at": datetime.now(),
+        "expires_at": datetime.now() + timedelta(hours=24)
+    }
+    return session_token
+
+def get_current_user(request: Request) -> Optional[Dict]:
+    """Get the current user from session"""
+    # Check for session cookie
+    session_token = request.cookies.get("session_token")
+    if not session_token or session_token not in sessions_db:
+        return None
+    
+    session = sessions_db[session_token]
+    if datetime.now() > session["expires_at"]:
+        del sessions_db[session_token]
+        return None
+    
+    user_id = session["user_id"]
+    return users_db.get(user_id)
+
+def require_auth(request: Request):
+    """Require authentication"""
+    user = get_current_user(request)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authentication required"
+        )
+    return user
+
+def require_admin(request: Request):
+    """Require admin role"""
+    user = require_auth(request)
+    if user["role"] != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    return user
 
 def format_phone_number(phone_number, country_code) -> str:
     """Format phone number with the selected country code"""
@@ -535,9 +626,93 @@ async def make_call(call_request: CallRequest, country_code: str = "+1"):
         raise HTTPException(status_code=500,
                             detail=f"Error making call: {str(e)}")
 
+@app.get("/login", response_class=HTMLResponse)
+async def login_page(request: Request):
+    """Login page"""
+    # Check if user is already logged in
+    user = get_current_user(request)
+    if user:
+        return RedirectResponse(url="/", status_code=302)
+    
+    return templates.TemplateResponse("login.html", {"request": request})
+
+@app.get("/signup", response_class=HTMLResponse)
+async def signup_page(request: Request):
+    """Signup page"""
+    # Check if user is already logged in
+    user = get_current_user(request)
+    if user:
+        return RedirectResponse(url="/", status_code=302)
+    
+    return templates.TemplateResponse("signup.html", {"request": request})
+
+@app.post("/api/login")
+async def login(request: Request, username: str = Form(...), password: str = Form(...)):
+    """Handle login"""
+    try:
+        user = None
+        for user_data in users_db.values():
+            if user_data["username"] == username:
+                user = user_data
+                break
+        
+        if not user or not verify_password(password, user["password_hash"]):
+            return {"success": False, "message": "Invalid username or password"}
+        
+        # Create session
+        session_token = create_session(user["id"])
+        
+        response = {"success": True, "message": "Login successful", "user": user}
+        return response
+    except Exception as e:
+        return {"success": False, "message": f"Login error: {str(e)}"}
+
+@app.post("/api/signup")
+async def signup(request: Request, user_data: UserCreate):
+    """Handle signup"""
+    try:
+        # Check if username already exists
+        for existing_user in users_db.values():
+            if existing_user["username"] == user_data.username:
+                return {"success": False, "message": "Username already exists"}
+        
+        # Create new user
+        user_id = str(uuid.uuid4())
+        new_user = {
+            "id": user_id,
+            "username": user_data.username,
+            "password_hash": hash_password(user_data.password),
+            "role": user_data.role,
+            "email": user_data.email,
+            "created_at": datetime.now().isoformat()
+        }
+        
+        users_db[user_id] = new_user
+        
+        # Create session
+        session_token = create_session(user_id)
+        
+        return {"success": True, "message": "Account created successfully", "user": new_user}
+    except Exception as e:
+        return {"success": False, "message": f"Signup error: {str(e)}"}
+
+@app.post("/api/logout")
+async def logout(request: Request):
+    """Handle logout"""
+    session_token = request.cookies.get("session_token")
+    if session_token and session_token in sessions_db:
+        del sessions_db[session_token]
+    
+    return {"success": True, "message": "Logged out successfully"}
+
 @app.get("/", response_class=HTMLResponse)
 async def dashboard(request: Request):
     """Main dashboard interface"""
+    # Check authentication
+    user = get_current_user(request)
+    if not user:
+        return RedirectResponse(url="/login", status_code=302)
+    
     api_key = get_api_key()
 
     # Load clients and campaigns data for dashboard
@@ -582,7 +757,8 @@ async def dashboard(request: Request):
         "has_api_key": bool(api_key),
         "metrics": metrics,
         "clients": clients,
-        "campaigns": campaigns
+        "campaigns": campaigns,
+        "current_user": user
     })
 
 
@@ -599,11 +775,13 @@ async def upload_page(request: Request):
 @app.get("/clients", response_class=HTMLResponse)
 async def clients_page(request: Request):
     """Clients management page"""
+    user = require_auth(request)
     api_key = get_api_key()
     return templates.TemplateResponse("clients.html", {
         "request": request,
         "has_api_key": bool(api_key),
-        "clients": list(clients_db.values())
+        "clients": list(clients_db.values()),
+        "current_user": user
     })
 
 # Helper functions to load data (mimicking database interaction)
@@ -618,6 +796,7 @@ def load_campaigns():
 async def campaigns_page(request: Request, client_id: Optional[str] = None, client_name: Optional[str] = None):
     """Display campaigns page"""
     try:
+        user = require_auth(request)
         clients = load_clients()
         campaigns = load_campaigns()
         has_api_key = bool(get_api_key())
@@ -645,7 +824,8 @@ async def campaigns_page(request: Request, client_id: Optional[str] = None, clie
             "campaigns": serializable_campaigns,
             "has_api_key": has_api_key,
             "filtered_client_id": client_id,
-            "filtered_client_name": client_name
+            "filtered_client_name": client_name,
+            "current_user": user
         })
     except Exception as e:
         print(f"Error in campaigns_page: {str(e)}")
@@ -653,12 +833,24 @@ async def campaigns_page(request: Request, client_id: Optional[str] = None, clie
 
 
 @app.post("/add_client")
-async def add_client(client: Client):
-    """Add a new client"""
+async def add_client(request: Request, client: Client):
+    """Add a new client (admin only)"""
+    user = require_admin(request)
     client_id = str(uuid.uuid4())
     client.id = client_id
     clients_db[client_id] = client.dict()
     return {"success": True, "client_id": client_id, "message": "Client added successfully"}
+
+@app.get("/api/users")
+async def get_users(request: Request):
+    """Get all users (admin only)"""
+    user = require_admin(request)
+    users_list = []
+    for user_data in users_db.values():
+        user_copy = user_data.copy()
+        del user_copy["password_hash"]  # Don't return password hashes
+        users_list.append(user_copy)
+    return {"success": True, "users": users_list}
 
 
 @app.post("/add_campaign")

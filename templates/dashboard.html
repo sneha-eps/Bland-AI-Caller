@@ -669,6 +669,44 @@
             margin-bottom: 1rem;
         }
 
+        /* Header actions and user menu */
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .user-menu {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-left: 1rem;
+            padding-left: 1rem;
+            border-left: 1px solid var(--border-color);
+        }
+
+        .user-info {
+            color: var(--text-primary);
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .user-info i {
+            font-size: 1.2rem;
+            color: var(--primary-color);
+        }
+
+        .logout-btn {
+            background: var(--danger-color) !important;
+            color: white !important;
+        }
+
+        .logout-btn:hover {
+            background: #c82333 !important;
+        }
+
         @media (max-width: 768px) {
             .main-content {
                 padding: 1rem;
@@ -803,13 +841,22 @@
             <h1 class="header-title">Dashboard</h1>
         </div>
         <div class="header-right">
-            <button class="theme-toggle" id="themeToggle" title="Toggle theme">
+            <button id="themeToggle" class="theme-toggle">
                 <i class="fas fa-moon"></i>
             </button>
-            <div class="status-badge {% if has_api_key %}status-connected{% else %}status-error{% endif %}">
-                <i class="fas {% if has_api_key %}fa-check-circle{% else %}fa-exclamation-triangle{% endif %}"></i>
-                {% if has_api_key %}API Connected{% else %}API Not Configured{% endif %}
+
+            {% if current_user %}
+            <div class="user-menu">
+                <span class="user-info">
+                    <i class="fas fa-user-circle"></i>
+                    {{ current_user.username }} ({{ current_user.role.title() }})
+                </span>
+                <button id="logoutBtn" class="header-action logout-btn">
+                    <i class="fas fa-sign-out-alt"></i>
+                    Logout
+                </button>
             </div>
+            {% endif %}
         </div>
     </div>
 
@@ -1095,10 +1142,10 @@
         });
 
         console.log('Dashboard loaded successfully');
-        
+
         // Refresh metrics every 30 seconds to show updated data
         setInterval(refreshDashboardMetrics, 30000);
-        
+
         // Also refresh metrics when page gains focus (user comes back to tab)
         window.addEventListener('focus', refreshDashboardMetrics);
 
@@ -1308,37 +1355,37 @@
             try {
                 const response = await fetch('/api/dashboard_metrics');
                 const data = await response.json();
-                
+
                 if (data.success) {
                     const metrics = data.metrics;
-                    
+
                     // Update metric cards
                     const totalClientsCard = document.querySelector('.metric-card.clients .metric-value');
                     const totalCampaignsCard = document.querySelector('.metric-card.campaigns .metric-value');
                     const totalCallsCard = document.querySelector('.metric-card.calls .metric-value');
                     const totalDurationCard = document.querySelector('.metric-card.duration .metric-value');
-                    
+
                     if (totalClientsCard) totalClientsCard.textContent = metrics.total_clients.toLocaleString();
                     if (totalCampaignsCard) totalCampaignsCard.textContent = metrics.total_campaigns.toLocaleString();
                     if (totalCallsCard) totalCallsCard.textContent = metrics.total_calls.toLocaleString();
                     if (totalDurationCard) totalDurationCard.textContent = metrics.total_duration;
-                    
+
                     // Update status text for calls and duration
                     const callsStatus = document.querySelector('.metric-card.calls .metric-change span');
                     const durationStatus = document.querySelector('.metric-card.duration .metric-change span');
-                    
+
                     if (callsStatus) {
                         callsStatus.textContent = metrics.total_calls > 0 ? 
                             `${metrics.total_calls} calls made` : 
                             'No calls made yet';
                     }
-                    
+
                     if (durationStatus) {
                         durationStatus.textContent = metrics.total_calls > 0 ? 
                             `Total call time: ${metrics.total_duration}` : 
                             'No call time recorded';
                     }
-                    
+
                     console.log('Dashboard metrics refreshed:', metrics);
                 } else {
                     console.error('Failed to refresh metrics:', data.message);
@@ -1360,6 +1407,24 @@
                 closeCampaignsListModal();
             }
         };
+
+        // Add event listener for logout button
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', async () => {
+                try {
+                    const response = await fetch('/logout', { method: 'POST' });
+                    if (response.ok) {
+                        window.location.href = '/login'; // Redirect to login page
+                    } else {
+                        alert('Logout failed. Please try again.');
+                    }
+                } catch (error) {
+                    console.error('Error during logout:', error);
+                    alert('An error occurred during logout.');
+                }
+            });
+        }
     </script>
 </body>
 </html>
