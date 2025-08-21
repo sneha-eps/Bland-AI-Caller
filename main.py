@@ -851,6 +851,8 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
         # Store in the global results database
         campaign_results_db[campaign_id] = campaign_results
         print(f"✅ Stored campaign results for {campaign_id}. Total campaigns with results: {len(campaign_results_db)}")
+        print(f"✅ Campaign results keys: {list(campaign_results_db.keys())}")
+        print(f"✅ This campaign results: Total={len(results)}, Success={successful_calls}, Failed={failed_calls}")
 
         return {
             "success": True,
@@ -1819,6 +1821,35 @@ async def get_campaigns_api():
             "message": f"Error loading campaigns: {str(e)}"
         }
 
+@app.get("/debug/campaign_results")
+async def debug_campaign_results():
+    """Debug endpoint to check stored campaign results"""
+    try:
+        debug_info = {
+            "total_campaigns_with_results": len(campaign_results_db),
+            "campaign_ids": list(campaign_results_db.keys()),
+            "campaign_details": {}
+        }
+        
+        for campaign_id, results in campaign_results_db.items():
+            debug_info["campaign_details"][campaign_id] = {
+                "campaign_name": results.get("campaign_name", "Unknown"),
+                "total_calls": results.get("total_calls", 0),
+                "successful_calls": results.get("successful_calls", 0),
+                "started_at": results.get("started_at", "Unknown"),
+                "results_count": len(results.get("results", []))
+            }
+        
+        return {
+            "success": True,
+            "debug_info": debug_info
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
 @app.get("/api/dashboard_metrics")
 async def get_dashboard_metrics():
     """Get updated dashboard metrics"""
@@ -1867,6 +1898,42 @@ async def get_dashboard_metrics():
         return {
             "success": False,
             "message": f"Error calculating metrics: {str(e)}"
+        }
+
+@app.get("/view_results/{campaign_id}")
+async def view_campaign_results(campaign_id: str):
+    """Simple endpoint to view campaign results for debugging"""
+    try:
+        if campaign_id not in campaign_results_db:
+            return {
+                "success": False,
+                "message": f"No results found for campaign {campaign_id}",
+                "available_campaigns": list(campaign_results_db.keys())
+            }
+        
+        results = campaign_results_db[campaign_id]
+        return {
+            "success": True,
+            "campaign_id": campaign_id,
+            "campaign_name": results.get("campaign_name", "Unknown"),
+            "total_calls": results.get("total_calls", 0),
+            "successful_calls": results.get("successful_calls", 0),
+            "failed_calls": results.get("failed_calls", 0),
+            "started_at": results.get("started_at", "Unknown"),
+            "results_summary": [
+                {
+                    "patient_name": r.get("patient_name", "Unknown"),
+                    "success": r.get("success", False),
+                    "error": r.get("error", None),
+                    "call_id": r.get("call_id", None)
+                }
+                for r in results.get("results", [])
+            ]
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
         }
 
 @app.get("/docs")
