@@ -261,6 +261,48 @@ def format_phone_number(phone_number, country_code) -> str:
     return f"{country_code}{cleaned}"
 
 
+def parse_duration(raw_duration):
+    """Parse duration from various formats to seconds"""
+    if isinstance(raw_duration, (int, float)):
+        return int(raw_duration)
+    elif isinstance(raw_duration, str) and raw_duration:
+        try:
+            duration_str = raw_duration.lower().strip()
+            if 'm' in duration_str and 's' in duration_str:
+                # Format: "2m 30s" or "2m30s"
+                import re
+                match = re.search(r'(\d+)m\s*(\d+)?s?', duration_str)
+                if match:
+                    minutes = int(match.group(1))
+                    seconds = int(match.group(2)) if match.group(2) else 0
+                    return minutes * 60 + seconds
+            elif 's' in duration_str:
+                # Format: "150s"
+                return int(duration_str.replace('s', ''))
+            elif 'm' in duration_str:
+                # Format: "2m"
+                return int(duration_str.replace('m', '')) * 60
+            elif duration_str.isdigit():
+                # Just a number, assume seconds
+                return int(duration_str)
+        except Exception:
+            return 0
+    return 0
+
+def format_duration_display(total_duration_seconds):
+    """Format duration in seconds to display format"""
+    hours = total_duration_seconds // 3600
+    minutes = (total_duration_seconds % 3600) // 60
+    seconds = total_duration_seconds % 60
+
+    if hours > 0:
+        return f"{hours}h {minutes}m"
+    elif minutes > 0:
+        return f"{minutes}m {seconds}s"
+    else:
+        return f"{seconds}s"
+
+
 async def make_single_call_async(call_request: CallRequest, api_key: str,
                                  semaphore: asyncio.Semaphore) -> CallResult:
     """Make a single call asynchronously with concurrency control"""
@@ -512,7 +554,7 @@ async def dashboard(request: Request):
     for campaign_id, campaign_results in campaign_results_db.items():
         if 'results' in campaign_results:
             total_calls += len(campaign_results['results'])
-            
+
             # Calculate duration from individual call results if available
             for result in campaign_results['results']:
                 if result.get('success') and result.get('call_id'):
@@ -523,16 +565,7 @@ async def dashboard(request: Request):
                         total_duration_seconds += 60  # Estimate 1 minute per successful call
 
     # Format total duration
-    hours = total_duration_seconds // 3600
-    minutes = (total_duration_seconds % 3600) // 60
-    seconds = total_duration_seconds % 60
-    
-    if hours > 0:
-        formatted_duration = f"{hours}h {minutes}m"
-    elif minutes > 0:
-        formatted_duration = f"{minutes}m {seconds}s"
-    else:
-        formatted_duration = f"{seconds}s"
+    formatted_duration = format_duration_display(total_duration_seconds)
 
     metrics = {
         "total_clients": total_clients,
@@ -824,9 +857,9 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
 
             # Process calls with retry logic
             final_results = await process_calls_with_retry(
-                call_requests, 
-                api_key, 
-                max_attempts, 
+                call_requests,
+                api_key,
+                max_attempts,
                 retry_interval_minutes,
                 campaign['name']
             )
@@ -973,7 +1006,7 @@ async def process_calls_with_retry(call_requests, api_key, max_attempts, retry_i
                 print(f"⏳ Call to {call_request.patient_name} will be retried (Status: {call_status}, Remaining attempts: {remaining_attempts})")
 
         # If there are more attempts needed, wait for retry interval
-        pending_retries = [i for i, tracker in retry_tracker.items() 
+        pending_retries = [i for i, tracker in retry_tracker.items()
                           if not tracker['completed'] and tracker['attempts'] < max_attempts]
 
         if pending_retries:
@@ -1505,7 +1538,7 @@ async def get_campaign_analytics(campaign_id: str):
         print(f"🔍 Campaign analytics requested for ID: {campaign_id}")
         print(f"📊 Available campaigns in campaigns_db: {list(campaigns_db.keys())}")
         print(f"📊 Available campaigns in results_db: {list(campaign_results_db.keys())}")
-        
+
         # Get campaign details
         if campaign_id not in campaigns_db:
             print(f"❌ Campaign {campaign_id} not found in campaigns_db")
@@ -1518,12 +1551,12 @@ async def get_campaign_analytics(campaign_id: str):
         campaign = campaigns_db[campaign_id]
         campaign_name = campaign.get('name', 'Unknown Campaign')
         print(f"🔍 Looking for analytics for campaign: {campaign_name} (ID: {campaign_id})")
-        
+
         # Debug: Print all available campaign result IDs
         print(f"🔍 All campaign result IDs: {list(campaign_results_db.keys())}")
         print(f"🔍 Campaign ID being searched: {campaign_id}")
         print(f"🔍 Campaign ID type: {type(campaign_id)}")
-        
+
         # Check if any stored results have mismatched ID types
         for stored_id in campaign_results_db.keys():
             print(f"🔍 Stored ID: {stored_id} (type: {type(stored_id)})")
@@ -1534,7 +1567,7 @@ async def get_campaign_analytics(campaign_id: str):
             print(f"📊 Found stored results for campaign {campaign_name} with {len(campaign_results.get('results', []))} calls")
         else:
             print(f"🔍 No stored results found for campaign {campaign_name}. Available campaigns in results_db: {list(campaign_results_db.keys())}")
-            
+
             # If no stored results, return empty analytics structure
             return {
                 "success": True,
@@ -1589,7 +1622,7 @@ async def get_campaign_analytics(campaign_id: str):
             if result.get('success') and result.get('call_id'):
                 try:
                     print(f"🔍 Fetching call details for call_id: {result.get('call_id')}")
-                    
+
                     async with aiohttp.ClientSession() as session:
                         async with session.get(
                             f"https://api.bland.ai/v1/calls/{result['call_id']}",
@@ -1607,34 +1640,7 @@ async def get_campaign_analytics(campaign_id: str):
 
                                 # Parse duration more robustly
                                 raw_duration = call_data.get('duration', 0)
-                                duration_seconds = 0
-
-                                if isinstance(raw_duration, (int, float)):
-                                    duration_seconds = int(raw_duration)
-                                elif isinstance(raw_duration, str) and raw_duration:
-                                    try:
-                                        # Handle various duration formats
-                                        duration_str = raw_duration.lower().strip()
-                                        if 'm' in duration_str and 's' in duration_str:
-                                            # Format: "2m 30s" or "2m30s"
-                                            import re
-                                            match = re.search(r'(\d+)m\s*(\d+)?s?', duration_str)
-                                            if match:
-                                                minutes = int(match.group(1))
-                                                seconds = int(match.group(2)) if match.group(2) else 0
-                                                duration_seconds = minutes * 60 + seconds
-                                        elif 's' in duration_str:
-                                            # Format: "150s"
-                                            duration_seconds = int(duration_str.replace('s', ''))
-                                        elif 'm' in duration_str:
-                                            # Format: "2m"
-                                            duration_seconds = int(duration_str.replace('m', '')) * 60
-                                        elif duration_str.isdigit():
-                                            # Just a number, assume seconds
-                                            duration_seconds = int(duration_str)
-                                    except Exception as e:
-                                        print(f"⚠️ Could not parse duration '{raw_duration}': {e}")
-                                        duration_seconds = 0
+                                duration_seconds = parse_duration(raw_duration)
 
                                 call_details['duration'] = duration_seconds
                                 total_duration += duration_seconds
@@ -1681,10 +1687,7 @@ async def get_campaign_analytics(campaign_id: str):
         success_rate = round((successful_calls / total_calls * 100) if total_calls > 0 else 0, 1)
 
         # Format total duration
-        hours = total_duration // 3600
-        minutes = (total_duration % 3600) // 60
-        seconds = total_duration % 60
-        formatted_duration = f"{hours}h {minutes}m {seconds}s"
+        formatted_duration = format_duration_display(total_duration)
 
         analytics = {
             'total_calls': total_calls,
@@ -1738,33 +1741,7 @@ async def get_call_details(call_id: str):
 
             # Handle duration formatting consistently
             raw_duration = call_data.get("duration", 0)
-            duration = 0
-
-            if isinstance(raw_duration, (int, float)):
-                duration = int(raw_duration)
-            elif isinstance(raw_duration, str) and raw_duration:
-                try:
-                    duration_str = raw_duration.lower().strip()
-                    if 'm' in duration_str and 's' in duration_str:
-                        # Format: "2m 30s" or "2m30s"
-                        import re
-                        match = re.search(r'(\d+)m\s*(\d+)?s?', duration_str)
-                        if match:
-                            minutes = int(match.group(1))
-                            seconds = int(match.group(2)) if match.group(2) else 0
-                            duration = minutes * 60 + seconds
-                    elif 's' in duration_str:
-                        # Format: "150s"
-                        duration = int(duration_str.replace('s', ''))
-                    elif 'm' in duration_str:
-                        # Format: "2m"
-                        duration = int(duration_str.replace('m', '')) * 60
-                    elif duration_str.isdigit():
-                        # Just a number, assume seconds
-                        duration = int(duration_str)
-                except Exception as e:
-                    print(f"⚠️ Could not parse duration '{raw_duration}': {e}")
-                    duration = 0
+            duration = parse_duration(raw_duration)
 
             return {
                 "call_id": call_id,
@@ -1830,7 +1807,7 @@ async def debug_campaign_results():
             "campaign_ids": list(campaign_results_db.keys()),
             "campaign_details": {}
         }
-        
+
         for campaign_id, results in campaign_results_db.items():
             debug_info["campaign_details"][campaign_id] = {
                 "campaign_name": results.get("campaign_name", "Unknown"),
@@ -1839,7 +1816,7 @@ async def debug_campaign_results():
                 "started_at": results.get("started_at", "Unknown"),
                 "results_count": len(results.get("results", []))
             }
-        
+
         return {
             "success": True,
             "debug_info": debug_info
@@ -1857,7 +1834,7 @@ async def get_dashboard_metrics():
         # Calculate metrics from actual campaign results
         clients = load_clients()
         campaigns = load_campaigns()
-        
+
         total_clients = len(clients)
         total_campaigns = len(campaigns)
         total_calls = 0
@@ -1867,23 +1844,14 @@ async def get_dashboard_metrics():
         for campaign_id, campaign_results in campaign_results_db.items():
             if 'results' in campaign_results:
                 total_calls += len(campaign_results['results'])
-                
+
                 # Calculate duration from individual call results if available
                 for result in campaign_results['results']:
                     if result.get('success'):
                         total_duration_seconds += 60  # Estimate 1 minute per successful call
 
         # Format total duration
-        hours = total_duration_seconds // 3600
-        minutes = (total_duration_seconds % 3600) // 60
-        seconds = total_duration_seconds % 60
-        
-        if hours > 0:
-            formatted_duration = f"{hours}h {minutes}m"
-        elif minutes > 0:
-            formatted_duration = f"{minutes}m {seconds}s"
-        else:
-            formatted_duration = f"{seconds}s"
+        formatted_duration = format_duration_display(total_duration_seconds)
 
         return {
             "success": True,
@@ -1910,7 +1878,7 @@ async def view_campaign_results(campaign_id: str):
                 "message": f"No results found for campaign {campaign_id}",
                 "available_campaigns": list(campaign_results_db.keys())
             }
-        
+
         results = campaign_results_db[campaign_id]
         return {
             "success": True,
