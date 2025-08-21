@@ -63,22 +63,22 @@ def get_api_key():
 
 
 VOICE_MAP = {
-    "male_professional": "61507da3-4abd-49b6-983f-9ce659fd9e91",
-    "female_professional": "70f05206-71ab-4b39-b238-ed1bf17b365a",
-    "female_warm": "2f9fdbc7-4bf2-4792-8a18-21ce3c93978f",
-    "female_clear": "17e8f694-d230-4b64-b040-6108088d9e6c",
-    "female_friendly": "bbeabae6-ec8d-444f-92ad-c8e620d3de8d",
-    "male_casual": "a3d43393-dacb-43d3-91d7-b4cb913a5908",
-    "male_warm": "90295ec4-f0fe-4783-ab33-8b997ddc3ae4",
-    "male_clear": "37b3f1c8-a01e-4d70-b251-294733f08371"
+    "Ryan": "37b3f1c8-a01e-4d70-b251-294733f08371",
+    "Paige": "70f05206-71ab-4b39-b238-ed1bf17b365a",
+    "Maya": "2f9fdbc7-4bf2-4792-8a18-21ce3c93978f",
+    "Adriana": "1d054475-3908-4f64-9158-9d3911fe9597",
+    "Destiny": "0d6a3160-e7d8-4594-9508-650ec8945ba8",
+    "Matt": "a3d43393-dacb-43d3-91d7-b4cb913a5908",
+    "Mason": "90295ec4-f0fe-4783-ab33-8b997ddc3ae4",
+    "Sal": "0f3e6942-5576-4d9d-8437-6c52ed7ed279"
 }
 
 
-def get_voice_id(name="female_professional") -> str:
+def get_voice_id(name="Paige") -> str:
     """Get the voice ID for the given voice name"""
     return VOICE_MAP.get(
         name,
-        VOICE_MAP["female_professional"])  # Default to female_professional
+        VOICE_MAP["Paige"])  # Default to Paige
 
 
 def get_call_prompt(office_location: str = "",
@@ -275,7 +275,7 @@ async def make_single_call_async(call_request: CallRequest, api_key: str,
         }
 
         try:
-            selected_voice = VOICE_MAP.get("female_professional",
+            selected_voice = VOICE_MAP.get("Paige",
                                            "default_voice_id")
 
             payload = {
@@ -373,7 +373,7 @@ def make_single_call(call_request: CallRequest, api_key: str) -> CallResult:
     }
 
     try:
-        selected_voice = VOICE_MAP.get("female_professional",
+        selected_voice = VOICE_MAP.get("Paige",
                                        "default_voice_id")
 
         payload = {
@@ -1168,7 +1168,7 @@ def get_voicemail_prompt(patient_name: str = "[patient name]",
 async def send_automatic_voicemail(call_request: CallRequest, api_key: str):
     """Send a voicemail message to a patient, used for automatic follow-ups"""
     try:
-        selected_voice = VOICE_MAP.get("female_professional", "default_voice_id")
+        selected_voice = VOICE_MAP.get("Paige", "default_voice_id")
 
         payload = {
             "phone_number": call_request.phone_number,
@@ -1243,7 +1243,7 @@ async def send_voicemail(call_request: CallRequest):
             detail="BLAND_API_KEY not found in Secrets. Please add your API key.")
 
     try:
-        selected_voice = VOICE_MAP.get("female_professional", "default_voice_id")
+        selected_voice = VOICE_MAP.get("Paige", "default_voice_id")
 
         payload = {
             "phone_number": call_request.phone_number,
