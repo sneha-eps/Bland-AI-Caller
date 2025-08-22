@@ -597,6 +597,21 @@
             box-shadow: var(--shadow-md);
         }
 
+        .list-item.clickable {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .list-item.clickable:hover {
+            transform: translateY(-3px);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--primary-color);
+        }
+
+        .list-item.clickable:hover .list-item-title {
+            color: var(--primary-color);
+        }
+
         .list-item-content {
             flex-grow: 1;
             margin-right: 1rem;
@@ -992,7 +1007,7 @@
                     {% if campaigns %}
                     <div class="campaigns-list">
                         {% for campaign in campaigns %}
-                        <div class="list-item campaign-item" data-client-id="{{ campaign.client_id }}">
+                        <div class="list-item campaign-item clickable" data-client-id="{{ campaign.client_id }}" onclick="redirectToCampaignAnalytics('{{ campaign.id }}')">
                             <div class="list-item-content">
                                 <div class="list-item-title">{{ campaign.name }}</div>
                                 <div class="list-item-meta">
@@ -1004,6 +1019,11 @@
                                     <span><i class="fas fa-redo"></i> {{ campaign.max_attempts }} attempts</span>
                                     <span><i class="fas fa-clock"></i> {{ campaign.retry_interval }}min retry</span>
                                 </div>
+                            </div>
+                            <div class="list-item-actions">
+                                <span style="color: var(--primary-color); font-size: 0.875rem;">
+                                    <i class="fas fa-chart-bar"></i> View Analytics
+                                </span>
                             </div>
                         </div>
                         {% endfor %}
@@ -1393,6 +1413,11 @@
             } catch (error) {
                 console.error('Error refreshing dashboard metrics:', error);
             }
+        }
+
+        // Function to redirect to campaign analytics page
+        function redirectToCampaignAnalytics(campaignId) {
+            window.location.href = `/campaigns?campaign_id=${campaignId}&view=analytics`;
         }
 
         // Close modals when clicking outside
