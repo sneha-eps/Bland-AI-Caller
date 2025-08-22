@@ -1206,7 +1206,7 @@
                         <i class="fas fa-play"></i>
                         Start Campaign
                     </button>
-                    <button class="btn-view-results" onclick="loadCampaignAnalytics('{{ campaign.id }}')">
+                    <button class="btn-view-results" onclick="viewCampaignResults('{{ campaign.id }}')">
                         <i class="fas fa-chart-bar"></i>
                         View Results
                     </button>
@@ -1898,61 +1898,137 @@
             calls.forEach((call, index) => {
                 const row = document.createElement('tr');
 
-                // Use the call_status from analytics data if available, otherwise determine from transcript
-                let callStatus = call.call_status || 'pending';
-                let statusIcon = 'fa-clock';
+                // Use the call_status from analytics data if available
+                let callStatus = call.call_status || 'busy_voicemail';
+                let statusIcon = 'fa-phone-slash';
+                let statusClass = 'busy_voicemail';
 
-                // Set appropriate icon based on status
+                // Set appropriate icon and class based on status
                 switch (callStatus) {
                     case 'confirmed':
                         statusIcon = 'fa-check-circle';
+                        statusClass = 'confirmed';
                         break;
                     case 'cancelled':
                         statusIcon = 'fa-times-circle';
+                        statusClass = 'cancelled';
                         break;
                     case 'rescheduled':
                         statusIcon = 'fa-calendar-alt';
+                        statusClass = 'rescheduled';
+                        break;
+                    case 'busy_voicemail':
+                        statusIcon = 'fa-phone-slash';
+                        statusClass = 'busy_voicemail';
                         break;
                     case 'busy':
                         statusIcon = 'fa-phone-slash';
+                        statusClass = 'busy';
+                        callStatus = 'busy_voicemail'; // Normalize display
                         break;
                     case 'completed':
                         statusIcon = 'fa-check';
+                        statusClass = 'confirmed';
                         break;
                     case 'failed':
                         statusIcon = 'fa-exclamation-triangle';
+                        statusClass = 'busy_voicemail';
                         break;
                     default:
-                        statusIcon = 'fa-clock';
-                        callStatus = 'pending';
+                        statusIcon = 'fa-phone-slash';
+                        statusClass = 'busy_voicemail';
+                        callStatus = 'busy_voicemail';
                 }
 
-                // Create transcript preview
-                const transcriptPreview = call.transcript 
-                    ? (call.transcript.length > 50 ? call.transcript.substring(0, 50) + '...' : call.transcript)
-                    : (call.error || 'No transcript available');
+                // Create transcript preview with better handling
+                let transcriptPreview = 'No transcript available';
+                let transcriptSection = '';
+
+                if (call.transcript && call.transcript.trim()) {
+                    transcriptPreview = call.transcript.length > 100 
+                        ? call.transcript.substring(0, 100) + '...' 
+                        : call.transcript;
+                    
+                    transcriptSection = `
+                        <div class="transcript-preview" onclick="showFullTranscript('${encodeURIComponent(call.transcript)}', '${call.patient_name}')" 
+                             style="cursor: pointer; color: var(--primary-color); text-decoration: underline;">
+                            ${transcriptPreview}
+                        </div>
+                    `;
+                } else if (call.error) {
+                    transcriptPreview = call.error;
+                    transcriptSection = `<div class="transcript-preview" style="color: var(--danger-color);">${transcriptPreview}</div>`;
+                } else if (call.analysis_notes) {
+                    transcriptPreview = call.analysis_notes;
+                    transcriptSection = `<div class="transcript-preview" style="color: var(--text-tertiary);">${transcriptPreview}</div>`;
+                } else {
+                    transcriptSection = `<div class="transcript-preview" style="color: var(--text-tertiary);">${transcriptPreview}</div>`;
+                }
+
+                // Format status display
+                const statusDisplay = callStatus === 'busy_voicemail' ? 'Busy/Voicemail' : 
+                                    callStatus.charAt(0).toUpperCase() + callStatus.slice(1);
 
                 row.innerHTML = `
-                    <td>${call.patient_name || 'Unknown'}</td>
-                    <td>${call.phone_number || 'Unknown'}</td>
+                    <td style="font-weight: 600;">${call.patient_name || 'Unknown'}</td>
+                    <td style="font-family: monospace;">${call.phone_number || 'Unknown'}</td>
                     <td>
-                        <span class="call-status ${callStatus}">
+                        <span class="call-status ${statusClass}">
                             <i class="fas ${statusIcon}"></i>
-                            ${callStatus.charAt(0).toUpperCase() + callStatus.slice(1)}
+                            ${statusDisplay}
                         </span>
                     </td>
-                    <td>${formatDuration(call.duration || 0)}</td>
-                    <td>${call.created_at ? new Date(call.created_at).toLocaleString() : 'N/A'}</td>
-                    <td>
-                        <div class="transcript-preview">${transcriptPreview}</div>
-                        ${call.transcript && call.transcript.length > 50 ? `
-                            <button class="transcript-toggle" onclick="toggleTranscript(${index})">Show More</button>
-                            <div class="transcript-full" id="transcript-${index}">${call.transcript}</div>
-                        ` : ''}
+                    <td style="font-family: monospace; font-weight: 600;">${formatDuration(call.duration || 0)}</td>
+                    <td style="font-size: 0.875rem;">${call.created_at ? new Date(call.created_at).toLocaleString() : 'N/A'}</td>
+                    <td style="max-width: 300px;">
+                        ${transcriptSection}
                     </td>
                 `;
 
                 tbody.appendChild(row);
+            });
+        }
+
+        function showFullTranscript(encodedTranscript, patientName) {
+            const transcript = decodeURIComponent(encodedTranscript);
+            
+            // Create a modal-like dialog for full transcript
+            const modal = document.createElement('div');
+            modal.style.cssText = `
+                position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+                background: rgba(0,0,0,0.7); z-index: 3000; display: flex;
+                align-items: center; justify-content: center; backdrop-filter: blur(4px);
+            `;
+            
+            const content = document.createElement('div');
+            content.style.cssText = `
+                background: var(--bg-primary); border-radius: 12px; max-width: 80%;
+                max-height: 80%; padding: 2rem; box-shadow: var(--shadow-xl);
+                border: 1px solid var(--border-color); overflow-y: auto;
+            `;
+            
+            content.innerHTML = `
+                <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
+                    <h3 style="margin: 0; color: var(--text-primary);">Full Transcript - ${patientName}</h3>
+                    <button onclick="this.closest('.transcript-modal').remove()" 
+                            style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary); margin-left: auto;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div style="white-space: pre-wrap; line-height: 1.6; color: var(--text-primary); font-size: 0.95rem;">
+                    ${transcript}
+                </div>
+            `;
+            
+            modal.className = 'transcript-modal';
+            modal.appendChild(content);
+            document.body.appendChild(modal);
+            
+            // Close on background click
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.remove();
+                }
             });
         }
 

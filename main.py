@@ -1676,59 +1676,124 @@ async def process_csv(file: UploadFile = File(...),
 
 
 def analyze_call_transcript(transcript: str) -> str:
-    """Analyze transcript to determine call status"""
+    """
+    Analyze transcript to determine final call status based on patient's ultimate decision.
+    This function analyzes the entire conversation to understand the patient's final response.
+    """
     if not transcript or transcript.strip() == "":
         return 'busy_voicemail'
 
-    transcript_lower = transcript.lower()
-
-    # Check for confirmation indicators first (more specific)
-    confirmation_indicators = [
+    transcript_lower = transcript.lower().strip()
+    
+    # Split transcript into sentences for better analysis
+    sentences = [s.strip() for s in transcript_lower.replace('.', '|').replace('!', '|').replace('?', '|').split('|') if s.strip()]
+    
+    # Track decisions throughout the conversation (later decisions override earlier ones)
+    decisions = []
+    
+    # Define more comprehensive keyword patterns
+    confirmation_patterns = [
+        # Direct confirmations
         "yes, i'll be there", "yes i will be there", "yes that works", "yes that's fine",
-        "confirm", "yes", "see you then", "i'll be there", "sounds good",
-        "that works", "perfect", "okay", "sure", "will be there",
-        "looking forward", "great", "excellent", "wonderful"
+        "yes i can make it", "yes i will make it", "yes that's good", "yes sounds good",
+        "i'll be there", "i will be there", "i can make it", "i will make it",
+        "see you then", "see you there", "sounds good", "that works", "that's fine",
+        "perfect", "great", "excellent", "wonderful", "good", "okay", "sure",
+        "confirmed", "confirm", "looking forward", "will be there", "plan to be there",
+        # Contextual confirmations
+        "yes to confirm", "yes for confirmation", "confirming", "i confirm"
     ]
-
-    # Check for strong confirmation patterns
-    strong_confirmations = ["yes", "confirm", "i'll be there", "see you then", "that works", "sounds good"]
-    if any(indicator in transcript_lower for indicator in strong_confirmations):
-        # Make sure it's not a cancellation disguised as confirmation
-        if not any(cancel in transcript_lower for cancel in ["cancel", "can't make it", "won't be available"]):
-            return 'confirmed'
-
-    # Check for rescheduling indicators (should come before cancellation)
-    reschedule_indicators = [
-        "reschedule", "different time", "change the time", "move the appointment", "another time",
-        "can we schedule", "find a new time", "not that time", "different day",
-        "schedule for", "what about", "how about", "prefer", "better time"
+    
+    reschedule_patterns = [
+        # Direct reschedule requests
+        "reschedule", "reschedule it", "reschedule this", "reschedule the appointment",
+        "change the time", "change the date", "move the appointment", "different time",
+        "different date", "different day", "another time", "another date", "another day",
+        "can we schedule", "can we reschedule", "find a new time", "find another time",
+        "not that time", "not that date", "not that day", "better time", "better date",
+        "prefer", "would prefer", "i prefer", "schedule for", "what about", "how about",
+        "can we do", "is there", "available", "free", "open", "works better"
     ]
-    if any(indicator in transcript_lower for indicator in reschedule_indicators):
-        return 'rescheduled'
-
-    # Check for cancellation indicators
-    cancellation_indicators = [
-        "cancel", "can't make it", "won't be available", "not coming",
-        "unable to", "won't be able", "have to cancel", "need to cancel",
-        "don't need", "no longer need"
+    
+    cancellation_patterns = [
+        # Direct cancellations
+        "cancel", "cancel it", "cancel this", "cancel the appointment", "cancel my appointment",
+        "want to cancel", "need to cancel", "have to cancel", "going to cancel",
+        "i'm canceling", "i'm cancelling", "canceling", "cancelling",
+        # Inability to attend
+        "can't make it", "cannot make it", "won't make it", "will not make it",
+        "can't come", "cannot come", "won't come", "will not come",
+        "can't be there", "cannot be there", "won't be there", "will not be there",
+        "not available", "won't be available", "will not be available",
+        "unable to", "not coming", "don't need", "do not need", "no longer need"
     ]
-    if any(indicator in transcript_lower for indicator in cancellation_indicators):
-        return 'cancelled'
-
-    # Check for busy/voicemail indicators
-    busy_voicemail_indicators = [
-        "busy", "no answer", "disconnected", "line busy", "call ended immediately",
-        "hung up", "voicemail", "leave a message", "after the beep",
-        "not available", "please leave", "can't come to the phone", "mailbox",
-        "voice message", "recording", "dial tone"
+    
+    # Analyze each sentence for decision indicators
+    for i, sentence in enumerate(sentences):
+        sentence = sentence.strip()
+        
+        # Check for confirmations
+        for pattern in confirmation_patterns:
+            if pattern in sentence:
+                # Make sure it's not negated
+                if not any(neg in sentence for neg in ["don't", "do not", "won't", "will not", "can't", "cannot", "no", "not"]):
+                    decisions.append(('confirmed', i))
+                break
+        
+        # Check for rescheduling
+        for pattern in reschedule_patterns:
+            if pattern in sentence:
+                decisions.append(('rescheduled', i))
+                break
+        
+        # Check for cancellation
+        for pattern in cancellation_patterns:
+            if pattern in sentence:
+                decisions.append(('cancelled', i))
+                break
+    
+    # If we have decisions, return the last one (final decision)
+    if decisions:
+        final_decision = sorted(decisions, key=lambda x: x[1])[-1][0]
+        return final_decision
+    
+    # If no clear decision patterns found, analyze context more broadly
+    
+    # Check for voicemail/busy indicators
+    voicemail_indicators = [
+        "voicemail", "voice mail", "leave a message", "after the beep", "beep",
+        "mailbox", "voice message", "recording", "automated", "please leave",
+        "can't come to the phone", "not available", "busy", "no answer",
+        "disconnected", "line busy", "hung up", "dial tone", "no response"
     ]
-    if any(indicator in transcript_lower for indicator in busy_voicemail_indicators):
+    
+    if any(indicator in transcript_lower for indicator in voicemail_indicators):
         return 'busy_voicemail'
-
-    # If we have a meaningful transcript but can't categorize it, mark as completed
-    if len(transcript.strip()) > 10:  # At least some meaningful content
-        return 'confirmed'  # Default to confirmed if we have a real conversation
-
+    
+    # Check if conversation seems like a real interaction
+    interaction_indicators = [
+        "hello", "hi", "hey", "good morning", "good afternoon", "good evening",
+        "speaking", "this is", "who is", "what", "when", "where", "how",
+        "thank you", "thanks", "sorry", "excuse me", "pardon"
+    ]
+    
+    has_interaction = any(indicator in transcript_lower for indicator in interaction_indicators)
+    
+    # If we have a real conversation but no clear decision, analyze sentiment
+    if has_interaction and len(transcript.strip()) > 20:
+        # Look for positive vs negative sentiment in the overall response
+        positive_words = ["yes", "okay", "sure", "fine", "good", "great", "perfect", "alright"]
+        negative_words = ["no", "can't", "won't", "unable", "busy", "sorry", "problem"]
+        
+        positive_count = sum(1 for word in positive_words if word in transcript_lower)
+        negative_count = sum(1 for word in negative_words if word in transcript_lower)
+        
+        if positive_count > negative_count:
+            return 'confirmed'
+        elif negative_count > positive_count:
+            return 'busy_voicemail'
+    
+    # Default to busy_voicemail if we can't determine the status
     return 'busy_voicemail'
 
 
@@ -1962,7 +2027,7 @@ async def get_campaign_analytics(campaign_id: str):
                 }
             }
 
-        # Get detailed call information for each call
+        # Get detailed call information for each call with batch processing
         calls_with_details = []
         total_duration = 0
         status_counts = {
@@ -1976,81 +2041,136 @@ async def get_campaign_analytics(campaign_id: str):
 
         print(f"🔍 Processing {len(campaign_results['results'])} calls for analytics")
 
-        for result in campaign_results['results']:
-            call_details = {
-                'patient_name': result.get('patient_name', 'Unknown'),
-                'phone_number': result.get('phone_number', 'Unknown'),
-                'success': result.get('success', False),
-                'error': result.get('error'),
-                'call_id': result.get('call_id'),
-                'transcript': None,
-                'duration': 0,
-                'call_status': 'failed',
-                'created_at': campaign_results.get('started_at', datetime.now().isoformat())
-            }
+        # Process calls in batches to avoid overwhelming the API
+        batch_size = 5
+        results_list = campaign_results['results']
 
-            # If call was successful and has call_id, try to get detailed info
-            if result.get('success') and result.get('call_id'):
-                try:
-                    print(f"🔍 Fetching call details for call_id: {result.get('call_id')}")
+        for i in range(0, len(results_list), batch_size):
+            batch = results_list[i:i + batch_size]
+            batch_calls = []
 
-                    async with aiohttp.ClientSession() as session:
-                        async with session.get(
-                            f"https://api.bland.ai/v1/calls/{result['call_id']}",
-                            headers={"Authorization": f"Bearer {api_key}"},
-                            timeout=aiohttp.ClientTimeout(total=30)
-                        ) as call_response:
+            # Process each call in the batch
+            for result in batch:
+                call_details = {
+                    'patient_name': result.get('patient_name', 'Unknown'),
+                    'phone_number': result.get('phone_number', 'Unknown'),
+                    'success': result.get('success', False),
+                    'error': result.get('error'),
+                    'call_id': result.get('call_id'),
+                    'transcript': None,
+                    'duration': 0,
+                    'call_status': 'failed',
+                    'created_at': campaign_results.get('started_at', datetime.now().isoformat()),
+                    'analysis_notes': ''
+                }
 
-                            if call_response.status == 200:
-                                call_data = await call_response.json()
+                # If call was successful and has call_id, try to get detailed info
+                if result.get('success') and result.get('call_id'):
+                    try:
+                        print(f"🔍 Fetching call details for call_id: {result.get('call_id')}")
 
-                                # Get transcript and other details
-                                transcript = call_data.get('transcript', '')
-                                call_details['transcript'] = transcript
-                                call_details['created_at'] = call_data.get('created_at', call_details['created_at'])
+                        async with aiohttp.ClientSession() as session:
+                            async with session.get(
+                                f"https://api.bland.ai/v1/calls/{result['call_id']}",
+                                headers={"Authorization": f"Bearer {api_key}"},
+                                timeout=aiohttp.ClientTimeout(total=45)
+                            ) as call_response:
 
-                                # Parse duration more robustly
-                                raw_duration = call_data.get('duration', 0)
-                                duration_seconds = parse_duration(raw_duration)
+                                if call_response.status == 200:
+                                    call_data = await call_response.json()
 
-                                call_details['duration'] = duration_seconds
-                                total_duration += duration_seconds
+                                    # Get transcript and other details
+                                    transcript = call_data.get('transcript', '')
+                                    call_length = call_data.get('call_length', call_data.get('duration', 0))
+                                    
+                                    call_details['transcript'] = transcript
+                                    call_details['created_at'] = call_data.get('created_at', call_details['created_at'])
 
-                                # Analyze transcript for status using our improved function
-                                call_status = analyze_call_transcript(transcript)
-                                call_details['call_status'] = call_status
+                                    # Parse duration more robustly - try multiple fields
+                                    raw_duration = call_length or call_data.get('duration', 0) or call_data.get('call_duration', 0)
+                                    duration_seconds = parse_duration(raw_duration)
 
-                                # Handle legacy 'busy' status by converting to 'busy_voicemail'
-                                if call_status == 'busy':
-                                    call_status = 'busy_voicemail'
+                                    call_details['duration'] = duration_seconds
+                                    total_duration += duration_seconds
+
+                                    # Analyze transcript for status using our enhanced function
+                                    if transcript and transcript.strip():
+                                        call_status = analyze_call_transcript(transcript)
+                                        call_details['analysis_notes'] = f"Analyzed {len(transcript)} characters of transcript"
+                                    else:
+                                        call_status = 'busy_voicemail'
+                                        call_details['analysis_notes'] = "No transcript available - likely voicemail or no answer"
+
+                                    call_details['call_status'] = call_status
+
+                                    # Count the status
+                                    if call_status in status_counts:
+                                        status_counts[call_status] += 1
+                                    else:
+                                        # Fallback for unexpected statuses
+                                        status_counts['busy_voicemail'] += 1
+                                        call_details['call_status'] = 'busy_voicemail'
+
+                                    print(f"✅ Call details retrieved for {call_details['patient_name']}: Status={call_details['call_status']}, Duration={duration_seconds}s, Transcript length={len(transcript)}")
+                                    
+                                elif call_response.status == 404:
+                                    print(f"⚠️ Call {result.get('call_id')} not found in Bland AI")
                                     call_details['call_status'] = 'busy_voicemail'
-
-                                # Make sure the status exists in our counts dictionary
-                                if call_status in status_counts:
-                                    status_counts[call_status] += 1
-                                else:
-                                    # Fallback for unexpected statuses
+                                    call_details['analysis_notes'] = "Call not found in API"
                                     status_counts['busy_voicemail'] += 1
+                                elif call_response.status == 429:
+                                    print(f"⏳ Rate limit hit, waiting and retrying...")
+                                    await asyncio.sleep(2)
+                                    # Retry once
+                                    async with session.get(
+                                        f"https://api.bland.ai/v1/calls/{result['call_id']}",
+                                        headers={"Authorization": f"Bearer {api_key}"},
+                                        timeout=aiohttp.ClientTimeout(total=45)
+                                    ) as retry_response:
+                                        if retry_response.status == 200:
+                                            call_data = await retry_response.json()
+                                            transcript = call_data.get('transcript', '')
+                                            call_details['transcript'] = transcript
+                                            if transcript:
+                                                call_details['call_status'] = analyze_call_transcript(transcript)
+                                                status_counts[call_details['call_status']] += 1
+                                            else:
+                                                call_details['call_status'] = 'busy_voicemail'
+                                                status_counts['busy_voicemail'] += 1
+                                        else:
+                                            call_details['call_status'] = 'busy_voicemail'
+                                            status_counts['busy_voicemail'] += 1
+                                else:
+                                    response_text = await call_response.text()
+                                    print(f"❌ API error for call {result.get('call_id')}: Status {call_response.status}")
                                     call_details['call_status'] = 'busy_voicemail'
+                                    call_details['analysis_notes'] = f"API error: {call_response.status}"
+                                    status_counts['busy_voicemail'] += 1
 
-                                print(f"✅ Call details retrieved for {call_details['patient_name']}: Status={call_details['call_status']}, Duration={duration_seconds}s, Transcript length={len(transcript)}")
-                            else:
-                                response_text = await call_response.text()
-                                print(f"❌ Failed to get call details: Status {call_response.status}, Response: {response_text}")
-                                call_details['call_status'] = 'failed'
-                                status_counts['failed'] += 1
+                    except asyncio.TimeoutError:
+                        print(f"⏱️ Timeout getting call details for {result.get('call_id')}")
+                        call_details['call_status'] = 'busy_voicemail'
+                        call_details['analysis_notes'] = "API timeout"
+                        status_counts['busy_voicemail'] += 1
+                    except Exception as e:
+                        print(f"❌ Exception getting call details for {result.get('call_id')}: {str(e)}")
+                        call_details['call_status'] = 'busy_voicemail'
+                        call_details['analysis_notes'] = f"Error: {str(e)}"
+                        status_counts['busy_voicemail'] += 1
+                else:
+                    # Failed calls or calls without call_id count as busy_voicemail
+                    call_details['call_status'] = 'busy_voicemail'
+                    call_details['analysis_notes'] = "Call failed or no call_id"
+                    status_counts['busy_voicemail'] += 1
 
-                except Exception as e:
-                    # If we can't get call details, count as failed
-                    call_details['call_status'] = 'failed'
-                    status_counts['failed'] += 1
-                    print(f"❌ Error getting call details for {result.get('call_id')}: {str(e)}")
-            else:
-                # Failed calls count as busy_voicemail (no connection made)
-                call_details['call_status'] = 'busy_voicemail'
-                status_counts['busy_voicemail'] += 1
+                batch_calls.append(call_details)
 
-            calls_with_details.append(call_details)
+            # Add batch to main list
+            calls_with_details.extend(batch_calls)
+
+            # Small delay between batches to be respectful to API
+            if i + batch_size < len(results_list):
+                await asyncio.sleep(1)
 
         # Calculate analytics
         total_calls = len(campaign_results['results'])
