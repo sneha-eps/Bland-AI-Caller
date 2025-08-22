@@ -1,0 +1,12 @@
+{
+  "c4732973-06dc-43d8-8ec7-f7ec8dcc9fc5": {
+    "id": "c4732973-06dc-43d8-8ec7-f7ec8dcc9fc5",
+    "name": "Testing",
+    "client_id": "fd18d957-f59e-481d-b556-53c4e0d48eb6",
+    "max_attempts": 2,
+    "retry_interval": 30,
+    "country_code": "+91",
+    "file_name": "Untitled spreadsheet - Untitled spreadsheet - Sheet1 (1).csv",
+    "file_data_b64": "cGhvbmVfbnVtYmVyLHBhdGllbnRfbmFtZSxvZmZpY2VfbG9jYXRpb24sZGF0ZSx0aW1lLHByb3ZpZGVyX25hbWUNCjcwMTQ2MDgzMjUsU25laGEsIjEyODgxIEkzNSwgTGl2ZSBPYWssIFRYIDc4MjMzLCBVbml0ZWQgU3RhdGVzIiwwOC8yMC8yMDI1LDE1OjAwLERyLiBKb2huDQo="
+  }
+}

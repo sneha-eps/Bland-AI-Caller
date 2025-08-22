@@ -1,0 +1,12 @@
+{
+  "fd18d957-f59e-481d-b556-53c4e0d48eb6": {
+    "id": "fd18d957-f59e-481d-b556-53c4e0d48eb6",
+    "name": "Hillside Primary Care",
+    "phone_number": "210-742-6555",
+    "email": "liveoakoffice@hillsideprimarycare.com",
+    "website_url": "https://www.hillsideprimarycare.com/",
+    "language": "english",
+    "call_type": "appointment_confirmation",
+    "voice": "Paige"
+  }
+}

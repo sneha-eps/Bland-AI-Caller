@@ -1,0 +1,18 @@
+{
+  "admin": {
+    "id": "admin",
+    "username": "admin",
+    "password_hash": "240be518fabd2724ddb6f04eeb1da5967448d7e831c08c8fa822809f74c720a9",
+    "role": "admin",
+    "email": "admin@company.com",
+    "created_at": "2025-08-22T05:30:02.389560"
+  },
+  "user": {
+    "id": "user",
+    "username": "user",
+    "password_hash": "e606e38b0d8c19b24cf0ee3808183162ea7cd63ff7912dbb22b5e803286b4446",
+    "role": "user",
+    "email": "user@company.com",
+    "created_at": "2025-08-22T05:30:02.389579"
+  }
+}
