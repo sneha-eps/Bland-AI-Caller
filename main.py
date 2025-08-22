@@ -43,28 +43,173 @@ clients_db = {}
 campaigns_db = {}
 campaign_results_db = {}
 
-# User authentication storage
-users_db = {
-    "admin": {
-        "id": "admin",
-        "username": "admin",
-        "password_hash": hashlib.sha256("admin123".encode()).hexdigest(),
-        "role": "admin",
-        "email": "admin@company.com",
-        "created_at": datetime.now().isoformat()
-    },
-    "user": {
-        "id": "user", 
-        "username": "user",
-        "password_hash": hashlib.sha256("user123".encode()).hexdigest(),
-        "role": "user",
-        "email": "user@company.com",
-        "created_at": datetime.now().isoformat()
-    }
-}
+import json
+import os
 
-# Session storage (in production, use proper session management)
-sessions_db = {}
+# File paths for persistent storage
+USERS_FILE = "data/users.json"
+SESSIONS_FILE = "data/sessions.json"
+CLIENTS_FILE = "data/clients.json"
+CAMPAIGNS_FILE = "data/campaigns.json"
+CAMPAIGN_RESULTS_FILE = "data/campaign_results.json"
+
+def ensure_data_directory():
+    """Ensure data directory exists"""
+    os.makedirs("data", exist_ok=True)
+
+def load_users_db():
+    """Load users from file or create default users"""
+    ensure_data_directory()
+    if os.path.exists(USERS_FILE):
+        try:
+            with open(USERS_FILE, 'r') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            pass
+    
+    # Default users if file doesn't exist or is corrupted
+    default_users = {
+        "admin": {
+            "id": "admin",
+            "username": "admin",
+            "password_hash": hashlib.sha256("admin123".encode()).hexdigest(),
+            "role": "admin",
+            "email": "admin@company.com",
+            "created_at": datetime.now().isoformat()
+        },
+        "user": {
+            "id": "user", 
+            "username": "user",
+            "password_hash": hashlib.sha256("user123".encode()).hexdigest(),
+            "role": "user",
+            "email": "user@company.com",
+            "created_at": datetime.now().isoformat()
+        }
+    }
+    save_users_db(default_users)
+    return default_users
+
+def save_users_db(users_data):
+    """Save users to file"""
+    ensure_data_directory()
+    with open(USERS_FILE, 'w') as f:
+        json.dump(users_data, f, indent=2)
+
+def load_sessions_db():
+    """Load sessions from file"""
+    ensure_data_directory()
+    if os.path.exists(SESSIONS_FILE):
+        try:
+            with open(SESSIONS_FILE, 'r') as f:
+                sessions_data = json.load(f)
+                # Convert datetime strings back to datetime objects and clean expired sessions
+                current_time = datetime.now()
+                valid_sessions = {}
+                for token, session in sessions_data.items():
+                    try:
+                        expires_at = datetime.fromisoformat(session['expires_at'])
+                        if expires_at > current_time:
+                            session['created_at'] = datetime.fromisoformat(session['created_at'])
+                            session['expires_at'] = expires_at
+                            valid_sessions[token] = session
+                    except (KeyError, ValueError):
+                        continue
+                return valid_sessions
+        except (json.JSONDecodeError, IOError):
+            pass
+    return {}
+
+def save_sessions_db(sessions_data):
+    """Save sessions to file"""
+    ensure_data_directory()
+    # Convert datetime objects to strings for JSON serialization
+    serializable_sessions = {}
+    for token, session in sessions_data.items():
+        serializable_sessions[token] = {
+            "user_id": session["user_id"],
+            "created_at": session["created_at"].isoformat() if isinstance(session["created_at"], datetime) else session["created_at"],
+            "expires_at": session["expires_at"].isoformat() if isinstance(session["expires_at"], datetime) else session["expires_at"]
+        }
+    
+    with open(SESSIONS_FILE, 'w') as f:
+        json.dump(serializable_sessions, f, indent=2)
+
+def load_clients_db():
+    """Load clients from file"""
+    ensure_data_directory()
+    if os.path.exists(CLIENTS_FILE):
+        try:
+            with open(CLIENTS_FILE, 'r') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            pass
+    return {}
+
+def save_clients_db(clients_data):
+    """Save clients to file"""
+    ensure_data_directory()
+    with open(CLIENTS_FILE, 'w') as f:
+        json.dump(clients_data, f, indent=2)
+
+def load_campaigns_db():
+    """Load campaigns from file"""
+    ensure_data_directory()
+    if os.path.exists(CAMPAIGNS_FILE):
+        try:
+            with open(CAMPAIGNS_FILE, 'r') as f:
+                campaigns_data = json.load(f)
+                # Convert base64 file data back to bytes
+                for campaign in campaigns_data.values():
+                    if 'file_data_b64' in campaign:
+                        import base64
+                        campaign['file_data'] = base64.b64decode(campaign['file_data_b64'])
+                        del campaign['file_data_b64']
+                return campaigns_data
+        except (json.JSONDecodeError, IOError):
+            pass
+    return {}
+
+def save_campaigns_db(campaigns_data):
+    """Save campaigns to file"""
+    ensure_data_directory()
+    # Convert bytes to base64 for JSON serialization
+    serializable_campaigns = {}
+    for campaign_id, campaign in campaigns_data.items():
+        campaign_copy = campaign.copy()
+        if 'file_data' in campaign_copy and isinstance(campaign_copy['file_data'], bytes):
+            import base64
+            campaign_copy['file_data_b64'] = base64.b64encode(campaign_copy['file_data']).decode('utf-8')
+            del campaign_copy['file_data']
+        serializable_campaigns[campaign_id] = campaign_copy
+    
+    with open(CAMPAIGNS_FILE, 'w') as f:
+        json.dump(serializable_campaigns, f, indent=2)
+
+def load_campaign_results_db():
+    """Load campaign results from file"""
+    ensure_data_directory()
+    if os.path.exists(CAMPAIGN_RESULTS_FILE):
+        try:
+            with open(CAMPAIGN_RESULTS_FILE, 'r') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            pass
+    return {}
+
+def save_campaign_results_db(results_data):
+    """Save campaign results to file"""
+    ensure_data_directory()
+    with open(CAMPAIGN_RESULTS_FILE, 'w') as f:
+        json.dump(results_data, f, indent=2)
+
+# Initialize databases from persistent storage
+users_db = load_users_db()
+sessions_db = load_sessions_db()
+clients_db = load_clients_db()
+campaigns_db = load_campaigns_db()
+campaign_results_db = load_campaign_results_db()
+
+print(f"✅ Loaded {len(users_db)} users, {len(sessions_db)} sessions, {len(clients_db)} clients, {len(campaigns_db)} campaigns, {len(campaign_results_db)} campaign results from persistent storage")
 
 security = HTTPBasic()
 
@@ -300,6 +445,7 @@ def create_session(user_id: str) -> str:
         "created_at": datetime.now(),
         "expires_at": datetime.now() + timedelta(hours=24)
     }
+    save_sessions_db(sessions_db)
     return session_token
 
 def get_current_user(request: Request) -> Optional[Dict]:
@@ -699,6 +845,7 @@ async def signup(request: Request, user_data: UserCreate):
         }
         
         users_db[user_id] = new_user
+        save_users_db(users_db)
         
         # Create session
         session_token = create_session(user_id)
@@ -725,6 +872,7 @@ async def logout(request: Request):
     session_token = request.cookies.get("session_token")
     if session_token and session_token in sessions_db:
         del sessions_db[session_token]
+        save_sessions_db(sessions_db)
     
     # Create response that clears the session cookie
     from fastapi.responses import JSONResponse
@@ -866,6 +1014,7 @@ async def add_client(request: Request, client: Client):
     client_id = str(uuid.uuid4())
     client.id = client_id
     clients_db[client_id] = client.dict()
+    save_clients_db(clients_db)
     return {"success": True, "client_id": client_id, "message": "Client added successfully"}
 
 @app.get("/api/users")
@@ -927,6 +1076,7 @@ async def add_campaign(
         }
 
         campaigns_db[campaign_id] = campaign_data
+        save_campaigns_db(campaigns_db)
         print(f"✅ Campaign '{name}' created successfully with ID: {campaign_id}")
         return {"success": True, "campaign_id": campaign_id, "message": "Campaign created successfully"}
 
@@ -972,6 +1122,7 @@ async def update_campaign(
         campaign["file_data"] = file_content
 
     campaigns_db[campaign_id] = campaign
+    save_campaigns_db(campaigns_db)
     return {"success": True, "message": "Campaign updated successfully"}
 
 @app.post("/start_campaign/{campaign_id}")
@@ -1102,6 +1253,7 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
 
         # Store in the global results database
         campaign_results_db[campaign_id] = campaign_results
+        save_campaign_results_db(campaign_results_db)
         print(f"✅ Stored campaign results for {campaign_id}. Total campaigns with results: {len(campaign_results_db)}")
         print(f"✅ Campaign results keys: {list(campaign_results_db.keys())}")
         print(f"✅ This campaign results: Total={len(results)}, Success={successful_calls}, Failed={failed_calls}")
