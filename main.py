@@ -1218,15 +1218,16 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
                 office_location=safe_str(row.get('office_location', '')))
             call_requests.append(call_request)
 
-        # Process all valid calls with retry logic
+        # Process all valid calls with retry logic and batch delays
         if call_requests:
             max_attempts = campaign.get('max_attempts', 3)
             retry_interval_minutes = campaign.get('retry_interval', 30)
 
             print(f"🚀 Starting campaign '{campaign['name']}' with retry logic - Max attempts: {max_attempts}, Retry interval: {retry_interval_minutes} min")
+            print(f"📊 Total calls to process: {len(call_requests)} (with 5-minute delay after every 5 calls)")
 
-            # Process calls with retry logic
-            final_results = await process_calls_with_retry(
+            # Process calls with retry logic and batch delays
+            final_results = await process_calls_with_retry_and_batching(
                 call_requests,
                 api_key,
                 max_attempts,
@@ -1272,9 +1273,11 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
         raise HTTPException(status_code=500, detail=f"Error starting campaign: {str(e)}")
 
 
-async def process_calls_with_retry(call_requests, api_key, max_attempts, retry_interval_minutes, campaign_name):
-    """Process calls with retry logic and send voicemail after max attempts"""
+async def process_calls_with_retry_and_batching(call_requests, api_key, max_attempts, retry_interval_minutes, campaign_name):
+    """Process calls with retry logic, batching (5-minute delay after every 5 calls), and send voicemail after max attempts"""
     final_results = []
+    BATCH_SIZE = 5
+    BATCH_DELAY_MINUTES = 5
 
     # Track retry status for each call
     retry_tracker = {}
@@ -1287,9 +1290,12 @@ async def process_calls_with_retry(call_requests, api_key, max_attempts, retry_i
         }
 
     # Create semaphore to limit concurrent calls
-    semaphore = asyncio.Semaphore(10)
+    semaphore = asyncio.Semaphore(5)  # Reduced to 5 to match batch size
 
+    attempt_number = 0
     while True:
+        attempt_number += 1
+        
         # Find calls that need retry attempts
         pending_calls = []
         pending_indices = []
@@ -1302,86 +1308,100 @@ async def process_calls_with_retry(call_requests, api_key, max_attempts, retry_i
         if not pending_calls:
             break  # All calls completed or exhausted retries
 
-        current_attempt = max(retry_tracker[i]['attempts'] for i in pending_indices) + 1
-        print(f"🔄 Campaign '{campaign_name}' - Starting attempt {current_attempt} for {len(pending_calls)} calls")
+        print(f"🔄 Campaign '{campaign_name}' - Attempt {attempt_number}: Processing {len(pending_calls)} calls in batches of {BATCH_SIZE}")
 
-        # Execute current batch of calls
-        tasks = [
-            make_single_call_async(call_request, api_key, semaphore)
-            for call_request in pending_calls
-        ]
+        # Process calls in batches with delays
+        for batch_start in range(0, len(pending_calls), BATCH_SIZE):
+            batch_end = min(batch_start + BATCH_SIZE, len(pending_calls))
+            batch_calls = pending_calls[batch_start:batch_end]
+            batch_indices = pending_indices[batch_start:batch_end]
+            batch_number = (batch_start // BATCH_SIZE) + 1
+            total_batches = (len(pending_calls) + BATCH_SIZE - 1) // BATCH_SIZE
 
-        batch_results = await asyncio.gather(*tasks)
+            print(f"📞 Processing batch {batch_number}/{total_batches} ({len(batch_calls)} calls)")
 
-        # Process results and check call status
-        for idx, result in enumerate(batch_results):
-            tracker_idx = pending_indices[idx]
-            call_request = pending_calls[idx]
-            retry_tracker[tracker_idx]['attempts'] += 1
+            # Execute current batch of calls
+            tasks = [
+                make_single_call_async(call_request, api_key, semaphore)
+                for call_request in batch_calls
+            ]
 
-            # Check if call was successful and determine actual status
-            call_status = 'failed'
-            if result.success and result.call_id:
-                try:
-                    # Wait for call to complete and get status
-                    await asyncio.sleep(3)
+            batch_results = await asyncio.gather(*tasks)
 
-                    async with aiohttp.ClientSession() as session:
-                        async with session.get(
-                            f"https://api.bland.ai/v1/calls/{result.call_id}",
-                            headers={"Authorization": f"Bearer {api_key}"},
-                            timeout=aiohttp.ClientTimeout(total=15)
-                        ) as call_response:
+            # Process results and check call status for this batch
+            for idx, result in enumerate(batch_results):
+                tracker_idx = batch_indices[idx]
+                call_request = batch_calls[idx]
+                retry_tracker[tracker_idx]['attempts'] += 1
 
-                            if call_response.status == 200:
-                                call_data = await call_response.json()
-                                transcript = call_data.get('transcript', '')
-                                call_status = analyze_call_transcript(transcript)
-
-                                # Update result with transcript and status
-                                result.transcript = transcript
-                                result.call_status = call_status
-                            else:
-                                call_status = 'busy_voicemail'
-
-                except Exception as e:
-                    print(f"❌ Error checking call status for {call_request.patient_name}: {str(e)}")
-                    call_status = 'busy_voicemail'
-            else:
+                # Check if call was successful and determine actual status
                 call_status = 'failed'
+                if result.success and result.call_id:
+                    try:
+                        # Wait for call to complete and get status
+                        await asyncio.sleep(3)
 
-            # Check if call is completed successfully (patient answered and responded)
-            if call_status in ['confirmed', 'cancelled', 'rescheduled']:
-                # Call completed successfully
-                retry_tracker[tracker_idx]['completed'] = True
-                retry_tracker[tracker_idx]['final_result'] = result
-                print(f"✅ Call to {call_request.patient_name} completed with status: {call_status}")
+                        async with aiohttp.ClientSession() as session:
+                            async with session.get(
+                                f"https://api.bland.ai/v1/calls/{result.call_id}",
+                                headers={"Authorization": f"Bearer {api_key}"},
+                                timeout=aiohttp.ClientTimeout(total=15)
+                            ) as call_response:
 
-            elif retry_tracker[tracker_idx]['attempts'] >= max_attempts:
-                # Max attempts reached, send voicemail
-                retry_tracker[tracker_idx]['completed'] = True
-                retry_tracker[tracker_idx]['final_result'] = result
+                                if call_response.status == 200:
+                                    call_data = await call_response.json()
+                                    transcript = call_data.get('transcript', '')
+                                    call_status = analyze_call_transcript(transcript)
 
-                print(f"📞 Max attempts ({max_attempts}) reached for {call_request.patient_name}, sending voicemail...")
+                                    # Update result with transcript and status
+                                    result.transcript = transcript
+                                    result.call_status = call_status
+                                else:
+                                    call_status = 'busy_voicemail'
 
-                # Send voicemail after all attempts exhausted
-                try:
-                    await send_final_voicemail(call_request, api_key)
-                    print(f"📬 Final voicemail sent to {call_request.patient_name}")
-                except Exception as e:
-                    print(f"❌ Error sending final voicemail to {call_request.patient_name}: {str(e)}")
+                    except Exception as e:
+                        print(f"❌ Error checking call status for {call_request.patient_name}: {str(e)}")
+                        call_status = 'busy_voicemail'
+                else:
+                    call_status = 'failed'
 
-            else:
-                # Call needs retry
-                remaining_attempts = max_attempts - retry_tracker[tracker_idx]['attempts']
-                print(f"⏳ Call to {call_request.patient_name} will be retried (Status: {call_status}, Remaining attempts: {remaining_attempts})")
+                # Check if call is completed successfully (patient answered and responded)
+                if call_status in ['confirmed', 'cancelled', 'rescheduled']:
+                    # Call completed successfully
+                    retry_tracker[tracker_idx]['completed'] = True
+                    retry_tracker[tracker_idx]['final_result'] = result
+                    print(f"✅ Call to {call_request.patient_name} completed with status: {call_status}")
 
-        # If there are more attempts needed, wait for retry interval
+                elif retry_tracker[tracker_idx]['attempts'] >= max_attempts:
+                    # Max attempts reached, send voicemail
+                    retry_tracker[tracker_idx]['completed'] = True
+                    retry_tracker[tracker_idx]['final_result'] = result
+
+                    print(f"📞 Max attempts ({max_attempts}) reached for {call_request.patient_name}, sending voicemail...")
+
+                    # Send voicemail after all attempts exhausted
+                    try:
+                        await send_final_voicemail(call_request, api_key)
+                        print(f"📬 Final voicemail sent to {call_request.patient_name}")
+                    except Exception as e:
+                        print(f"❌ Error sending final voicemail to {call_request.patient_name}: {str(e)}")
+
+                else:
+                    # Call needs retry
+                    remaining_attempts = max_attempts - retry_tracker[tracker_idx]['attempts']
+                    print(f"⏳ Call to {call_request.patient_name} will be retried (Status: {call_status}, Remaining attempts: {remaining_attempts})")
+
+            # Add batch delay if not the last batch and there are more calls to process
+            if batch_end < len(pending_calls):
+                print(f"⏰ Batch {batch_number} completed. Waiting {BATCH_DELAY_MINUTES} minutes before next batch...")
+                await asyncio.sleep(BATCH_DELAY_MINUTES * 60)  # Convert minutes to seconds
+
+        # Check if there are more attempts needed for retry interval
         pending_retries = [i for i, tracker in retry_tracker.items()
                           if not tracker['completed'] and tracker['attempts'] < max_attempts]
 
         if pending_retries:
-            print(f"⏰ Waiting {retry_interval_minutes} minutes before next retry attempt...")
+            print(f"⏰ Attempt {attempt_number} completed. Waiting {retry_interval_minutes} minutes before next retry attempt...")
             await asyncio.sleep(retry_interval_minutes * 60)  # Convert minutes to seconds
 
     # Collect all final results
@@ -1389,7 +1409,13 @@ async def process_calls_with_retry(call_requests, api_key, max_attempts, retry_i
         if tracker['final_result']:
             final_results.append(tracker['final_result'])
 
+    print(f"🎯 Campaign '{campaign_name}' completed! Processed {len(final_results)} calls with batching and retry logic.")
     return final_results
+
+# Keep the original function for backward compatibility (in case it's used elsewhere)
+async def process_calls_with_retry(call_requests, api_key, max_attempts, retry_interval_minutes, campaign_name):
+    """Legacy function - now redirects to new batching function"""
+    return await process_calls_with_retry_and_batching(call_requests, api_key, max_attempts, retry_interval_minutes, campaign_name)
 
 
 async def send_final_voicemail(call_request: CallRequest, api_key: str):
