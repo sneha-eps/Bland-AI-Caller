@@ -1296,6 +1296,12 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
     while True:
         attempt_number += 1
         
+        # Check if all calls have reached final status (early termination)
+        all_completed = all(tracker['completed'] for tracker in retry_tracker.values())
+        if all_completed:
+            print(f"🎯 Campaign '{campaign_name}' - All calls have reached final status. Ending campaign early.")
+            break
+        
         # Find calls that need retry attempts
         pending_calls = []
         pending_indices = []
@@ -1306,6 +1312,7 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
                 pending_indices.append(i)
 
         if not pending_calls:
+            print(f"🎯 Campaign '{campaign_name}' - No more pending calls. Campaign completed.")
             break  # All calls completed or exhausted retries
 
         print(f"🔄 Campaign '{campaign_name}' - Attempt {attempt_number}: Processing {len(pending_calls)} calls in batches of {BATCH_SIZE}")
@@ -1396,20 +1403,53 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
                 print(f"⏰ Batch {batch_number} completed. Waiting {BATCH_DELAY_MINUTES} minutes before next batch...")
                 await asyncio.sleep(BATCH_DELAY_MINUTES * 60)  # Convert minutes to seconds
 
+        # Check campaign completion status after each attempt
+        completed_calls = sum(1 for tracker in retry_tracker.values() if tracker['completed'])
+        total_calls = len(retry_tracker)
+        
+        print(f"📊 Campaign '{campaign_name}' - Attempt {attempt_number} summary: {completed_calls}/{total_calls} calls completed")
+        
         # Check if there are more attempts needed for retry interval
         pending_retries = [i for i, tracker in retry_tracker.items()
                           if not tracker['completed'] and tracker['attempts'] < max_attempts]
 
         if pending_retries:
-            print(f"⏰ Attempt {attempt_number} completed. Waiting {retry_interval_minutes} minutes before next retry attempt...")
+            print(f"⏰ Attempt {attempt_number} completed. {len(pending_retries)} calls still pending. Waiting {retry_interval_minutes} minutes before next retry attempt...")
             await asyncio.sleep(retry_interval_minutes * 60)  # Convert minutes to seconds
+        else:
+            print(f"✅ Campaign '{campaign_name}' - All calls have either completed or exhausted max attempts.")
 
-    # Collect all final results
+    # Collect all final results and generate final summary
+    status_summary = {
+        'confirmed': 0,
+        'cancelled': 0, 
+        'rescheduled': 0,
+        'busy_voicemail': 0,
+        'failed': 0
+    }
+    
     for tracker in retry_tracker.values():
         if tracker['final_result']:
             final_results.append(tracker['final_result'])
+            
+            # Count final statuses for summary
+            if hasattr(tracker['final_result'], 'call_status') and tracker['final_result'].call_status:
+                status = tracker['final_result'].call_status
+                if status in status_summary:
+                    status_summary[status] += 1
+                else:
+                    status_summary['failed'] += 1
+            else:
+                status_summary['failed'] += 1
 
-    print(f"🎯 Campaign '{campaign_name}' completed! Processed {len(final_results)} calls with batching and retry logic.")
+    print(f"🎯 Campaign '{campaign_name}' completed! Final summary:")
+    print(f"   📞 Total calls processed: {len(final_results)}")
+    print(f"   ✅ Confirmed: {status_summary['confirmed']}")
+    print(f"   ❌ Cancelled: {status_summary['cancelled']}")
+    print(f"   🔄 Rescheduled: {status_summary['rescheduled']}")
+    print(f"   📧 Busy/Voicemail: {status_summary['busy_voicemail']}")
+    print(f"   💥 Failed: {status_summary['failed']}")
+    
     return final_results
 
 # Keep the original function for backward compatibility (in case it's used elsewhere)
