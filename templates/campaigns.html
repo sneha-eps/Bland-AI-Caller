@@ -1002,6 +1002,17 @@
             color: #155724;
         }
 
+        .status-not_available {
+            background-color: #fff3cd;
+            color: #856404;
+        }
+
+        .status-wrong_number {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        }
+
         .status-cancelled {
             background-color: #f8d7da;
             color: #721c24;
@@ -1921,6 +1932,14 @@
                         statusIcon = 'fa-phone-slash';
                         statusClass = 'busy_voicemail';
                         break;
+                    case 'not_available':
+                        statusIcon = 'fa-user-clock';
+                        statusClass = 'not_available';
+                        break;
+                    case 'wrong_number':
+                        statusIcon = 'fa-phone-times';
+                        statusClass = 'wrong_number';
+                        break;
                     case 'busy':
                         statusIcon = 'fa-phone-slash';
                         statusClass = 'busy';
@@ -1966,8 +1985,21 @@
                 }
 
                 // Format status display
-                const statusDisplay = callStatus === 'busy_voicemail' ? 'Busy/Voicemail' : 
-                                    callStatus.charAt(0).toUpperCase() + callStatus.slice(1);
+                const // Format status display
+                let statusDisplay;
+                switch(callStatus) {
+                    case 'busy_voicemail':
+                        statusDisplay = 'Busy/Voicemail';
+                        break;
+                    case 'not_available':
+                        statusDisplay = 'Not Available';
+                        break;
+                    case 'wrong_number':
+                        statusDisplay = 'Wrong Number';
+                        break;
+                    default:
+                        statusDisplay = callStatus.charAt(0).toUpperCase() + callStatus.slice(1);
+                }
 
                 row.innerHTML = `
                     <td style="font-weight: 600;">${call.patient_name || 'Unknown'}</td>

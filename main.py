@@ -1380,7 +1380,7 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
                     call_status = 'failed'
 
                 # Check if call is completed successfully (patient answered and responded)
-                if call_status in ['confirmed', 'cancelled', 'rescheduled']:
+                if call_status in ['confirmed', 'cancelled', 'rescheduled', 'not_available', 'wrong_number']:
                     # Call completed successfully
                     retry_tracker[tracker_idx]['completed'] = True
                     retry_tracker[tracker_idx]['final_result'] = result
@@ -1432,6 +1432,8 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
         'cancelled': 0, 
         'rescheduled': 0,
         'busy_voicemail': 0,
+        'not_available': 0,
+        'wrong_number': 0,
         'failed': 0
     }
     
@@ -1455,6 +1457,8 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
     print(f"   ❌ Cancelled: {status_summary['cancelled']}")
     print(f"   🔄 Rescheduled: {status_summary['rescheduled']}")
     print(f"   📧 Busy/Voicemail: {status_summary['busy_voicemail']}")
+    print(f"   🚫 Not Available: {status_summary['not_available']}")
+    print(f"   📱 Wrong Number: {status_summary['wrong_number']}")
     print(f"   💥 Failed: {status_summary['failed']}")
     
     return final_results
@@ -1758,6 +1762,35 @@ def analyze_call_transcript(transcript: str) -> str:
 
     transcript_lower = transcript.lower().strip()
     
+    # Check for wrong number scenarios first (highest priority)
+    wrong_number_patterns = [
+        "wrong number", "you have the wrong number", "this is the wrong number",
+        "no one by that name", "nobody by that name", "don't know", "never heard of",
+        "no such person", "no one here by that name", "nobody here by that name",
+        "you've got the wrong", "this isn't", "that's not me", "i'm not",
+        "who is this", "who are you looking for", "there's no", "nobody named",
+        "no one named", "you must have the wrong", "i think you have the wrong"
+    ]
+    
+    for pattern in wrong_number_patterns:
+        if pattern in transcript_lower:
+            return 'wrong_number'
+    
+    # Check for not available scenarios (second priority)
+    not_available_patterns = [
+        "not here right now", "isn't here", "is not here", "not available",
+        "not home", "isn't home", "is not home", "out right now",
+        "can't come to the phone", "cannot come to the phone", "busy right now",
+        "in a meeting", "at work", "not in", "stepped out", "away from",
+        "will be back", "call back later", "try calling later", "not around",
+        "unavailable", "sleeping", "napping", "can you call back",
+        "not a good time", "isn't a good time", "bad time"
+    ]
+    
+    for pattern in not_available_patterns:
+        if pattern in transcript_lower:
+            return 'not_available'
+    
     # Split transcript into sentences for better analysis
     sentences = [s.strip() for s in transcript_lower.replace('.', '|').replace('!', '|').replace('?', '|').split('|') if s.strip()]
     
@@ -1797,7 +1830,6 @@ def analyze_call_transcript(transcript: str) -> str:
         "can't make it", "cannot make it", "won't make it", "will not make it",
         "can't come", "cannot come", "won't come", "will not come",
         "can't be there", "cannot be there", "won't be there", "will not be there",
-        "not available", "won't be available", "will not be available",
         "unable to", "not coming", "don't need", "do not need", "no longer need"
     ]
     
@@ -2108,6 +2140,8 @@ async def get_campaign_analytics(campaign_id: str):
             'cancelled': 0,
             'rescheduled': 0,
             'busy_voicemail': 0,
+            'not_available': 0,
+            'wrong_number': 0,
             'completed': 0,
             'failed': 0
         }
