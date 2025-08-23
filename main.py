@@ -372,6 +372,13 @@ def get_call_prompt(office_location: str = "",
     • If no response after 3-4 second wait: end call.
     • If silence after 10 seconds at any point after the main task is done: end call automatically.
 
+    FINAL SUMMARY RULE:
+    • Before the call ends, always provide a short summary of the outcome of the conversation:
+        – If appointment was CONFIRMED: say "Just to confirm, your appointment on {appointment_date} at {appointment_time} with {provider_name} at {office_location} is confirmed."
+        – If appointment was CANCELLED: say "Just to confirm, your appointment on {appointment_date} at {appointment_time} with {provider_name} has been cancelled."
+        – If appointment will be RESCHEDULED: say "Just to confirm, your appointment will be rescheduled and our scheduling agent will call you soon to arrange a new time."
+    • Deliver this summary immediately before the goodbye phrase (e.g., "Have a great day!") so the patient leaves with a clear understanding.
+
     REMEMBER: Maintain natural conversation flow with appropriate pauses. Let patients naturally end with acknowledgments while ensuring calls don't continue indefinitely."""
 
 
