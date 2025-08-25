@@ -1726,19 +1726,38 @@ async def process_csv(file: UploadFile = File(...),
         # Prepare all call requests and track validation results separately
         call_requests = []
         validation_failures = []
+        processed_rows = []  # Track all processed rows for debugging
         
-        for row in rows:
-            row_count += 1
-            print(f"📋 Processing row {row_count}: {row.get('patient_name', 'Unknown')} - {row.get('phone_number', 'Unknown')}")
+        print(f"📋 Starting to process {len(rows)} rows from CSV/Excel file")
+        
+        for row_index, row in enumerate(rows):
+            row_count = row_index + 1  # Use enumerate for accurate counting
             
-            # Validate required fields
+            # Log raw row data for debugging
+            row_info = {
+                'row_number': row_count,
+                'patient_name': row.get('patient_name', 'Missing'),
+                'phone_number': row.get('phone_number', 'Missing'),
+                'date': row.get('date', 'Missing'),
+                'time': row.get('time', 'Missing'),
+                'provider_name': row.get('provider_name', 'Missing'),
+                'office_location': row.get('office_location', 'Missing')
+            }
+            processed_rows.append(row_info)
+            
+            print(f"📋 Processing row {row_count}: {row_info['patient_name']} - {row_info['phone_number']}")
+            
+            # Validate required fields - check both empty and None values
             required_fields = [
                 'phone_number', 'patient_name', 'date', 'time', 'provider_name', 'office_location'
             ]
-            missing_fields = [
-                field for field in required_fields
-                if not str(row.get(field, '')).strip()
-            ]
+            
+            missing_fields = []
+            for field in required_fields:
+                field_value = row.get(field)
+                # Check for None, empty string, or whitespace-only values
+                if field_value is None or str(field_value).strip() == '' or str(field_value).strip().lower() == 'nan':
+                    missing_fields.append(field)
 
             if missing_fields:
                 validation_failure = CallResult(
@@ -1748,19 +1767,23 @@ async def process_csv(file: UploadFile = File(...),
                     phone_number=row.get('phone_number', 'Unknown')
                 )
                 validation_failures.append(validation_failure)
-                print(f"❌ Row {row_count} failed validation: Missing {missing_fields}")
-                continue
+                print(f"❌ Row {row_count} FAILED validation: Missing {missing_fields}")
+                print(f"   Raw values: {[f'{field}={row.get(field)}' for field in missing_fields]}")
+                continue  # Skip this row but continue processing others
 
             # Format phone number with selected country code
             phone_number_raw = row.get('phone_number', '')
             phone_number_str = str(phone_number_raw).strip() if phone_number_raw is not None else ''
             safe_country_code = country_code or '+1'
             formatted_phone = format_phone_number(phone_number_str, safe_country_code)
-            print(f"📞 CSV Row {row_count}: {phone_number_str} -> Formatted: {formatted_phone} (Country Code: {safe_country_code})")
+            print(f"📞 Row {row_count}: {phone_number_str} -> {formatted_phone} (Country: {safe_country_code})")
 
             # Create call request - safely handle None values
             def safe_str(value):
-                return str(value).strip() if value is not None else ''
+                if value is None:
+                    return ''
+                value_str = str(value).strip()
+                return value_str if value_str.lower() != 'nan' else ''
 
             call_request = CallRequest(
                 phone_number=formatted_phone,
@@ -1769,17 +1792,47 @@ async def process_csv(file: UploadFile = File(...),
                 appointment_date=safe_str(row.get('date', '')),
                 appointment_time=safe_str(row.get('time', '')),
                 office_location=safe_str(row.get('office_location', '')))
+            
             call_requests.append(call_request)
-            print(f"✅ Row {row_count} prepared for calling: {call_request.patient_name}")
+            print(f"✅ Row {row_count} PREPARED for calling: {call_request.patient_name}")
 
-        print(f"📊 Validation complete: {len(call_requests)} valid calls, {len(validation_failures)} validation failures")
+        # Summary logging
+        total_processed = len(processed_rows)
+        total_valid = len(call_requests)
+        total_invalid = len(validation_failures)
+        
+        print(f"📊 Processing summary:")
+        print(f"   📋 Total rows in file: {total_processed}")
+        print(f"   ✅ Valid for calling: {total_valid}")
+        print(f"   ❌ Validation failures: {total_invalid}")
+        print(f"   🔢 Accounted for: {total_valid + total_invalid} (should equal {total_processed})")
+        
+        if total_valid + total_invalid != total_processed:
+            print(f"⚠️  WARNING: Row count mismatch detected!")
+            print(f"   This suggests some rows may have been skipped unexpectedly")
+        
+        # Log first few valid calls for verification
+        print(f"📞 First few valid calls:")
+        for i, call in enumerate(call_requests[:3]):
+            print(f"   {i+1}. {call.patient_name} - {call.phone_number}")
+        
+        if len(call_requests) > 3:
+            print(f"   ... and {len(call_requests) - 3} more")
 
         # Add validation failures to results first
         results.extend(validation_failures)
+        print(f"📊 Added {len(validation_failures)} validation failures to results")
         
         # Process all valid calls concurrently (max 10 at a time)
         if call_requests:
-            print(f"🚀 Processing {len(call_requests)} calls concurrently (max 10 simultaneous)")
+            print(f"🚀 Starting concurrent call processing:")
+            print(f"   📞 Calls to process: {len(call_requests)}")
+            print(f"   🔄 Max simultaneous: 10")
+            
+            # Log all calls that will be processed
+            print(f"📋 Calls to be processed:")
+            for i, call_req in enumerate(call_requests):
+                print(f"   {i+1:2d}. {call_req.patient_name:20s} - {call_req.phone_number}")
 
             # Create semaphore to limit concurrent calls to 10
             semaphore = asyncio.Semaphore(10)
@@ -1789,14 +1842,36 @@ async def process_csv(file: UploadFile = File(...),
                 make_single_call_async(call_request, api_key, semaphore)
                 for call_request in call_requests
             ]
+            
+            print(f"🔧 Created {len(tasks)} async tasks")
 
             # Run all tasks concurrently
             concurrent_results = await asyncio.gather(*tasks)
-            results.extend(concurrent_results)
+            print(f"📊 Received {len(concurrent_results)} call results")
             
-            print(f"📊 Call processing complete: {len(concurrent_results)} calls attempted")
+            # Log results summary
+            successful_concurrent = sum(1 for r in concurrent_results if r.success)
+            failed_concurrent = len(concurrent_results) - successful_concurrent
+            print(f"   ✅ Successful calls: {successful_concurrent}")
+            print(f"   ❌ Failed calls: {failed_concurrent}")
+            
+            results.extend(concurrent_results)
+            print(f"📊 Added {len(concurrent_results)} call results to final results")
+        else:
+            print(f"⚠️  No valid calls to process - all rows failed validation")
         
-        print(f"📋 Final results: {len(results)} total entries ({len(validation_failures)} validation failures + {len(call_requests)} call attempts)")
+        # Final verification
+        expected_total = len(validation_failures) + len(call_requests)
+        actual_total = len(results)
+        print(f"📋 Final results verification:")
+        print(f"   📊 Expected total: {expected_total} ({len(validation_failures)} failures + {len(call_requests)} calls)")
+        print(f"   📊 Actual total: {actual_total}")
+        print(f"   {'✅ Match!' if expected_total == actual_total else '❌ MISMATCH!'}")
+        
+        if expected_total != actual_total:
+            print(f"🔍 Debugging result mismatch:")
+            print(f"   Validation failures: {[r.patient_name for r in results if not r.success and r.error and 'Missing required fields' in r.error]}")
+            print(f"   Call results: {[r.patient_name for r in results if r.call_id or (not r.success and 'Missing required fields' not in str(r.error))]}")
 
         # Calculate summary
         successful_calls = sum(1 for r in results if r.success)
