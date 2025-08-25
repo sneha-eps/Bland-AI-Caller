@@ -245,7 +245,7 @@ VOICE_MAP = {
 }
 
 
-def get_voice_id(name="Paige") -> str:
+def get_voice_id(name) -> str:
     """Get the voice ID for the given voice name"""
     return VOICE_MAP.get(
         name,
