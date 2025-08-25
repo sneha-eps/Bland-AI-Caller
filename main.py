@@ -1589,7 +1589,9 @@ async def voice_preview(voice_name: str):
 
         payload = {
             "text": sample_text,
-            "voice_settings": {},
+            "voice_settings": {
+                "speaking_rate" : 0.75
+            },
             "language": "en"
         }
 
