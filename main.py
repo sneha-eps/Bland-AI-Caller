@@ -66,7 +66,7 @@ def load_users_db():
                 return json.load(f)
         except (json.JSONDecodeError, IOError):
             pass
-    
+
     # Default users if file doesn't exist or is corrupted
     default_users = {
         "admin": {
@@ -78,7 +78,7 @@ def load_users_db():
             "created_at": datetime.now().isoformat()
         },
         "user": {
-            "id": "user", 
+            "id": "user",
             "username": "user",
             "password_hash": hashlib.sha256("user123".encode()).hexdigest(),
             "role": "user",
@@ -130,7 +130,7 @@ def save_sessions_db(sessions_data):
             "created_at": session["created_at"].isoformat() if isinstance(session["created_at"], datetime) else session["created_at"],
             "expires_at": session["expires_at"].isoformat() if isinstance(session["expires_at"], datetime) else session["expires_at"]
         }
-    
+
     with open(SESSIONS_FILE, 'w') as f:
         json.dump(serializable_sessions, f, indent=2)
 
@@ -181,7 +181,7 @@ def save_campaigns_db(campaigns_data):
             campaign_copy['file_data_b64'] = base64.b64encode(campaign_copy['file_data']).decode('utf-8')
             del campaign_copy['file_data']
         serializable_campaigns[campaign_id] = campaign_copy
-    
+
     with open(CAMPAIGNS_FILE, 'w') as f:
         json.dump(serializable_campaigns, f, indent=2)
 
@@ -398,6 +398,7 @@ class CallResult(BaseModel):
     call_status: Optional[
         str] = None  # confirmed, rescheduled, cancelled, voicemail, busy
     transcript: Optional[str] = None
+    final_summary: Optional[str] = None # Added for final summary
     message: Optional[str] = None
     error: Optional[str] = None
     patient_name: str
@@ -461,12 +462,12 @@ def get_current_user(request: Request) -> Optional[Dict]:
     session_token = request.cookies.get("session_token")
     if not session_token or session_token not in sessions_db:
         return None
-    
+
     session = sessions_db[session_token]
     if datetime.now() > session["expires_at"]:
         del sessions_db[session_token]
         return None
-    
+
     user_id = session["user_id"]
     return users_db.get(user_id)
 
@@ -786,7 +787,7 @@ async def login_page(request: Request):
     user = get_current_user(request)
     if user:
         return RedirectResponse(url="/", status_code=302)
-    
+
     return templates.TemplateResponse("login.html", {"request": request})
 
 @app.get("/signup", response_class=HTMLResponse)
@@ -796,7 +797,7 @@ async def signup_page(request: Request):
     user = get_current_user(request)
     if user:
         return RedirectResponse(url="/", status_code=302)
-    
+
     return templates.TemplateResponse("signup.html", {"request": request})
 
 @app.post("/api/login")
@@ -808,13 +809,13 @@ async def login(request: Request, username: str = Form(...), password: str = For
             if user_data["username"] == username:
                 user = user_data
                 break
-        
+
         if not user or not verify_password(password, user["password_hash"]):
             return {"success": False, "message": "Invalid username or password"}
-        
+
         # Create session
         session_token = create_session(user["id"])
-        
+
         # Create response with session cookie
         from fastapi.responses import JSONResponse
         response_data = {"success": True, "message": "Login successful", "redirect_url": "/"}
@@ -839,7 +840,7 @@ async def signup(request: Request, user_data: UserCreate):
         for existing_user in users_db.values():
             if existing_user["username"] == user_data.username:
                 return {"success": False, "message": "Username already exists"}
-        
+
         # Create new user
         user_id = str(uuid.uuid4())
         new_user = {
@@ -850,13 +851,13 @@ async def signup(request: Request, user_data: UserCreate):
             "email": user_data.email,
             "created_at": datetime.now().isoformat()
         }
-        
+
         users_db[user_id] = new_user
         save_users_db(users_db)
-        
+
         # Create session
         session_token = create_session(user_id)
-        
+
         # Create response with session cookie
         from fastapi.responses import JSONResponse
         response_data = {"success": True, "message": "Account created successfully", "redirect_url": "/"}
@@ -880,7 +881,7 @@ async def logout(request: Request):
     if session_token and session_token in sessions_db:
         del sessions_db[session_token]
         save_sessions_db(sessions_db)
-    
+
     # Create response that clears the session cookie
     from fastapi.responses import JSONResponse
     response = JSONResponse(content={"success": True, "message": "Logged out successfully"})
@@ -894,7 +895,7 @@ async def dashboard(request: Request):
     user = get_current_user(request)
     if not user:
         return RedirectResponse(url="/login", status_code=302)
-    
+
     api_key = get_api_key()
 
     # Load clients and campaigns data for dashboard
@@ -914,12 +915,8 @@ async def dashboard(request: Request):
 
             # Calculate duration from individual call results if available
             for result in campaign_results['results']:
-                if result.get('success') and result.get('call_id'):
-                    # Try to get call duration from stored data or API
-                    # For now, we'll estimate based on successful calls
-                    # This could be enhanced to fetch actual durations
-                    if result.get('success'):
-                        total_duration_seconds += 60  # Estimate 1 minute per successful call
+                if result.get('success'):
+                    total_duration_seconds += 60  # Estimate 1 minute per successful call
 
     # Format total duration
     formatted_duration = format_duration_display(total_duration_seconds)
@@ -1302,13 +1299,13 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
     attempt_number = 0
     while True:
         attempt_number += 1
-        
+
         # Check if all calls have reached final status (early termination)
         all_completed = all(tracker['completed'] for tracker in retry_tracker.values())
         if all_completed:
             print(f"🎯 Campaign '{campaign_name}' - All calls have reached final status. Ending campaign early.")
             break
-        
+
         # Find calls that need retry attempts
         pending_calls = []
         pending_indices = []
@@ -1367,9 +1364,23 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
                                     transcript = call_data.get('transcript', '')
                                     call_status = analyze_call_transcript(transcript)
 
+                                    # Analyze transcript for status using our enhanced function
+                                    if transcript and transcript.strip():
+                                        call_status = analyze_call_transcript(transcript)
+                                        final_summary = extract_final_summary(transcript)
+                                        call_details['analysis_notes'] = f"Analyzed {len(transcript)} characters of transcript"
+                                        call_details['final_summary'] = final_summary
+                                    else:
+                                        call_status = 'busy_voicemail'
+                                        final_summary = ""
+                                        call_details['analysis_notes'] = "No transcript available - likely voicemail or no answer"
+                                        call_details['final_summary'] = ""
+
                                     # Update result with transcript and status
                                     result.transcript = transcript
                                     result.call_status = call_status
+                                    result.final_summary = final_summary
+
                                 else:
                                     call_status = 'busy_voicemail'
 
@@ -1413,9 +1424,9 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
         # Check campaign completion status after each attempt
         completed_calls = sum(1 for tracker in retry_tracker.values() if tracker['completed'])
         total_calls = len(retry_tracker)
-        
+
         print(f"📊 Campaign '{campaign_name}' - Attempt {attempt_number} summary: {completed_calls}/{total_calls} calls completed")
-        
+
         # Check if there are more attempts needed for retry interval
         pending_retries = [i for i, tracker in retry_tracker.items()
                           if not tracker['completed'] and tracker['attempts'] < max_attempts]
@@ -1429,18 +1440,18 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
     # Collect all final results and generate final summary
     status_summary = {
         'confirmed': 0,
-        'cancelled': 0, 
+        'cancelled': 0,
         'rescheduled': 0,
         'busy_voicemail': 0,
         'not_available': 0,
         'wrong_number': 0,
         'failed': 0
     }
-    
+
     for tracker in retry_tracker.values():
         if tracker['final_result']:
             final_results.append(tracker['final_result'])
-            
+
             # Count final statuses for summary
             if hasattr(tracker['final_result'], 'call_status') and tracker['final_result'].call_status:
                 status = tracker['final_result'].call_status
@@ -1460,7 +1471,7 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
     print(f"   🚫 Not Available: {status_summary['not_available']}")
     print(f"   📱 Wrong Number: {status_summary['wrong_number']}")
     print(f"   💥 Failed: {status_summary['failed']}")
-    
+
     return final_results
 
 # Keep the original function for backward compatibility (in case it's used elsewhere)
@@ -1761,7 +1772,7 @@ def analyze_call_transcript(transcript: str) -> str:
         return 'busy_voicemail'
 
     transcript_lower = transcript.lower().strip()
-    
+
     # Check for wrong number scenarios first (highest priority)
     wrong_number_patterns = [
         "wrong number", "you have the wrong number", "this is the wrong number",
@@ -1771,11 +1782,11 @@ def analyze_call_transcript(transcript: str) -> str:
         "who is this", "who are you looking for", "there's no", "nobody named",
         "no one named", "you must have the wrong", "i think you have the wrong"
     ]
-    
+
     for pattern in wrong_number_patterns:
         if pattern in transcript_lower:
             return 'wrong_number'
-    
+
     # Check for not available scenarios (second priority)
     not_available_patterns = [
         "not here right now", "isn't here", "is not here", "not available",
@@ -1786,17 +1797,17 @@ def analyze_call_transcript(transcript: str) -> str:
         "unavailable", "sleeping", "napping", "can you call back",
         "not a good time", "isn't a good time", "bad time"
     ]
-    
+
     for pattern in not_available_patterns:
         if pattern in transcript_lower:
             return 'not_available'
-    
+
     # Split transcript into sentences for better analysis
     sentences = [s.strip() for s in transcript_lower.replace('.', '|').replace('!', '|').replace('?', '|').split('|') if s.strip()]
-    
+
     # Track decisions throughout the conversation (later decisions override earlier ones)
     decisions = []
-    
+
     # Define more comprehensive keyword patterns
     confirmation_patterns = [
         # Direct confirmations
@@ -1809,7 +1820,7 @@ def analyze_call_transcript(transcript: str) -> str:
         # Contextual confirmations
         "yes to confirm", "yes for confirmation", "confirming", "i confirm"
     ]
-    
+
     reschedule_patterns = [
         # Direct reschedule requests
         "reschedule", "reschedule it", "reschedule this", "reschedule the appointment",
@@ -1820,7 +1831,7 @@ def analyze_call_transcript(transcript: str) -> str:
         "prefer", "would prefer", "i prefer", "schedule for", "what about", "how about",
         "can we do", "is there", "available", "free", "open", "works better"
     ]
-    
+
     cancellation_patterns = [
         # Direct cancellations
         "cancel", "cancel it", "cancel this", "cancel the appointment", "cancel my appointment",
@@ -1832,11 +1843,11 @@ def analyze_call_transcript(transcript: str) -> str:
         "can't be there", "cannot be there", "won't be there", "will not be there",
         "unable to", "not coming", "don't need", "do not need", "no longer need"
     ]
-    
+
     # Analyze each sentence for decision indicators
     for i, sentence in enumerate(sentences):
         sentence = sentence.strip()
-        
+
         # Check for confirmations
         for pattern in confirmation_patterns:
             if pattern in sentence:
@@ -1844,26 +1855,26 @@ def analyze_call_transcript(transcript: str) -> str:
                 if not any(neg in sentence for neg in ["don't", "do not", "won't", "will not", "can't", "cannot", "no", "not"]):
                     decisions.append(('confirmed', i))
                 break
-        
+
         # Check for rescheduling
         for pattern in reschedule_patterns:
             if pattern in sentence:
                 decisions.append(('rescheduled', i))
                 break
-        
+
         # Check for cancellation
         for pattern in cancellation_patterns:
             if pattern in sentence:
                 decisions.append(('cancelled', i))
                 break
-    
+
     # If we have decisions, return the last one (final decision)
     if decisions:
         final_decision = sorted(decisions, key=lambda x: x[1])[-1][0]
         return final_decision
-    
+
     # If no clear decision patterns found, analyze context more broadly
-    
+
     # Check for voicemail/busy indicators
     voicemail_indicators = [
         "voicemail", "voice mail", "leave a message", "after the beep", "beep",
@@ -1871,33 +1882,33 @@ def analyze_call_transcript(transcript: str) -> str:
         "can't come to the phone", "not available", "busy", "no answer",
         "disconnected", "line busy", "hung up", "dial tone", "no response"
     ]
-    
+
     if any(indicator in transcript_lower for indicator in voicemail_indicators):
         return 'busy_voicemail'
-    
+
     # Check if conversation seems like a real interaction
     interaction_indicators = [
         "hello", "hi", "hey", "good morning", "good afternoon", "good evening",
         "speaking", "this is", "who is", "what", "when", "where", "how",
         "thank you", "thanks", "sorry", "excuse me", "pardon"
     ]
-    
+
     has_interaction = any(indicator in transcript_lower for indicator in interaction_indicators)
-    
+
     # If we have a real conversation but no clear decision, analyze sentiment
     if has_interaction and len(transcript.strip()) > 20:
         # Look for positive vs negative sentiment in the overall response
         positive_words = ["yes", "okay", "sure", "fine", "good", "great", "perfect", "alright"]
         negative_words = ["no", "can't", "won't", "unable", "busy", "sorry", "problem"]
-        
+
         positive_count = sum(1 for word in positive_words if word in transcript_lower)
         negative_count = sum(1 for word in negative_words if word in transcript_lower)
-        
+
         if positive_count > negative_count:
             return 'confirmed'
         elif negative_count > positive_count:
             return 'busy_voicemail'
-    
+
     # Default to busy_voicemail if we can't determine the status
     return 'busy_voicemail'
 
@@ -2142,7 +2153,6 @@ async def get_campaign_analytics(campaign_id: str):
             'busy_voicemail': 0,
             'not_available': 0,
             'wrong_number': 0,
-            'completed': 0,
             'failed': 0
         }
 
@@ -2165,6 +2175,7 @@ async def get_campaign_analytics(campaign_id: str):
                     'error': result.get('error'),
                     'call_id': result.get('call_id'),
                     'transcript': None,
+                    'final_summary': None, # Added for final summary
                     'duration': 0,
                     'call_status': 'failed',
                     'created_at': campaign_results.get('started_at', datetime.now().isoformat()),
@@ -2189,7 +2200,7 @@ async def get_campaign_analytics(campaign_id: str):
                                     # Get transcript and other details
                                     transcript = call_data.get('transcript', '')
                                     call_length = call_data.get('call_length', call_data.get('duration', 0))
-                                    
+
                                     call_details['transcript'] = transcript
                                     call_details['created_at'] = call_data.get('created_at', call_details['created_at'])
 
@@ -2203,12 +2214,19 @@ async def get_campaign_analytics(campaign_id: str):
                                     # Analyze transcript for status using our enhanced function
                                     if transcript and transcript.strip():
                                         call_status = analyze_call_transcript(transcript)
+                                        final_summary = extract_final_summary(transcript)
                                         call_details['analysis_notes'] = f"Analyzed {len(transcript)} characters of transcript"
+                                        call_details['final_summary'] = final_summary
                                     else:
                                         call_status = 'busy_voicemail'
+                                        final_summary = ""
                                         call_details['analysis_notes'] = "No transcript available - likely voicemail or no answer"
+                                        call_details['final_summary'] = ""
 
-                                    call_details['call_status'] = call_status
+                                    # Update result with transcript and status
+                                    result.transcript = transcript
+                                    result.call_status = call_status
+                                    result.final_summary = final_summary
 
                                     # Count the status
                                     if call_status in status_counts:
@@ -2219,7 +2237,7 @@ async def get_campaign_analytics(campaign_id: str):
                                         call_details['call_status'] = 'busy_voicemail'
 
                                     print(f"✅ Call details retrieved for {call_details['patient_name']}: Status={call_details['call_status']}, Duration={duration_seconds}s, Transcript length={len(transcript)}")
-                                    
+
                                 elif call_response.status == 404:
                                     print(f"⚠️ Call {result.get('call_id')} not found in Bland AI")
                                     call_details['call_status'] = 'busy_voicemail'
@@ -2336,6 +2354,7 @@ async def get_call_details(call_id: str):
             # Use our improved transcript analysis function
             transcript = call_data.get("transcript", "")
             call_status = analyze_call_transcript(transcript)
+            final_summary = extract_final_summary(transcript) # Extract final summary
 
             # Handle duration formatting consistently
             raw_duration = call_data.get("duration", 0)
@@ -2345,6 +2364,7 @@ async def get_call_details(call_id: str):
                 "call_id": call_id,
                 "status": call_data.get("status", "unknown"),
                 "call_status": call_status,
+                "final_summary": final_summary, # Include final summary
                 "transcript": transcript,
                 "duration": duration,
                 "created_at": call_data.get("created_at", ""),
