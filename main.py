@@ -1723,10 +1723,14 @@ async def process_csv(file: UploadFile = File(...),
         results = []
         row_count = 0
 
-        # Prepare all call requests
+        # Prepare all call requests and track validation results separately
         call_requests = []
+        validation_failures = []
+        
         for row in rows:
             row_count += 1
+            print(f"📋 Processing row {row_count}: {row.get('patient_name', 'Unknown')} - {row.get('phone_number', 'Unknown')}")
+            
             # Validate required fields
             required_fields = [
                 'phone_number', 'patient_name', 'date', 'time', 'provider_name', 'office_location'
@@ -1737,13 +1741,14 @@ async def process_csv(file: UploadFile = File(...),
             ]
 
             if missing_fields:
-                results.append(
-                    CallResult(
-                        success=False,
-                        error=
-                        f"Missing required fields: {', '.join(missing_fields)}",
-                        patient_name=row.get('patient_name', 'Unknown'),
-                        phone_number=row.get('phone_number', 'Unknown')))
+                validation_failure = CallResult(
+                    success=False,
+                    error=f"Missing required fields: {', '.join(missing_fields)}",
+                    patient_name=row.get('patient_name', 'Unknown'),
+                    phone_number=row.get('phone_number', 'Unknown')
+                )
+                validation_failures.append(validation_failure)
+                print(f"❌ Row {row_count} failed validation: Missing {missing_fields}")
                 continue
 
             # Format phone number with selected country code
@@ -1751,9 +1756,7 @@ async def process_csv(file: UploadFile = File(...),
             phone_number_str = str(phone_number_raw).strip() if phone_number_raw is not None else ''
             safe_country_code = country_code or '+1'
             formatted_phone = format_phone_number(phone_number_str, safe_country_code)
-            print(
-                f"📞 CSV Row: {phone_number_str} -> Formatted: {formatted_phone} (Country Code: {safe_country_code})"
-            )
+            print(f"📞 CSV Row {row_count}: {phone_number_str} -> Formatted: {formatted_phone} (Country Code: {safe_country_code})")
 
             # Create call request - safely handle None values
             def safe_str(value):
@@ -1767,12 +1770,16 @@ async def process_csv(file: UploadFile = File(...),
                 appointment_time=safe_str(row.get('time', '')),
                 office_location=safe_str(row.get('office_location', '')))
             call_requests.append(call_request)
+            print(f"✅ Row {row_count} prepared for calling: {call_request.patient_name}")
 
+        print(f"📊 Validation complete: {len(call_requests)} valid calls, {len(validation_failures)} validation failures")
+
+        # Add validation failures to results first
+        results.extend(validation_failures)
+        
         # Process all valid calls concurrently (max 10 at a time)
         if call_requests:
-            print(
-                f"🚀 Processing {len(call_requests)} calls concurrently (max 10 simultaneous)"
-            )
+            print(f"🚀 Processing {len(call_requests)} calls concurrently (max 10 simultaneous)")
 
             # Create semaphore to limit concurrent calls to 10
             semaphore = asyncio.Semaphore(10)
@@ -1786,6 +1793,10 @@ async def process_csv(file: UploadFile = File(...),
             # Run all tasks concurrently
             concurrent_results = await asyncio.gather(*tasks)
             results.extend(concurrent_results)
+            
+            print(f"📊 Call processing complete: {len(concurrent_results)} calls attempted")
+        
+        print(f"📋 Final results: {len(results)} total entries ({len(validation_failures)} validation failures + {len(call_requests)} call attempts)")
 
         # Calculate summary
         successful_calls = sum(1 for r in results if r.success)
