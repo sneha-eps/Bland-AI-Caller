@@ -2601,6 +2601,49 @@ async def view_campaign_results(campaign_id: str):
             "error": str(e)
         }
 
+@app.post("/bland_webhook")
+async def bland_webhook(request: Request):
+    """Webhook to receive Bland AI call updates"""
+    try:
+        data = await request.json()
+        event_type = data.get("type")
+        call_id = data.get("call_id")
+        campaign_id = data.get("campaign_id")
+        bland_status = data.get("status", "").lower()
+
+        # Only finalize on call completion
+        if event_type == "call.completed":
+            transcript = data.get("transcript") or data.get("call", {}).get("transcript")
+
+            # Extract final summary and appointment status
+            final_summary = extract_final_summary(transcript) if transcript else ""
+            appointment_status = analyze_call_transcript(transcript) if transcript else "Unknown"
+
+            # Fallback if no transcript and status indicates failure
+            if not transcript:
+                if bland_status in ["busy", "voicemail"]:
+                    appointment_status = bland_status.capitalize()
+
+            # Save call log entry
+            if campaign_id not in campaign_logs:
+                campaign_logs[campaign_id] = []
+
+            campaign_logs[campaign_id].append({
+                "call_id": call_id,
+                "status": appointment_status,
+                "summary": final_summary,
+                "transcript": transcript,
+                "duration": data.get("duration", 0),
+                "timestamp": datetime.utcnow().isoformat()
+            })
+
+            print(f"📞 Call completed | {appointment_status} | ID: {call_id}")
+
+        return {"success": True}
+    except Exception as e:
+        print(f"💥 Webhook error: {str(e)}")
+        return {"success": False, "error": str(e)}
+
 @app.get("/docs")
 async def get_docs():
     """Access FastAPI automatic documentation"""
