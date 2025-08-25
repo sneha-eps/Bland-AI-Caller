@@ -1279,28 +1279,26 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
 
 
 async def process_calls_with_retry_and_batching(call_requests, api_key, max_attempts, retry_interval_minutes, campaign_name):
-    """Process calls with retry logic, batching (5-minute delay after every 5 calls), and send voicemail after max attempts"""
-    final_results = []
-    BATCH_SIZE = 5
-    BATCH_DELAY_MINUTES = 5
-
-    # Prevent duplicate calls to same number
-    processed_numbers = set()
-    unique_call_requests = []
+    """Process calls with flag-based retry system - only retry calls with success=False"""
+    print(f"🚀 Starting flag-based retry system for campaign '{campaign_name}'")
+    print(f"📊 Initial calls to process: {len(call_requests)}")
     
-    for call_request in call_requests:
-        phone_key = f"{call_request.phone_number}_{call_request.patient_name}"
-        if phone_key not in processed_numbers:
-            processed_numbers.add(phone_key)
-            unique_call_requests.append(call_request)
-            print(f"✅ Added unique call: {call_request.patient_name} - {call_request.phone_number}")
-        else:
-            print(f"⚠️  DUPLICATE DETECTED - Skipping: {call_request.patient_name} - {call_request.phone_number}")
+    # Create call tracker with flag-based system
+    call_tracker = []
+    for i, call_request in enumerate(call_requests):
+        call_tracker.append({
+            'id': i,
+            'call_request': call_request,
+            'success': False,  # Flag: False = needs retry, True = completed successfully
+            'attempts': 0,
+            'max_attempts': max_attempts,
+            'final_result': None,
+            'call_status': None,
+            'patient_name': call_request.patient_name,
+            'phone_number': call_request.phone_number
+        })
     
-    print(f"📊 Duplicate check: {len(call_requests)} original -> {len(unique_call_requests)} unique calls")
-    call_requests = unique_call_requests
-
-    # Initialize status tracking variables
+    # Status tracking
     status_counts = {
         'confirmed': 0,
         'cancelled': 0,
@@ -1310,230 +1308,196 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
         'wrong_number': 0,
         'failed': 0
     }
-
-    # Track retry status for each call
-    retry_tracker = {}
-    for i, call_request in enumerate(call_requests):
-        retry_tracker[i] = {
-            'attempts': 0,
-            'completed': False,
-            'call_request': call_request,
-            'final_result': None
-        }
-
-    # Create semaphore to limit concurrent calls
-    semaphore = asyncio.Semaphore(5)  # Reduced to 5 to match batch size
-
-    attempt_number = 0
+    
+    # Semaphore for concurrency control
+    semaphore = asyncio.Semaphore(3)  # Conservative limit to prevent overwhelming API
+    
+    attempt_round = 0
+    
     while True:
-        attempt_number += 1
-
-        # Check if all calls have reached final status (early termination)
-        all_completed = all(tracker['completed'] for tracker in retry_tracker.values())
-        if all_completed:
-            print(f"🎯 Campaign '{campaign_name}' - All calls have reached final status. Ending campaign early.")
+        attempt_round += 1
+        
+        # Get all calls that need retry (success = False and haven't exceeded max attempts)
+        calls_to_retry = [
+            call for call in call_tracker 
+            if not call['success'] and call['attempts'] < call['max_attempts']
+        ]
+        
+        if not calls_to_retry:
+            print(f"🎯 Flag-based retry complete! No more calls need retry.")
             break
-
-        # Find calls that need retry attempts
-        pending_calls = []
-        pending_indices = []
-
-        for i, tracker in retry_tracker.items():
-            if not tracker['completed'] and tracker['attempts'] < max_attempts:
-                pending_calls.append(tracker['call_request'])
-                pending_indices.append(i)
-
-        if not pending_calls:
-            print(f"🎯 Campaign '{campaign_name}' - No more pending calls. Campaign completed.")
-            break  # All calls completed or exhausted retries
-
-        print(f"🔄 Campaign '{campaign_name}' - Attempt {attempt_number}: Processing {len(pending_calls)} calls in batches of {BATCH_SIZE}")
-
-        # Process calls in batches with delays
-        for batch_start in range(0, len(pending_calls), BATCH_SIZE):
-            batch_end = min(batch_start + BATCH_SIZE, len(pending_calls))
-            batch_calls = pending_calls[batch_start:batch_end]
-            batch_indices = pending_indices[batch_start:batch_end]
-            batch_number = (batch_start // BATCH_SIZE) + 1
-            total_batches = (len(pending_calls) + BATCH_SIZE - 1) // BATCH_SIZE
-
-            print(f"📞 Processing batch {batch_number}/{total_batches} ({len(batch_calls)} calls)")
-
-            # Execute current batch of calls
-            tasks = [
-                make_single_call_async(call_request, api_key, semaphore)
-                for call_request in batch_calls
-            ]
-
-            batch_results = await asyncio.gather(*tasks)
-
-            # Process results and check call status for this batch
-            for idx, result in enumerate(batch_results):
-                tracker_idx = batch_indices[idx]
-                call_request = batch_calls[idx]
-                retry_tracker[tracker_idx]['attempts'] += 1
-
-                # Initialize call details for this specific call
-                call_details = {
-                    'call_status': 'failed',
-                    'transcript': '',
-                    'final_summary': '',
-                    'analysis_notes': ''
-                }
-
-                # Check if call was successful and determine actual status
-                call_status = 'failed'
-                if result.success and result.call_id:
-                    try:
-                        # Wait for call to complete and get status
-                        await asyncio.sleep(3)
-
-                        async with aiohttp.ClientSession() as session:
-                            async with session.get(
-                                f"https://api.bland.ai/v1/calls/{result.call_id}",
-                                headers={"Authorization": f"Bearer {api_key}"},
-                                timeout=aiohttp.ClientTimeout(total=15)
-                            ) as call_response:
-
-                                if call_response.status == 200:
-                                    call_data = await call_response.json()
-                                    transcript = call_data.get('transcript', '')
-                                    call_length = call_data.get('call_length', call_data.get('duration', 0))
-                                    raw_duration = call_length or call_data.get('duration', 0) or call_data.get('call_duration', 0)
-                                    duration_seconds = parse_duration(raw_duration)
-
-                                    # Analyze transcript for status using our enhanced function
-                                    if transcript and transcript.strip():
-                                        call_status = analyze_call_transcript(transcript)
-                                        final_summary = extract_final_summary(transcript)
-                                        call_details['analysis_notes'] = f"Analyzed {len(transcript)} characters of transcript"
-                                        call_details['final_summary'] = final_summary
-                                    else:
-                                        call_status = 'busy_voicemail'
-                                        final_summary = ""
-                                        call_details['analysis_notes'] = "No transcript available - likely voicemail or no answer"
-                                        call_details['final_summary'] = ""
-
-                                    # Update result with transcript and status
-                                    result.transcript = transcript
-                                    result.call_status = call_status
-                                    result.final_summary = final_summary
-
-                                    # Store call status in call details
-                                    call_details['call_status'] = call_status
-                                    call_details['transcript'] = transcript
-                                    call_details['final_summary'] = final_summary
-
-                                    # Count the status
-                                    if call_status in status_counts:
-                                        status_counts[call_status] += 1
-                                    else:
-                                        # Fallback for unexpected statuses
-                                        status_counts['busy_voicemail'] += 1
-                                        call_details['call_status'] = 'busy_voicemail'
-
-                                else:
-                                    response_text = await call_response.text()
-                                    print(f"❌ API error for call {result.call_id}: Status {call_response.status}")
-                                    call_details['call_status'] = 'busy_voicemail'
-                                    call_details['analysis_notes'] = f"API error: {call_response.status}"
-                                    status_counts['busy_voicemail'] += 1
-
-                    except Exception as e:
-                        print(f"💥 Exception during call initiation: {str(e)}")
-                        return CallResult(success=False, error=str(e), patient_name=call_request.patient_name, phone_number=call_request.phone_number)
-                else:
-                    call_status = 'failed'
-
-                # Check if call was successful AND patient was actually reached
-                if result.success and call_status in ['confirmed', 'cancelled', 'rescheduled']:
-                    # Patient was reached and gave a definitive response - STOP retrying
-                    retry_tracker[tracker_idx]['completed'] = True
-                    retry_tracker[tracker_idx]['final_result'] = result
-                    print(f"✅ Call to {call_request.patient_name} COMPLETED with final status: {call_status} - NO MORE RETRIES")
-
-                elif call_status in ['not_available', 'wrong_number']:
-                    # These are also final states - don't retry
-                    retry_tracker[tracker_idx]['completed'] = True
-                    retry_tracker[tracker_idx]['final_result'] = result
-                    print(f"✅ Call to {call_request.patient_name} FINAL status: {call_status} - NO MORE RETRIES")
-
-                elif retry_tracker[tracker_idx]['attempts'] >= max_attempts:
-                    # Max attempts reached, send voicemail
-                    retry_tracker[tracker_idx]['completed'] = True
-                    retry_tracker[tracker_idx]['final_result'] = result
-
-                    print(f"📞 Max attempts ({max_attempts}) reached for {call_request.patient_name}, sending voicemail...")
-
-                    # Send voicemail after all attempts exhausted
-                    try:
-                        await send_final_voicemail(call_request, api_key)
-                        print(f"📬 Final voicemail sent to {call_request.patient_name}")
-                    except Exception as e:
-                        print(f"❌ Error sending final voicemail to {call_request.patient_name}: {str(e)}")
-
-                else:
-                    # Call needs retry (only for busy_voicemail or failed calls)
-                    remaining_attempts = max_attempts - retry_tracker[tracker_idx]['attempts']
-                    print(f"⏳ Call to {call_request.patient_name} will be retried (Status: {call_status}, Remaining attempts: {remaining_attempts})")
-
-            # Add batch delay if not the last batch and there are more calls to process
-            if batch_end < len(pending_calls):
-                print(f"⏰ Batch {batch_number} completed. Waiting {BATCH_DELAY_MINUTES} minutes before next batch...")
-                await asyncio.sleep(BATCH_DELAY_MINUTES * 60)  # Convert minutes to seconds
-
-        # Check campaign completion status after each attempt
-        completed_calls = sum(1 for tracker in retry_tracker.values() if tracker['completed'])
-        total_calls = len(retry_tracker)
-
-        print(f"📊 Campaign '{campaign_name}' - Attempt {attempt_number} summary: {completed_calls}/{total_calls} calls completed")
-
-        # Check if there are more attempts needed for retry interval
-        pending_retries = [i for i, tracker in retry_tracker.items()
-                          if not tracker['completed'] and tracker['attempts'] < max_attempts]
-
-        if pending_retries:
-            print(f"⏰ Attempt {attempt_number} completed. {len(pending_retries)} calls still pending. Waiting {retry_interval_minutes} minutes before next retry attempt...")
-            await asyncio.sleep(retry_interval_minutes * 60)  # Convert minutes to seconds
+        
+        print(f"\n🔄 RETRY ROUND {attempt_round}: Processing {len(calls_to_retry)} calls with success=False")
+        
+        # Process each call that needs retry
+        retry_tasks = []
+        for call_data in calls_to_retry:
+            retry_tasks.append(process_single_call_with_flag(call_data, api_key, semaphore))
+        
+        # Execute all retry calls
+        await asyncio.gather(*retry_tasks)
+        
+        # Update status counts after this round
+        for call_data in call_tracker:
+            if call_data['success'] and call_data['call_status']:
+                status = call_data['call_status']
+                if status in status_counts:
+                    # Only count once per successful call
+                    if status not in call_data.get('counted_statuses', set()):
+                        status_counts[status] += 1
+                        call_data.setdefault('counted_statuses', set()).add(status)
+        
+        # Check completion status
+        successful_calls = sum(1 for call in call_tracker if call['success'])
+        total_calls = len(call_tracker)
+        
+        print(f"📊 Round {attempt_round} complete: {successful_calls}/{total_calls} calls successful")
+        print(f"🔄 Calls still needing retry: {len([c for c in call_tracker if not c['success'] and c['attempts'] < c['max_attempts']])}")
+        
+        # If there are more calls to retry, wait for retry interval
+        remaining_retries = [c for c in call_tracker if not c['success'] and c['attempts'] < c['max_attempts']]
+        if remaining_retries:
+            print(f"⏰ Waiting {retry_interval_minutes} minutes before next retry round...")
+            await asyncio.sleep(retry_interval_minutes * 60)
+    
+    # Handle calls that exhausted all attempts (send voicemail)
+    exhausted_calls = [call for call in call_tracker if not call['success'] and call['attempts'] >= call['max_attempts']]
+    if exhausted_calls:
+        print(f"📬 Sending voicemails to {len(exhausted_calls)} calls that exhausted retry attempts...")
+        for call_data in exhausted_calls:
+            try:
+                await send_final_voicemail(call_data['call_request'], api_key)
+                print(f"📬 Voicemail sent to {call_data['patient_name']}")
+                # Mark as completed with voicemail status
+                call_data['success'] = True
+                call_data['call_status'] = 'busy_voicemail'
+                call_data['final_result'] = CallResult(
+                    success=True,
+                    call_status='busy_voicemail',
+                    patient_name=call_data['patient_name'],
+                    phone_number=call_data['phone_number'],
+                    message="Voicemail sent after max attempts"
+                )
+                status_counts['busy_voicemail'] += 1
+            except Exception as e:
+                print(f"❌ Failed to send voicemail to {call_data['patient_name']}: {str(e)}")
+                call_data['call_status'] = 'failed'
+                call_data['final_result'] = CallResult(
+                    success=False,
+                    error=f"Failed after {call_data['attempts']} attempts",
+                    patient_name=call_data['patient_name'],
+                    phone_number=call_data['phone_number']
+                )
+                status_counts['failed'] += 1
+    
+    # Generate final results
+    final_results = []
+    for call_data in call_tracker:
+        if call_data['final_result']:
+            final_results.append(call_data['final_result'])
         else:
-            print(f"✅ Campaign '{campaign_name}' - All calls have either completed or exhausted max attempts.")
-
-    # Collect all final results and generate final summary
-    status_summary = {
-        'confirmed': 0,
-        'cancelled': 0,
-        'rescheduled': 0,
-        'busy_voicemail': 0,
-        'not_available': 0,
-        'wrong_number': 0,
-        'failed': 0
-    }
-
-    for tracker in retry_tracker.values():
-        if tracker['final_result']:
-            final_results.append(tracker['final_result'])
-
-            # Count final statuses for summary
-            if hasattr(tracker['final_result'], 'call_status') and tracker['final_result'].call_status:
-                status = tracker['final_result'].call_status
-                if status in status_summary:
-                    status_summary[status] += 1
-                else:
-                    status_summary['failed'] += 1
-            else:
-                status_summary['failed'] += 1
-
-    print(f"🎯 Campaign '{campaign_name}' completed! Final summary:")
-    print(f"   📞 Total calls processed: {len(final_results)}")
-    print(f"   ✅ Confirmed: {status_summary['confirmed']}")
-    print(f"   ❌ Cancelled: {status_summary['cancelled']}")
-    print(f"   🔄 Rescheduled: {status_summary['rescheduled']}")
-    print(f"   📧 Busy/Voicemail: {status_summary['busy_voicemail']}")
-    print(f"   🚫 Not Available: {status_summary['not_available']}")
-    print(f"   📱 Wrong Number: {status_summary['wrong_number']}")
-    print(f"   💥 Failed: {status_summary['failed']}")
-
+            # Create a default result for calls without final_result
+            final_results.append(CallResult(
+                success=call_data['success'],
+                call_status=call_data.get('call_status', 'unknown'),
+                patient_name=call_data['patient_name'],
+                phone_number=call_data['phone_number'],
+                message="Processed by flag-based retry system"
+            ))
+    
+    # Final summary
+    print(f"\n🎯 Flag-based retry system completed for '{campaign_name}'!")
+    print(f"   📞 Total calls: {len(final_results)}")
+    print(f"   ✅ Confirmed: {status_counts['confirmed']}")
+    print(f"   ❌ Cancelled: {status_counts['cancelled']}")
+    print(f"   🔄 Rescheduled: {status_counts['rescheduled']}")
+    print(f"   📧 Busy/Voicemail: {status_counts['busy_voicemail']}")
+    print(f"   🚫 Not Available: {status_counts['not_available']}")
+    print(f"   📱 Wrong Number: {status_counts['wrong_number']}")
+    print(f"   💥 Failed: {status_counts['failed']}")
+    
     return final_results
+
+
+async def process_single_call_with_flag(call_data, api_key, semaphore):
+    """Process a single call and update its flag based on success"""
+    call_request = call_data['call_request']
+    call_data['attempts'] += 1
+    
+    print(f"📞 Attempt {call_data['attempts']} for {call_data['patient_name']} ({call_data['phone_number']})")
+    
+    try:
+        # Make the call
+        result = await make_single_call_async(call_request, api_key, semaphore)
+        
+        if result.success and result.call_id:
+            # Call was initiated successfully, now check the actual outcome
+            await asyncio.sleep(3)  # Wait for call to process
+            
+            # Get call details to determine final status
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"https://api.bland.ai/v1/calls/{result.call_id}",
+                    headers={"Authorization": f"Bearer {api_key}"},
+                    timeout=aiohttp.ClientTimeout(total=15)
+                ) as response:
+                    
+                    if response.status == 200:
+                        call_data_api = await response.json()
+                        transcript = call_data_api.get('transcript', '')
+                        
+                        if transcript and transcript.strip():
+                            call_status = analyze_call_transcript(transcript)
+                            final_summary = extract_final_summary(transcript)
+                        else:
+                            call_status = 'busy_voicemail'
+                            final_summary = "No transcript available"
+                        
+                        # Update result with analysis
+                        result.transcript = transcript
+                        result.call_status = call_status
+                        result.final_summary = final_summary
+                        
+                        # Determine if this is a successful completion
+                        if call_status in ['confirmed', 'cancelled', 'rescheduled', 'not_available', 'wrong_number']:
+                            # These are definitive responses - mark as successful (no more retries needed)
+                            call_data['success'] = True
+                            call_data['call_status'] = call_status
+                            call_data['final_result'] = result
+                            print(f"✅ SUCCESS (Flag=True): {call_data['patient_name']} - Status: {call_status}")
+                        else:
+                            # busy_voicemail or failed - keep success=False for retry
+                            call_data['success'] = False
+                            call_data['call_status'] = call_status
+                            print(f"⏳ RETRY NEEDED (Flag=False): {call_data['patient_name']} - Status: {call_status}")
+                    
+                    else:
+                        # API error - keep success=False for retry
+                        call_data['success'] = False
+                        call_data['call_status'] = 'failed'
+                        print(f"⏳ RETRY NEEDED (Flag=False): {call_data['patient_name']} - API Error")
+        
+        else:
+            # Call initiation failed - keep success=False for retry
+            call_data['success'] = False
+            call_data['call_status'] = 'failed'
+            call_data['final_result'] = result
+            print(f"⏳ RETRY NEEDED (Flag=False): {call_data['patient_name']} - Call initiation failed: {result.error}")
+    
+    except Exception as e:
+        # Exception occurred - keep success=False for retry
+        call_data['success'] = False
+        call_data['call_status'] = 'failed'
+        call_data['final_result'] = CallResult(
+            success=False,
+            error=str(e),
+            patient_name=call_data['patient_name'],
+            phone_number=call_data['phone_number']
+        )
+        print(f"⏳ RETRY NEEDED (Flag=False): {call_data['patient_name']} - Exception: {str(e)}")
+    
+    # Small delay to prevent API overwhelm
+    await asyncio.sleep(1)
 
 # Keep the original function for backward compatibility (in case it's used elsewhere)
 async def process_calls_with_retry(call_requests, api_key, max_attempts, retry_interval_minutes, campaign_name):
@@ -1745,19 +1709,16 @@ async def process_csv(file: UploadFile = File(...),
         results = []
         row_count = 0
 
-        # Process ALL rows with explicit tracking to prevent skipping
-        all_results = []  # Track every single row result
+        # Prepare call requests with validation
+        validation_failures = []
+        call_requests = []
         
-        print(f"📋 Starting to process ALL {len(rows)} rows from CSV/Excel file")
+        print(f"📋 Validating ALL {len(rows)} rows from CSV/Excel file")
         
         for row_index, row in enumerate(rows):
             actual_row_number = row_index + 1  # 1-based numbering for user display
             
-            print(f"\n🔍 Processing Row {actual_row_number}/{len(rows)}:")
-            print(f"   Patient: {row.get('patient_name', 'N/A')}")
-            print(f"   Phone: {row.get('phone_number', 'N/A')}")
-            
-            # Validate required fields with detailed logging
+            # Validate required fields
             required_fields = ['phone_number', 'patient_name', 'date', 'time', 'provider_name', 'office_location']
             missing_fields = []
             
@@ -1765,7 +1726,6 @@ async def process_csv(file: UploadFile = File(...),
                 field_value = row.get(field)
                 if field_value is None or str(field_value).strip() == '' or str(field_value).strip().lower() in ['nan', 'null']:
                     missing_fields.append(field)
-                    print(f"   ❌ Missing field '{field}': '{field_value}'")
 
             if missing_fields:
                 # Create validation failure result
@@ -1775,8 +1735,8 @@ async def process_csv(file: UploadFile = File(...),
                     patient_name=str(row.get('patient_name', f'Row{actual_row_number}')),
                     phone_number=str(row.get('phone_number', 'Unknown'))
                 )
-                all_results.append(validation_result)
-                print(f"   ❌ Row {actual_row_number} FAILED validation: {missing_fields}")
+                validation_failures.append(validation_result)
+                print(f"❌ Row {actual_row_number} FAILED validation: {missing_fields}")
                 continue
 
             # Valid row - prepare for calling
@@ -1801,45 +1761,50 @@ async def process_csv(file: UploadFile = File(...),
                 office_location=safe_str(row.get('office_location', ''))
             )
             
-            print(f"   ✅ Row {actual_row_number} VALID - will call {call_request.patient_name} at {formatted_phone}")
-            
-            # Make the call immediately (no batching for CSV uploads to prevent duplicates)
-            semaphore = asyncio.Semaphore(1)  # One at a time for CSV
-            call_result = await make_single_call_async(call_request, api_key, semaphore)
-            
-            print(f"   📞 Row {actual_row_number} call result: {'SUCCESS' if call_result.success else 'FAILED'}")
-            if not call_result.success:
-                print(f"      Error: {call_result.error}")
-            
-            all_results.append(call_result)
-            
-            # Small delay between calls to prevent rate limiting
-            await asyncio.sleep(1)
+            call_requests.append(call_request)
+            print(f"✅ Row {actual_row_number} VALID - {call_request.patient_name} at {formatted_phone}")
 
-        # Verify all rows processed
-        print(f"\n📊 FINAL VERIFICATION:")
-        print(f"   Total rows in file: {len(rows)}")
-        print(f"   Total results generated: {len(all_results)}")
-        print(f"   Match: {'✅ YES' if len(rows) == len(all_results) else '❌ NO - ROWS WERE SKIPPED!'}")
+        print(f"📊 Validation complete: {len(validation_failures)} failures, {len(call_requests)} valid calls")
+
+        # Process valid calls using flag-based retry system (simplified for CSV)
+        call_results = []
+        if call_requests:
+            print(f"📞 Processing {len(call_requests)} calls using flag-based system...")
+            
+            # For CSV uploads, we'll do a single attempt per call (no retry)
+            semaphore = asyncio.Semaphore(3)  # Limit concurrency
+            
+            for call_request in call_requests:
+                try:
+                    result = await make_single_call_async(call_request, api_key, semaphore)
+                    call_results.append(result)
+                    
+                    print(f"📞 Call to {call_request.patient_name}: {'SUCCESS' if result.success else 'FAILED'}")
+                    if not result.success:
+                        print(f"   Error: {result.error}")
+                    
+                    # Small delay to prevent rate limiting
+                    await asyncio.sleep(1)
+                    
+                except Exception as e:
+                    error_result = CallResult(
+                        success=False,
+                        error=str(e),
+                        patient_name=call_request.patient_name,
+                        phone_number=call_request.phone_number
+                    )
+                    call_results.append(error_result)
+                    print(f"❌ Exception calling {call_request.patient_name}: {str(e)}")
+
+        # Combine all results
+        results = validation_failures + call_results
         
-        if len(rows) != len(all_results):
-            print(f"   🚨 CRITICAL: {len(rows) - len(all_results)} rows were skipped!")
-        
-        # Use all_results as our final results
-        results = all_results
-        
-        # Final verification
-        expected_total = len(validation_failures) + len(call_requests)
-        actual_total = len(results)
-        print(f"📋 Final results verification:")
-        print(f"   📊 Expected total: {expected_total} ({len(validation_failures)} failures + {len(call_requests)} calls)")
-        print(f"   📊 Actual total: {actual_total}")
-        print(f"   {'✅ Match!' if expected_total == actual_total else '❌ MISMATCH!'}")
-        
-        if expected_total != actual_total:
-            print(f"🔍 Debugging result mismatch:")
-            print(f"   Validation failures: {[r.patient_name for r in results if not r.success and r.error and 'Missing required fields' in r.error]}")
-            print(f"   Call results: {[r.patient_name for r in results if r.call_id or (not r.success and 'Missing required fields' not in str(r.error))]}")
+        print(f"\n📊 FINAL CSV PROCESSING SUMMARY:")
+        print(f"   Total rows processed: {len(rows)}")
+        print(f"   Validation failures: {len(validation_failures)}")
+        print(f"   Valid calls processed: {len(call_requests)}")
+        print(f"   Total results: {len(results)}")
+        print(f"   ✅ All rows accounted for: {len(rows) == len(results)}")
 
         # Calculate summary
         successful_calls = sum(1 for r in results if r.success)
