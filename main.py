@@ -1784,6 +1784,39 @@ async def process_csv(file: UploadFile = File(...),
                             detail=f"Error processing CSV: {str(e)}")
 
 
+def extract_final_summary(transcript: str) -> str:
+    """
+    Extract a final summary from the call transcript.
+    This function analyzes the transcript and returns a brief summary of the call outcome.
+    """
+    if not transcript or transcript.strip() == "":
+        return "No summary available - no transcript"
+
+    transcript_lower = transcript.lower().strip()
+    
+    # If transcript is very short, return it as is
+    if len(transcript.strip()) < 50:
+        return transcript.strip()
+    
+    # Look for key outcome phrases in the transcript
+    if any(phrase in transcript_lower for phrase in ["appointment confirmed", "confirmed", "see you then", "will be there"]):
+        return "Patient confirmed appointment"
+    elif any(phrase in transcript_lower for phrase in ["cancel", "cancelled", "can't make it", "won't make it"]):
+        return "Patient cancelled appointment"
+    elif any(phrase in transcript_lower for phrase in ["reschedule", "different time", "change the time", "move the appointment"]):
+        return "Patient requested to reschedule"
+    elif any(phrase in transcript_lower for phrase in ["voicemail", "leave a message", "beep", "not available"]):
+        return "Reached voicemail or patient not available"
+    elif any(phrase in transcript_lower for phrase in ["wrong number", "no one by that name", "you have the wrong"]):
+        return "Wrong number or patient not found"
+    else:
+        # Return first 150 characters as a general summary
+        summary = transcript.strip()[:150]
+        if len(transcript.strip()) > 150:
+            summary += "..."
+        return summary
+
+
 def analyze_call_transcript(transcript: str) -> str:
     """
     Analyze transcript to determine final call status based on patient's ultimate decision.
