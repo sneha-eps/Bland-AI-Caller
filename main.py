@@ -908,7 +908,7 @@ async def dashboard(request: Request):
     total_calls = 0
     total_duration_seconds = 0
 
-    # Aggregate data from all campaign results
+    # Aggregate data from all campaign results (including CSV uploads)
     for campaign_id, campaign_results in campaign_results_db.items():
         if 'results' in campaign_results:
             total_calls += len(campaign_results['results'])
@@ -1790,12 +1790,31 @@ async def process_csv(file: UploadFile = File(...),
         successful_calls = sum(1 for r in results if r.success)
         failed_calls = len(results) - successful_calls
 
+        # Store results in a format similar to campaigns so dashboard can display them
+        csv_session_id = f"csv_upload_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        csv_results = {
+            "campaign_id": csv_session_id,
+            "campaign_name": f"CSV Upload - {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+            "client_name": "Direct Upload",
+            "total_calls": len(results),
+            "successful_calls": successful_calls,
+            "failed_calls": failed_calls,
+            "started_at": datetime.now().isoformat(),
+            "results": [result.dict() for result in results]
+        }
+
+        # Store in the global results database so dashboard can show these calls
+        campaign_results_db[csv_session_id] = csv_results
+        save_campaign_results_db(campaign_results_db)
+        print(f"✅ Stored CSV upload results with ID {csv_session_id}. Total stored campaigns: {len(campaign_results_db)}")
+
         return {
             "success": True,
             "total_calls": len(results),
             "successful_calls": successful_calls,
             "failed_calls": failed_calls,
-            "results": [result.dict() for result in results]
+            "results": [result.dict() for result in results],
+            "session_id": csv_session_id
         }
 
     except Exception as e:
@@ -2508,10 +2527,12 @@ async def debug_campaign_results():
         for campaign_id, results in campaign_results_db.items():
             debug_info["campaign_details"][campaign_id] = {
                 "campaign_name": results.get("campaign_name", "Unknown"),
+                "client_name": results.get("client_name", "Unknown"),
                 "total_calls": results.get("total_calls", 0),
                 "successful_calls": results.get("successful_calls", 0),
                 "started_at": results.get("started_at", "Unknown"),
-                "results_count": len(results.get("results", []))
+                "results_count": len(results.get("results", [])),
+                "is_csv_upload": campaign_id.startswith("csv_upload_")
             }
 
         return {
