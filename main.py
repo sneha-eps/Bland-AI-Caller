@@ -1285,20 +1285,21 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
     print(f"🚀 Starting flag-based retry system for campaign '{campaign_name}'")
     print(f"📊 Initial calls to process: {len(call_requests)}")
     
-    # Create call tracker with flag-based system
+    # Create call tracker with flag-based system - ALL NUMBERS START WITH success=False
     call_tracker = []
     for i, call_request in enumerate(call_requests):
         call_tracker.append({
             'id': i,
             'call_request': call_request,
-            'success': False,  # Flag: False = needs retry, True = completed successfully
+            'success': False,  # Flag: False = needs retry/processing, True = completed successfully
             'attempts': 0,
             'max_attempts': max_attempts,
             'final_result': None,
-            'call_status': None,
+            'call_status': 'pending',  # Initialize with pending status
             'patient_name': call_request.patient_name,
             'phone_number': call_request.phone_number
         })
+        print(f"📋 Initialized {call_request.patient_name} ({call_request.phone_number}) - Flag: False (needs processing)")
     
     # Status tracking
     status_counts = {
@@ -1359,12 +1360,27 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
                         status_counts[status] += 1
                         call_data.setdefault('counted_statuses', set()).add(status)
         
-        # Check completion status
+        # Check completion status and show flag breakdown
         successful_calls = sum(1 for call in call_tracker if call['success'])
         total_calls = len(call_tracker)
+        flag_true_calls = [c for c in call_tracker if c['success']]
+        flag_false_calls = [c for c in call_tracker if not c['success']]
         
         print(f"📊 Round {attempt_round} complete: {successful_calls}/{total_calls} calls successful")
-        print(f"🔄 Calls still needing retry: {len([c for c in call_tracker if not c['success'] and c['attempts'] < c['max_attempts']])}")
+        print(f"🏁 Flag=True (Completed): {len(flag_true_calls)} calls")
+        print(f"⏳ Flag=False (Need retry): {len(flag_false_calls)} calls")
+        
+        # Show status breakdown for Flag=True calls
+        if flag_true_calls:
+            status_breakdown = {}
+            for call in flag_true_calls:
+                status = call.get('call_status', 'unknown')
+                status_breakdown[status] = status_breakdown.get(status, 0) + 1
+            print(f"   ✅ Completed statuses: {dict(status_breakdown)}")
+        
+        # Show remaining retries
+        remaining_retries = [c for c in call_tracker if not c['success'] and c['attempts'] < c['max_attempts']]
+        print(f"🔄 Calls still needing retry: {len(remaining_retries)} calls")
         
         # If there are more calls to retry, wait for retry interval + 2 extra minutes for international protection
         remaining_retries = [c for c in call_tracker if not c['success'] and c['attempts'] < c['max_attempts']]
@@ -1373,17 +1389,19 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
             print(f"⏰ Waiting {extended_interval} minutes before next retry round (includes 2-min international protection)...")
             await asyncio.sleep(extended_interval * 60)
     
-    # Handle calls that exhausted all attempts (send voicemail)
+    # Handle calls that exhausted all attempts (send voicemail and change flag)
     exhausted_calls = [call for call in call_tracker if not call['success'] and call['attempts'] >= call['max_attempts']]
     if exhausted_calls:
-        print(f"📬 Sending voicemails to {len(exhausted_calls)} calls that exhausted retry attempts...")
+        print(f"📬 Processing {len(exhausted_calls)} calls that exhausted retry attempts...")
         for call_data in exhausted_calls:
             try:
                 await send_final_voicemail(call_data['call_request'], api_key)
                 print(f"📬 Voicemail sent to {call_data['patient_name']}")
-                # Mark as completed with voicemail status
+                # Change flag to True - voicemail sent, no more processing needed
+                old_flag = call_data['success']
                 call_data['success'] = True
                 call_data['call_status'] = 'busy_voicemail'
+                print(f"🔄 FLAG CHANGED: {call_data['patient_name']} - Flag: {old_flag} → True (voicemail sent)")
                 call_data['final_result'] = CallResult(
                     success=True,
                     call_status='busy_voicemail',
@@ -1394,6 +1412,9 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
                 status_counts['busy_voicemail'] += 1
             except Exception as e:
                 print(f"❌ Failed to send voicemail to {call_data['patient_name']}: {str(e)}")
+                # Even if voicemail fails, change flag to True - we've exhausted all attempts
+                old_flag = call_data['success']
+                call_data['success'] = True  # No more processing needed
                 call_data['call_status'] = 'failed'
                 call_data['final_result'] = CallResult(
                     success=False,
@@ -1402,6 +1423,7 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
                     phone_number=call_data['phone_number']
                 )
                 status_counts['failed'] += 1
+                print(f"🔄 FLAG CHANGED: {call_data['patient_name']} - Flag: {old_flag} → True (max attempts reached)")
     
     # Generate final results
     final_results = []
@@ -1471,18 +1493,21 @@ async def process_single_call_with_flag(call_data, api_key, semaphore):
                         result.call_status = call_status
                         result.final_summary = final_summary
                         
-                        # Determine if this is a successful completion
+                        # Determine if this is a successful completion and change flag accordingly
                         if call_status in ['confirmed', 'cancelled', 'rescheduled', 'not_available', 'wrong_number']:
-                            # These are definitive responses - mark as successful (no more retries needed)
+                            # These are definitive responses - change flag to True (no more retries needed)
+                            old_flag = call_data['success']
                             call_data['success'] = True
                             call_data['call_status'] = call_status
                             call_data['final_result'] = result
-                            print(f"✅ SUCCESS (Flag=True): {call_data['patient_name']} - Status: {call_status}")
+                            print(f"🔄 FLAG CHANGED: {call_data['patient_name']} - Flag: {old_flag} → True - Status: {call_status}")
+                            print(f"✅ COMPLETED: {call_data['patient_name']} - No more retries needed")
                         else:
-                            # busy_voicemail or failed - keep success=False for retry
+                            # busy_voicemail or failed - keep flag as False for retry
                             call_data['success'] = False
                             call_data['call_status'] = call_status
-                            print(f"⏳ RETRY NEEDED (Flag=False): {call_data['patient_name']} - Status: {call_status}")
+                            print(f"🔄 FLAG UNCHANGED: {call_data['patient_name']} - Flag remains: False - Status: {call_status}")
+                            print(f"⏳ RETRY NEEDED: {call_data['patient_name']} - Will retry in next round")
                     
                     else:
                         # API error - keep success=False for retry
@@ -1491,14 +1516,17 @@ async def process_single_call_with_flag(call_data, api_key, semaphore):
                         print(f"⏳ RETRY NEEDED (Flag=False): {call_data['patient_name']} - API Error")
         
         else:
-            # Call initiation failed - keep success=False for retry
+            # Call initiation failed - keep flag as False for retry
+            old_flag = call_data['success']
             call_data['success'] = False
             call_data['call_status'] = 'failed'
             call_data['final_result'] = result
-            print(f"⏳ RETRY NEEDED (Flag=False): {call_data['patient_name']} - Call initiation failed: {result.error}")
+            print(f"🔄 FLAG UNCHANGED: {call_data['patient_name']} - Flag remains: {old_flag} → False")
+            print(f"⏳ RETRY NEEDED: {call_data['patient_name']} - Call initiation failed: {result.error}")
     
     except Exception as e:
-        # Exception occurred - keep success=False for retry
+        # Exception occurred - keep flag as False for retry
+        old_flag = call_data['success']
         call_data['success'] = False
         call_data['call_status'] = 'failed'
         call_data['final_result'] = CallResult(
@@ -1507,7 +1535,8 @@ async def process_single_call_with_flag(call_data, api_key, semaphore):
             patient_name=call_data['patient_name'],
             phone_number=call_data['phone_number']
         )
-        print(f"⏳ RETRY NEEDED (Flag=False): {call_data['patient_name']} - Exception: {str(e)}")
+        print(f"🔄 FLAG UNCHANGED: {call_data['patient_name']} - Flag remains: {old_flag} → False")
+        print(f"⏳ RETRY NEEDED: {call_data['patient_name']} - Exception: {str(e)}")
     
     # Extended delay for international rate limit protection
     await asyncio.sleep(3)
