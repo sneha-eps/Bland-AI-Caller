@@ -1417,14 +1417,14 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
 
                                 else:
                                     response_text = await call_response.text()
-                                    print(f"❌ API error for call {result.get('call_id')}: Status {call_response.status}")
+                                    print(f"❌ API error for call {result.call_id}: Status {call_response.status}")
                                     call_details['call_status'] = 'busy_voicemail'
                                     call_details['analysis_notes'] = f"API error: {call_response.status}"
                                     status_counts['busy_voicemail'] += 1
 
                     except Exception as e:
-                        print(f"❌ Error checking call status for {call_request.patient_name}: {str(e)}")
-                        call_status = 'busy_voicemail'
+                        print(f"💥 Exception during call initiation: {str(e)}")
+                        return CallResult(success=False, error=str(e), patient_name=call_request.patient_name, phone_number=call_request.phone_number)
                 else:
                     call_status = 'failed'
 
@@ -1812,11 +1812,11 @@ def extract_final_summary(transcript: str) -> str:
         return "No summary available - no transcript"
 
     transcript_lower = transcript.lower().strip()
-    
+
     # If transcript is very short, return it as is
     if len(transcript.strip()) < 50:
         return transcript.strip()
-    
+
     # Look for key outcome phrases in the transcript
     if any(phrase in transcript_lower for phrase in ["appointment confirmed", "confirmed", "see you then", "will be there"]):
         return "Patient confirmed appointment"
@@ -1851,7 +1851,7 @@ def analyze_call_transcript(transcript: str) -> str:
         "wrong number", "you have the wrong number", "this is the wrong number",
         "no one by that name", "nobody by that name", "don't know", "never heard of",
         "no such person", "no one here by that name", "nobody here by that name",
-        "you've got the wrong", "this isn't", "that's not me", "i'm not",
+        "you must have the wrong", "this isn't", "that's not me", "i'm not",
         "who is this", "who are you looking for", "there's no", "nobody named",
         "no one named", "you must have the wrong", "i think you have the wrong"
     ]
