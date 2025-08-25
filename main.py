@@ -1283,6 +1283,17 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
     BATCH_SIZE = 5
     BATCH_DELAY_MINUTES = 5
 
+    # Initialize status tracking variables
+    status_counts = {
+        'confirmed': 0,
+        'cancelled': 0,
+        'rescheduled': 0,
+        'busy_voicemail': 0,
+        'not_available': 0,
+        'wrong_number': 0,
+        'failed': 0
+    }
+
     # Track retry status for each call
     retry_tracker = {}
     for i, call_request in enumerate(call_requests):
@@ -1344,6 +1355,14 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
                 tracker_idx = batch_indices[idx]
                 call_request = batch_calls[idx]
                 retry_tracker[tracker_idx]['attempts'] += 1
+
+                # Initialize call details for this specific call
+                call_details = {
+                    'call_status': 'failed',
+                    'transcript': '',
+                    'final_summary': '',
+                    'analysis_notes': ''
+                }
 
                 # Check if call was successful and determine actual status
                 call_status = 'failed'
