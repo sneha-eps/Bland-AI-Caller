@@ -612,12 +612,13 @@ async def make_single_call_async(call_request: CallRequest, api_key: str,
                             phone_number=call_request.phone_number)
                     elif response.status == 429:
                         print(
-                            f"⏳ Rate limit hit for {call_request.patient_name}"
+                            f"⏳ Rate limit hit for {call_request.patient_name}, applying 10-second backoff..."
                         )
+                        await asyncio.sleep(10)  # 10-second backoff for rate limits
                         return CallResult(
                             success=False,
                             error=
-                            "Rate limit exceeded - please try again later",
+                            "Rate limit exceeded - applied backoff, will retry",
                             patient_name=call_request.patient_name,
                             phone_number=call_request.phone_number)
                     else:
@@ -708,12 +709,12 @@ def make_single_call(call_request: CallRequest, api_key: str) -> CallResult:
                               phone_number=call_request.phone_number)
         elif response.status_code == 429:
             print(
-                f"⏳ Rate limit hit for {call_request.patient_name}, waiting 5 seconds..."
+                f"⏳ Rate limit hit for {call_request.patient_name}, applying 10-second backoff..."
             )
-            time.sleep(5)
+            time.sleep(10)  # 10-second backoff for rate limits
             return CallResult(
                 success=False,
-                error=f"Rate limit exceeded - please try again later",
+                error=f"Rate limit exceeded - applied backoff, will retry",
                 patient_name=call_request.patient_name,
                 phone_number=call_request.phone_number)
         else:
@@ -1229,7 +1230,8 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
             retry_interval_minutes = campaign.get('retry_interval', 30)
 
             print(f"🚀 Starting campaign '{campaign['name']}' with retry logic - Max attempts: {max_attempts}, Retry interval: {retry_interval_minutes} min")
-            print(f"📊 Total calls to process: {len(call_requests)} (with 5-minute delay after every 5 calls)")
+            print(f"📊 Total calls to process: {len(call_requests)} (with international rate limit protection)")
+            print(f"🌍 International rate limit protection: 2 concurrent calls, 30s batch delays, extended retry intervals")
 
             # Process calls with retry logic and batch delays
             final_results = await process_calls_with_retry_and_batching(
@@ -1310,7 +1312,7 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
     }
     
     # Semaphore for concurrency control
-    semaphore = asyncio.Semaphore(5)  # Updated batch size to 5
+    semaphore = asyncio.Semaphore(2)  # Reduced concurrency for international rate limits
     
     attempt_round = 0
     
@@ -1329,13 +1331,23 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
         
         print(f"\n🔄 RETRY ROUND {attempt_round}: Processing {len(calls_to_retry)} calls with success=False")
         
-        # Process each call that needs retry
-        retry_tasks = []
-        for call_data in calls_to_retry:
-            retry_tasks.append(process_single_call_with_flag(call_data, api_key, semaphore))
-        
-        # Execute all retry calls
-        await asyncio.gather(*retry_tasks)
+        # Process calls in batches of 5 with 30-second delays for international rate limits
+        batch_size = 5
+        for i in range(0, len(calls_to_retry), batch_size):
+            batch = calls_to_retry[i:i + batch_size]
+            print(f"🔄 Processing batch {i//batch_size + 1} of {(len(calls_to_retry) + batch_size - 1)//batch_size}: {len(batch)} calls")
+            
+            retry_tasks = []
+            for call_data in batch:
+                retry_tasks.append(process_single_call_with_flag(call_data, api_key, semaphore))
+            
+            # Execute batch
+            await asyncio.gather(*retry_tasks)
+            
+            # Add 30-second delay between batches (except for last batch)
+            if i + batch_size < len(calls_to_retry):
+                print(f"⏰ Waiting 30 seconds before next batch for international rate limit protection...")
+                await asyncio.sleep(30)
         
         # Update status counts after this round
         for call_data in call_tracker:
@@ -1354,11 +1366,12 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
         print(f"📊 Round {attempt_round} complete: {successful_calls}/{total_calls} calls successful")
         print(f"🔄 Calls still needing retry: {len([c for c in call_tracker if not c['success'] and c['attempts'] < c['max_attempts']])}")
         
-        # If there are more calls to retry, wait for retry interval
+        # If there are more calls to retry, wait for retry interval + 2 extra minutes for international protection
         remaining_retries = [c for c in call_tracker if not c['success'] and c['attempts'] < c['max_attempts']]
         if remaining_retries:
-            print(f"⏰ Waiting {retry_interval_minutes} minutes before next retry round...")
-            await asyncio.sleep(retry_interval_minutes * 60)
+            extended_interval = retry_interval_minutes + 2  # Add 2 extra minutes for international rate limits
+            print(f"⏰ Waiting {extended_interval} minutes before next retry round (includes 2-min international protection)...")
+            await asyncio.sleep(extended_interval * 60)
     
     # Handle calls that exhausted all attempts (send voicemail)
     exhausted_calls = [call for call in call_tracker if not call['success'] and call['attempts'] >= call['max_attempts']]
@@ -1496,7 +1509,7 @@ async def process_single_call_with_flag(call_data, api_key, semaphore):
         )
         print(f"⏳ RETRY NEEDED (Flag=False): {call_data['patient_name']} - Exception: {str(e)}")
     
-    # Increased delay to prevent international rate limiting
+    # Extended delay for international rate limit protection
     await asyncio.sleep(3)
 
 # Keep the original function for backward compatibility (in case it's used elsewhere)
@@ -1772,7 +1785,7 @@ async def process_csv(file: UploadFile = File(...),
             print(f"📞 Processing {len(call_requests)} calls using flag-based system...")
             
             # For CSV uploads, we'll do a single attempt per call (no retry)
-            semaphore = asyncio.Semaphore(5)  # Updated batch size to 5
+            semaphore = asyncio.Semaphore(2)  # Reduced concurrency for international rate limits
             
             for call_request in call_requests:
                 try:
