@@ -1310,7 +1310,7 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
     }
     
     # Semaphore for concurrency control
-    semaphore = asyncio.Semaphore(3)  # Conservative limit to prevent overwhelming API
+    semaphore = asyncio.Semaphore(5)  # Updated batch size to 5
     
     attempt_round = 0
     
@@ -1496,8 +1496,8 @@ async def process_single_call_with_flag(call_data, api_key, semaphore):
         )
         print(f"⏳ RETRY NEEDED (Flag=False): {call_data['patient_name']} - Exception: {str(e)}")
     
-    # Small delay to prevent API overwhelm
-    await asyncio.sleep(1)
+    # Increased delay to prevent international rate limiting
+    await asyncio.sleep(3)
 
 # Keep the original function for backward compatibility (in case it's used elsewhere)
 async def process_calls_with_retry(call_requests, api_key, max_attempts, retry_interval_minutes, campaign_name):
@@ -1772,7 +1772,7 @@ async def process_csv(file: UploadFile = File(...),
             print(f"📞 Processing {len(call_requests)} calls using flag-based system...")
             
             # For CSV uploads, we'll do a single attempt per call (no retry)
-            semaphore = asyncio.Semaphore(3)  # Limit concurrency
+            semaphore = asyncio.Semaphore(5)  # Updated batch size to 5
             
             for call_request in call_requests:
                 try:
@@ -1783,8 +1783,8 @@ async def process_csv(file: UploadFile = File(...),
                     if not result.success:
                         print(f"   Error: {result.error}")
                     
-                    # Small delay to prevent rate limiting
-                    await asyncio.sleep(1)
+                    # Increased delay to prevent international rate limiting
+                    await asyncio.sleep(3)
                     
                 except Exception as e:
                     error_result = CallResult(
@@ -2411,9 +2411,9 @@ async def get_campaign_analytics(campaign_id: str):
             # Add batch to main list
             calls_with_details.extend(batch_calls)
 
-            # Small delay between batches to be respectful to API
+            # Increased delay between batches for international rate limiting
             if i + batch_size < len(results_list):
-                await asyncio.sleep(1)
+                await asyncio.sleep(5)
 
         # Calculate analytics
         total_calls = len(campaign_results['results'])
