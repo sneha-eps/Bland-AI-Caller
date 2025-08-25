@@ -1362,7 +1362,9 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
                                 if call_response.status == 200:
                                     call_data = await call_response.json()
                                     transcript = call_data.get('transcript', '')
-                                    call_status = analyze_call_transcript(transcript)
+                                    call_length = call_data.get('call_length', call_data.get('duration', 0))
+                                    raw_duration = call_length or call_data.get('duration', 0) or call_data.get('call_duration', 0)
+                                    duration_seconds = parse_duration(raw_duration)
 
                                     # Analyze transcript for status using our enhanced function
                                     if transcript and transcript.strip():
@@ -1381,8 +1383,25 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
                                     result.call_status = call_status
                                     result.final_summary = final_summary
 
+                                    # Store call status in call details
+                                    call_details['call_status'] = call_status
+                                    call_details['transcript'] = transcript
+                                    call_details['final_summary'] = final_summary
+
+                                    # Count the status
+                                    if call_status in status_counts:
+                                        status_counts[call_status] += 1
+                                    else:
+                                        # Fallback for unexpected statuses
+                                        status_counts['busy_voicemail'] += 1
+                                        call_details['call_status'] = 'busy_voicemail'
+
                                 else:
-                                    call_status = 'busy_voicemail'
+                                    response_text = await call_response.text()
+                                    print(f"❌ API error for call {result.get('call_id')}: Status {call_response.status}")
+                                    call_details['call_status'] = 'busy_voicemail'
+                                    call_details['analysis_notes'] = f"API error: {call_response.status}"
+                                    status_counts['busy_voicemail'] += 1
 
                     except Exception as e:
                         print(f"❌ Error checking call status for {call_request.patient_name}: {str(e)}")
@@ -2201,9 +2220,6 @@ async def get_campaign_analytics(campaign_id: str):
                                     transcript = call_data.get('transcript', '')
                                     call_length = call_data.get('call_length', call_data.get('duration', 0))
 
-                                    call_details['transcript'] = transcript
-                                    call_details['created_at'] = call_data.get('created_at', call_details['created_at'])
-
                                     # Parse duration more robustly - try multiple fields
                                     raw_duration = call_length or call_data.get('duration', 0) or call_data.get('call_duration', 0)
                                     duration_seconds = parse_duration(raw_duration)
@@ -2227,6 +2243,11 @@ async def get_campaign_analytics(campaign_id: str):
                                     result.transcript = transcript
                                     result.call_status = call_status
                                     result.final_summary = final_summary
+
+                                    # Store call status in call details
+                                    call_details['call_status'] = call_status
+                                    call_details['transcript'] = transcript
+                                    call_details['final_summary'] = final_summary
 
                                     # Count the status
                                     if call_status in status_counts:
@@ -2257,8 +2278,12 @@ async def get_campaign_analytics(campaign_id: str):
                                             transcript = call_data.get('transcript', '')
                                             call_details['transcript'] = transcript
                                             if transcript:
-                                                call_details['call_status'] = analyze_call_transcript(transcript)
-                                                status_counts[call_details['call_status']] += 1
+                                                call_status = analyze_call_transcript(transcript)
+                                                call_details['call_status'] = call_status
+                                                if call_status in status_counts:
+                                                    status_counts[call_status] += 1
+                                                else:
+                                                    status_counts['busy_voicemail'] += 1
                                             else:
                                                 call_details['call_status'] = 'busy_voicemail'
                                                 status_counts['busy_voicemail'] += 1
