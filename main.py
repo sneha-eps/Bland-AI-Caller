@@ -1701,6 +1701,21 @@ async def voice_preview(voice_name: str):
                             return {"success": False, "error": "Invalid response format from voice API"}
 
                 elif response.status == 404:
+                    return {"success": False, "error": f"Voice ID '{voice_id}' not found in Bland AI"}
+                elif response.status == 401:
+                    return {"success": False, "error": "Invalid API key"}
+                elif response.status == 429:
+                    return {"success": False, "error": "Rate limit exceeded. Please try again later."}
+                else:
+                    error_text = await response.text()
+                    print(f"❌ Bland AI voice sample error: Status {response.status}, Response: {error_text}")
+                    return {"success": False, "error": f"API error: {error_text}"}
+
+    except asyncio.TimeoutError:
+        return {"success": False, "error": "Request timeout. Please try again."}
+    except Exception as e:
+        print(f"💥 Exception generating voice sample: {str(e)}")
+        return {"success": False, "error": f"Error generating voice sample: {str(e)}"}
 
 
 @app.get("/api/clinic_locations")
@@ -1798,23 +1813,6 @@ async def upload_clinic_data(
             "success": False,
             "message": f"Error uploading clinic data: {str(e)}"
         }
-
-
-    return {"success": False, "error": f"Voice ID '{voice_id}' not found in Bland AI"}
-            elif response.status == 401:
-                return {"success": False, "error": "Invalid API key"}
-            elif response.status == 429:
-                return {"success": False, "error": "Rate limit exceeded. Please try again later."}
-            else:
-                error_text = await response.text()
-                print(f"❌ Bland AI voice sample error: Status {response.status}, Response: {error_text}")
-                return {"success": False, "error": f"API error: {error_text}"}
-
-except asyncio.TimeoutError:
-    return {"success": False, "error": "Request timeout. Please try again."}
-except Exception as e:
-    print(f"💥 Exception generating voice sample: {str(e)}")
-    return {"success": False, "error": f"Error generating voice sample: {str(e)}"}
 
 
 @app.post("/process_csv")
@@ -2801,47 +2799,47 @@ async def view_campaign_results(campaign_id: str):
 
 @app.post("/bland_webhook")
 async def bland_webhook(request: Request):
-                  """Webhook to receive Bland AI call updates and update the main results DB."""
-                  try:
-                      data = await request.json()
-                      print(f"🔔 Webhook received: {data}")
+    """Webhook to receive Bland AI call updates and update the main results DB."""
+    try:
+        data = await request.json()
+        print(f"🔔 Webhook received: {data}")
 
-                      call_id = data.get("call_id")
-                      request_data = data.get("request_data", {})
-                      campaign_id = request_data.get("campaign_id") # <-- Get campaign_id from request_data
+        call_id = data.get("call_id")
+        request_data = data.get("request_data", {})
+        campaign_id = request_data.get("campaign_id") # <-- Get campaign_id from request_data
 
-                      if not call_id or not campaign_id:
-                          print("Webhook ignored: Missing call_id or campaign_id in request_data")
-                          return {"success": False, "reason": "Missing call_id or campaign_id"}
+        if not call_id or not campaign_id:
+            print("Webhook ignored: Missing call_id or campaign_id in request_data")
+            return {"success": False, "reason": "Missing call_id or campaign_id"}
 
-                      # Find the campaign in our main results database
-                      if campaign_id in campaign_results_db:
-                          # Find the specific call within that campaign's results
-                          for result in campaign_results_db[campaign_id].get("results", []):
-                              if result.get("call_id") == call_id:
-                                  # Update this call's data with the final results
-                                  transcript = data.get('transcript', '')
-                                  final_status = analyze_call_transcript(transcript) if transcript else "busy_voicemail"
-                                  final_summary = extract_final_summary(transcript)
-                                  duration = parse_duration(data.get('call_length', 0))
+        # Find the campaign in our main results database
+        if campaign_id in campaign_results_db:
+            # Find the specific call within that campaign's results
+            for result in campaign_results_db[campaign_id].get("results", []):
+                if result.get("call_id") == call_id:
+                    # Update this call's data with the final results
+                    transcript = data.get('transcript', '')
+                    final_status = analyze_call_transcript(transcript) if transcript else "busy_voicemail"
+                    final_summary = extract_final_summary(transcript)
+                    duration = parse_duration(data.get('call_length', 0))
 
-                                  result.update({
-                                      "transcript": transcript,
-                                      "call_status": final_status,
-                                      "final_summary": final_summary,
-                                      "duration": duration
-                                  })
-                                  print(f"✅ Webhook updated call {call_id} in campaign {campaign_id} with status: {final_status}")
+                    result.update({
+                        "transcript": transcript,
+                        "call_status": final_status,
+                        "final_summary": final_summary,
+                        "duration": duration
+                    })
+                    print(f"✅ Webhook updated call {call_id} in campaign {campaign_id} with status: {final_status}")
 
-                                  # Persist the changes to the JSON file
-                                  save_campaign_results_db(campaign_results_db)
-                                  break
+                    # Persist the changes to the JSON file
+                    save_campaign_results_db(campaign_results_db)
+                    break
 
-                      return {"success": True}
+        return {"success": True}
 
-                  except Exception as e:
-                      print(f"💥 Webhook error: {str(e)}")
-                      return {"success": False, "error": str(e)}
+    except Exception as e:
+        print(f"💥 Webhook error: {str(e)}")
+        return {"success": False, "error": str(e)}
 
 
 @app.get("/docs")
