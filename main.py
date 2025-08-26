@@ -550,7 +550,7 @@ def format_duration_display(total_duration_seconds):
 
 
 async def make_single_call_async(call_request: CallRequest, api_key: str,
-                                 semaphore: asyncio.Semaphore, campaign_id: str) -> CallResult:
+                                 semaphore: asyncio.Semaphore, campaign_id: str = None) -> CallResult:
     """Make a single call asynchronously with concurrency control"""
     async with semaphore:  # Limit concurrent calls to 10
         call_data = {
@@ -1859,10 +1859,11 @@ async def process_csv(file: UploadFile = File(...),
 
             # For CSV uploads, we'll do a single attempt per call (no retry)
             semaphore = asyncio.Semaphore(2)  # Reduced concurrency for international rate limits
+            csv_session_id = f"csv_upload_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
             for call_request in call_requests:
                 try:
-                    result = await make_single_call_async(call_request, api_key, semaphore, campaign_id)
+                    result = await make_single_call_async(call_request, api_key, semaphore, csv_session_id)
                     call_results.append(result)
 
                     print(f"📞 Call to {call_request.patient_name}: {'SUCCESS' if result.success else 'FAILED'}")
@@ -1896,8 +1897,7 @@ async def process_csv(file: UploadFile = File(...),
         successful_calls = sum(1 for r in results if r.success)
         failed_calls = len(results) - successful_calls
 
-        # Store results in a format similar to campaigns so dashboard can display them
-        csv_session_id = f"csv_upload_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+        # Store results in a format similar to campaigns so dashboard can display them  
         csv_results = {
             "campaign_id": csv_session_id,
             "campaign_name": f"CSV Upload - {datetime.now().strftime('%Y-%m-%d %H:%M')}",
