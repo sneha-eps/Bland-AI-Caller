@@ -1281,15 +1281,16 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
 
 
 async def process_calls_with_retry_and_batching(call_requests, api_key, max_attempts, retry_interval_minutes, campaign_name):
-    """Process calls with flag-based retry system - only retry calls with success=False"""
-    print(f"🚀 Starting flag-based retry system for campaign '{campaign_name}'")
-    print(f"📊 Initial calls to process: {len(call_requests)}")
+    """Process calls with index-based traversal and flag-based retry system"""
+    print(f"🚀 Starting index-based traversal with flag-based retry system for campaign '{campaign_name}'")
+    print(f"📊 Total contacts in sheet: {len(call_requests)} (Index 0 to {len(call_requests)-1})")
     
-    # Create call tracker with flag-based system - ALL NUMBERS START WITH success=False
+    # Create call tracker with index-based traversal - ALL NUMBERS START WITH success=False
     call_tracker = []
-    for i, call_request in enumerate(call_requests):
+    for sheet_index, call_request in enumerate(call_requests):
         call_tracker.append({
-            'id': i,
+            'sheet_index': sheet_index,  # Track original position in sheet (0 to end)
+            'id': sheet_index,  # Use sheet index as ID
             'call_request': call_request,
             'success': False,  # Flag: False = needs retry/processing, True = completed successfully
             'attempts': 0,
@@ -1297,9 +1298,12 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
             'final_result': None,
             'call_status': 'pending',  # Initialize with pending status
             'patient_name': call_request.patient_name,
-            'phone_number': call_request.phone_number
+            'phone_number': call_request.phone_number,
+            'processing_status': 'queued'  # queued -> processing -> completed/failed
         })
-        print(f"📋 Initialized {call_request.patient_name} ({call_request.phone_number}) - Flag: False (needs processing)")
+        print(f"📋 [Index {sheet_index:03d}] Initialized {call_request.patient_name} ({call_request.phone_number}) - Flag: False (needs processing)")
+    
+    print(f"📊 Sheet traversal setup complete: Index 0 → {len(call_requests)-1} with flag-based processing")
     
     # Status tracking
     status_counts = {
@@ -1332,21 +1336,40 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
         
         print(f"\n🔄 RETRY ROUND {attempt_round}: Processing {len(calls_to_retry)} calls with success=False")
         
-        # Process calls in batches of 5 with 30-second delays for international rate limits
+        # Process calls in batches of 5 with index-based traversal for international rate limits
         batch_size = 5
-        for i in range(0, len(calls_to_retry), batch_size):
-            batch = calls_to_retry[i:i + batch_size]
-            print(f"🔄 Processing batch {i//batch_size + 1} of {(len(calls_to_retry) + batch_size - 1)//batch_size}: {len(batch)} calls")
+        
+        # Sort calls by sheet index to maintain traversal order
+        calls_to_retry_sorted = sorted(calls_to_retry, key=lambda x: x['sheet_index'])
+        
+        for i in range(0, len(calls_to_retry_sorted), batch_size):
+            batch = calls_to_retry_sorted[i:i + batch_size]
+            batch_start_idx = batch[0]['sheet_index']
+            batch_end_idx = batch[-1]['sheet_index']
+            
+            print(f"🔄 Processing batch {i//batch_size + 1} of {(len(calls_to_retry_sorted) + batch_size - 1)//batch_size}")
+            print(f"   📍 Sheet traversal: Index [{batch_start_idx:03d}] to [{batch_end_idx:03d}] ({len(batch)} calls)")
+            
+            # Mark calls as processing
+            for call_data in batch:
+                call_data['processing_status'] = 'processing'
             
             retry_tasks = []
             for call_data in batch:
-                retry_tasks.append(process_single_call_with_flag(call_data, api_key, semaphore))
+                retry_tasks.append(process_single_call_with_flag_indexed(call_data, api_key, semaphore))
             
             # Execute batch
             await asyncio.gather(*retry_tasks)
             
+            # Mark completed calls
+            for call_data in batch:
+                if call_data['success']:
+                    call_data['processing_status'] = 'completed'
+                else:
+                    call_data['processing_status'] = 'retry_needed'
+            
             # Add 30-second delay between batches (except for last batch)
-            if i + batch_size < len(calls_to_retry):
+            if i + batch_size < len(calls_to_retry_sorted):
                 print(f"⏰ Waiting 30 seconds before next batch for international rate limit protection...")
                 await asyncio.sleep(30)
         
@@ -1440,8 +1463,14 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
                 message="Processed by flag-based retry system"
             ))
     
-    # Final summary
-    print(f"\n🎯 Flag-based retry system completed for '{campaign_name}'!")
+    # Generate traversal summary with index statistics
+    completed_indexes = [c['sheet_index'] for c in call_tracker if c['success']]
+    failed_indexes = [c['sheet_index'] for c in call_tracker if not c['success']]
+    
+    print(f"\n🎯 Index-based traversal completed for '{campaign_name}'!")
+    print(f"   📊 Sheet Coverage: Index 0 → {len(call_tracker)-1} (Total: {len(call_tracker)} contacts)")
+    print(f"   ✅ Completed Indexes: {len(completed_indexes)} contacts")
+    print(f"   ❌ Failed Indexes: {len(failed_indexes)} contacts")
     print(f"   📞 Total calls: {len(final_results)}")
     print(f"   ✅ Confirmed: {status_counts['confirmed']}")
     print(f"   ❌ Cancelled: {status_counts['cancelled']}")
@@ -1451,15 +1480,34 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
     print(f"   📱 Wrong Number: {status_counts['wrong_number']}")
     print(f"   💥 Failed: {status_counts['failed']}")
     
+    # Show index ranges for debugging
+    if completed_indexes:
+        print(f"   📍 Completed range: {min(completed_indexes)} - {max(completed_indexes)}")
+    if failed_indexes:
+        print(f"   📍 Failed range: {min(failed_indexes)} - {max(failed_indexes)}")
+    
     return final_results
 
 
-async def process_single_call_with_flag(call_data, api_key, semaphore):
-    """Process a single call and update its flag based on success"""
+async def process_single_call_with_flag_indexed(call_data, api_key, semaphore):
+    """Process a single call with index tracking and update its flag based on success"""
     call_request = call_data['call_request']
     call_data['attempts'] += 1
+    sheet_index = call_data['sheet_index']
     
-    print(f"📞 Attempt {call_data['attempts']} for {call_data['patient_name']} ({call_data['phone_number']})")
+    print(f"📞 [Index {sheet_index:03d}] Attempt {call_data['attempts']}/{call_data['max_attempts']} for {call_data['patient_name']} ({call_data['phone_number']})")
+
+async def process_single_call_with_flag(call_data, api_key, semaphore):
+    """Legacy function - redirects to indexed version"""
+    return await process_single_call_with_flag_indexed(call_data, api_key, semaphore)
+
+async def process_single_call_with_flag_indexed(call_data, api_key, semaphore):
+    """Process a single call with index tracking and update its flag based on success"""
+    call_request = call_data['call_request']
+    call_data['attempts'] += 1
+    sheet_index = call_data['sheet_index']
+    
+    print(f"📞 [Index {sheet_index:03d}] Attempt {call_data['attempts']}/{call_data['max_attempts']} for {call_data['patient_name']} ({call_data['phone_number']})")
     
     try:
         # Make the call
@@ -1500,14 +1548,14 @@ async def process_single_call_with_flag(call_data, api_key, semaphore):
                             call_data['success'] = True
                             call_data['call_status'] = call_status
                             call_data['final_result'] = result
-                            print(f"🔄 FLAG CHANGED: {call_data['patient_name']} - Flag: {old_flag} → True - Status: {call_status}")
-                            print(f"✅ COMPLETED: {call_data['patient_name']} - No more retries needed")
+                            print(f"🔄 [Index {sheet_index:03d}] FLAG CHANGED: {call_data['patient_name']} - Flag: {old_flag} → True - Status: {call_status}")
+                            print(f"✅ [Index {sheet_index:03d}] COMPLETED: {call_data['patient_name']} - No more retries needed")
                         else:
                             # busy_voicemail or failed - keep flag as False for retry
                             call_data['success'] = False
                             call_data['call_status'] = call_status
-                            print(f"🔄 FLAG UNCHANGED: {call_data['patient_name']} - Flag remains: False - Status: {call_status}")
-                            print(f"⏳ RETRY NEEDED: {call_data['patient_name']} - Will retry in next round")
+                            print(f"🔄 [Index {sheet_index:03d}] FLAG UNCHANGED: {call_data['patient_name']} - Flag remains: False - Status: {call_status}")
+                            print(f"⏳ [Index {sheet_index:03d}] RETRY NEEDED: {call_data['patient_name']} - Will retry in next round")
                     
                     else:
                         # API error - keep success=False for retry
@@ -1521,8 +1569,8 @@ async def process_single_call_with_flag(call_data, api_key, semaphore):
             call_data['success'] = False
             call_data['call_status'] = 'failed'
             call_data['final_result'] = result
-            print(f"🔄 FLAG UNCHANGED: {call_data['patient_name']} - Flag remains: {old_flag} → False")
-            print(f"⏳ RETRY NEEDED: {call_data['patient_name']} - Call initiation failed: {result.error}")
+            print(f"🔄 [Index {sheet_index:03d}] FLAG UNCHANGED: {call_data['patient_name']} - Flag remains: {old_flag} → False")
+            print(f"⏳ [Index {sheet_index:03d}] RETRY NEEDED: {call_data['patient_name']} - Call initiation failed: {result.error}")
     
     except Exception as e:
         # Exception occurred - keep flag as False for retry
@@ -1535,8 +1583,8 @@ async def process_single_call_with_flag(call_data, api_key, semaphore):
             patient_name=call_data['patient_name'],
             phone_number=call_data['phone_number']
         )
-        print(f"🔄 FLAG UNCHANGED: {call_data['patient_name']} - Flag remains: {old_flag} → False")
-        print(f"⏳ RETRY NEEDED: {call_data['patient_name']} - Exception: {str(e)}")
+        print(f"🔄 [Index {sheet_index:03d}] FLAG UNCHANGED: {call_data['patient_name']} - Flag remains: {old_flag} → False")
+        print(f"⏳ [Index {sheet_index:03d}] RETRY NEEDED: {call_data['patient_name']} - Exception: {str(e)}")
     
     # Extended delay for international rate limit protection
     await asyncio.sleep(3)
