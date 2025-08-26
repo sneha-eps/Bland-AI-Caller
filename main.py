@@ -11,6 +11,7 @@ import aiohttp
 import uuid
 from datetime import datetime, timedelta
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form, Depends, status
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.security import HTTPBasic, HTTPBasicCredentials
@@ -38,6 +39,13 @@ except ImportError:
 
 app = FastAPI(title="Bland AI Call Center",
               description="Make automated calls using Bland AI")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Allows all origins
+    allow_credentials=True,
+    allow_methods=["*"],  # Allows all methods
+    allow_headers=["*"],  # Allows all headers
+)
 templates = Jinja2Templates(directory="templates")
 
 # In-memory storage (in production, use a database)
@@ -1188,6 +1196,7 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
 
         # Prepare all call requests
         call_requests = []
+        validation_failures = []
         for row in rows:
             row_count += 1
             # Validate required fields
@@ -1200,7 +1209,7 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
             ]
 
             if missing_fields:
-                results.append(
+                validation_failures.append(
                     CallResult(
                         success=False,
                         error=f"Missing required fields: {', '.join(missing_fields)}",
@@ -1240,8 +1249,10 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
                 appointment_time=safe_str(row.get('time', '')),
                 office_location=office_location)
             call_requests.append(call_request)
+            print(f"📊 Validation complete: {len(validation_failures)} failures, {len(call_requests)} valid calls")
 
         # Process all valid calls with retry logic and batch delays
+        call_results = []
         if call_requests:
             max_attempts = campaign.get('max_attempts', 3)
             retry_interval_minutes = campaign.get('retry_interval', 30)
@@ -1251,7 +1262,7 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
             print(f"🌍 International rate limit protection: 2 concurrent calls, 30s batch delays, extended retry intervals")
 
             # Process calls with retry logic and batch delays
-            final_results = await process_calls_with_retry_and_batching(
+            call_results = await process_calls_with_retry_and_batching(
                 call_requests,
                 api_key,
                 max_attempts,
@@ -1259,7 +1270,7 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
                 campaign['name'],
                 campaign_id
             )
-            results.extend(final_results)
+            results = validation_failures + call_results
 
         # Calculate summary
         successful_calls = sum(1 for r in results if r.success)
@@ -1295,7 +1306,11 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
         }
 
     except Exception as e:
+        print(f"❌ Error starting campaign {campaign_id}: {str(e)}")
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error starting campaign: {str(e)}")
+        
 
 
 async def process_calls_with_retry_and_batching(call_requests, api_key, max_attempts, retry_interval_minutes, campaign_name, campaign_id):
