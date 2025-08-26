@@ -550,7 +550,7 @@ def format_duration_display(total_duration_seconds):
 
 
 async def make_single_call_async(call_request: CallRequest, api_key: str,
-                                 semaphore: asyncio.Semaphore, campaign_id: str = None) -> CallResult:
+                                 semaphore: asyncio.Semaphore, campaign_id: Optional[str] = None) -> CallResult:
     """Make a single call asynchronously with concurrency control"""
     async with semaphore:  # Limit concurrent calls to 10
         call_data = {
