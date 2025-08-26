@@ -1494,96 +1494,39 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
 
 
 async def process_single_call_with_flag_indexed(call_data, api_key, semaphore, campaign_id):
-    """Process a single call with index tracking and update its flag based on success"""
+    """Process a single call and update its flag based ONLY on successful initiation."""
     call_request = call_data['call_request']
     call_data['attempts'] += 1
     sheet_index = call_data['sheet_index']
 
-    print(f"📞 [Index {sheet_index:03d}] Attempt {call_data['attempts']}/{call_data['max_attempts']} for {call_data['patient_name']} ({call_data['phone_number']})")
+    print(f"📞 [Index {sheet_index:03d}] Attempt {call_data['attempts']}/{call_data['max_attempts']} for {call_data['patient_name']}")
 
     try:
-        # Make the call
+        # Pass campaign_id to the async call function
         result = await make_single_call_async(call_request, api_key, semaphore, campaign_id)
 
+        # The ONLY goal here is to see if the call was successfully QUEUED.
+        # The final status will be handled by the webhook.
         if result.success and result.call_id:
-            # Call was initiated successfully, now check the actual outcome
-            await asyncio.sleep(3)  # Wait for call to process
-
-            # Get call details to determine final status
-            async with aiohttp.ClientSession() as session:
-                async with session.get(
-                    f"https://api.bland.ai/v1/calls/{result.call_id}",
-                    headers={"Authorization": f"Bearer {api_key}"},
-                    timeout=aiohttp.ClientTimeout(total=15)
-                ) as response:
-
-                    if response.status == 200:
-                        call_data_api = await response.json()
-                        transcript = call_data_api.get('transcript', '')
-
-                        if transcript and transcript.strip():
-                            call_status = analyze_call_transcript(transcript)
-                            final_summary = extract_final_summary(transcript)
-                            print(f"📋 [Index {sheet_index:03d}] Transcript Analysis: {call_data['patient_name']}")
-                            print(f"   📝 Status from transcript: {call_status}")
-                            print(f"   📄 Final summary: {final_summary[:100]}{'...' if len(final_summary) > 100 else ''}")
-                        else:
-                            call_status = 'busy_voicemail'
-                            final_summary = "No transcript available - likely voicemail or no answer"
-                            print(f"📋 [Index {sheet_index:03d}] No transcript: {call_data['patient_name']} - Status: {call_status}")
-
-                        # Update result with analysis
-                        result.transcript = transcript
-                        result.call_status = call_status
-                        result.final_summary = final_summary
-
-                        # Determine if this is a successful completion and change flag accordingly
-                        if call_status in ['confirmed', 'cancelled', 'rescheduled', 'not_available', 'wrong_number']:
-                            # These are definitive responses - change flag to True (no more retries needed)
-                            old_flag = call_data['success']
-                            call_data['success'] = True
-                            call_data['call_status'] = call_status
-                            call_data['final_result'] = result
-                            print(f"🔄 [Index {sheet_index:03d}] FLAG CHANGED: {call_data['patient_name']} - Flag: {old_flag} → True - Status: {call_status}")
-                            print(f"✅ [Index {sheet_index:03d}] COMPLETED: {call_data['patient_name']} - No more retries needed")
-                        else:
-                            # busy_voicemail or failed - keep flag as False for retry
-                            call_data['success'] = False
-                            call_data['call_status'] = call_status
-                            print(f"🔄 [Index {sheet_index:03d}] FLAG UNCHANGED: {call_data['patient_name']} - Flag remains: False - Status: {call_status}")
-                            print(f"⏳ [Index {sheet_index:03d}] RETRY NEEDED: {call_data['patient_name']} - Will retry in next round")
-
-                    else:
-                        # API error - keep success=False for retry
-                        call_data['success'] = False
-                        call_data['call_status'] = 'failed'
-                        print(f"⏳ RETRY NEEDED (Flag=False): {call_data['patient_name']} - API Error")
-
-        else:
-            # Call initiation failed - keep flag as False for retry
-            old_flag = call_data['success']
-            call_data['success'] = False
-            call_data['call_status'] = 'failed'
+            call_data['success'] = True  # Flag TRUE means successfully initiated
             call_data['final_result'] = result
-            print(f"🔄 [Index {sheet_index:03d}] FLAG UNCHANGED: {call_data['patient_name']} - Flag remains: {old_flag} → False")
-            print(f"⏳ [Index {sheet_index:03d}] RETRY NEEDED: {call_data['patient_name']} - Call initiation failed: {result.error}")
+            result.call_status = 'initiated'  # Set initial status
+            print(f"✅ [Index {sheet_index:03d}] INITIATED: {call_data['patient_name']} - Call ID: {result.call_id}")
+        else:
+            call_data['success'] = False  # Flag FALSE means it failed to initiate
+            call_data['final_result'] = result
+            print(f"⏳ [Index {sheet_index:03d}] FAILED TO INITIATE: {call_data['patient_name']} - Error: {result.error}")
 
     except Exception as e:
-        # Exception occurred - keep flag as False for retry
-        old_flag = call_data['success']
         call_data['success'] = False
-        call_data['call_status'] = 'failed'
         call_data['final_result'] = CallResult(
-            success=False,
-            error=str(e),
-            patient_name=call_data['patient_name'],
-            phone_number=call_data['phone_number']
+            success=False, error=str(e),
+            patient_name=call_data['patient_name'], phone_number=call_data['phone_number']
         )
-        print(f"🔄 [Index {sheet_index:03d}] FLAG UNCHANGED: {call_data['patient_name']} - Flag remains: {old_flag} → False")
-        print(f"⏳ [Index {sheet_index:03d}] RETRY NEEDED: {call_data['patient_name']} - Exception: {str(e)}")
+        print(f"💥 [Index {sheet_index:03d}] EXCEPTION: {call_data['patient_name']} - {str(e)}")
 
-    # Extended delay for international rate limit protection
-    await asyncio.sleep(3)
+    # Add a small delay to respect rate limits
+    await asyncio.sleep(1)
 
 # Keep the original function for backward compatibility (in case it's used elsewhere)
 async def process_calls_with_retry(call_requests, api_key, max_attempts, retry_interval_minutes, campaign_name, campaign_id):
