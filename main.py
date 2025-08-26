@@ -550,7 +550,7 @@ def format_duration_display(total_duration_seconds):
 
 
 async def make_single_call_async(call_request: CallRequest, api_key: str,
-                                 semaphore: asyncio.Semaphore) -> CallResult:
+                                 semaphore: asyncio.Semaphore, campaign_id: str) -> CallResult:
     """Make a single call asynchronously with concurrency control"""
     async with semaphore:  # Limit concurrent calls to 10
         call_data = {
@@ -574,7 +574,10 @@ async def make_single_call_async(call_request: CallRequest, api_key: str,
                     provider_name=call_request.provider_name
                 ),
                 "voice": selected_voice,
-                "request_data": call_data
+                "request_data": {
+                  **call_data,
+                  "campaign_id": campaign_id 
+                }
             }
 
             print(
@@ -1239,7 +1242,8 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
                 api_key,
                 max_attempts,
                 retry_interval_minutes,
-                campaign['name']
+                campaign['name'],
+                campaign_id
             )
             results.extend(final_results)
 
@@ -1280,7 +1284,7 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
         raise HTTPException(status_code=500, detail=f"Error starting campaign: {str(e)}")
 
 
-async def process_calls_with_retry_and_batching(call_requests, api_key, max_attempts, retry_interval_minutes, campaign_name):
+async def process_calls_with_retry_and_batching(call_requests, api_key, max_attempts, retry_interval_minutes, campaign_name, campaign_id):
     """Process calls with index-based traversal and flag-based retry system"""
     print(f"🚀 Starting index-based traversal with flag-based retry system for campaign '{campaign_name}'")
     print(f"📊 Total contacts in sheet: {len(call_requests)} (Index 0 to {len(call_requests)-1})")
@@ -1356,7 +1360,7 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
 
             retry_tasks = []
             for call_data in batch:
-                retry_tasks.append(process_single_call_with_flag_indexed(call_data, api_key, semaphore))
+                retry_tasks.append(process_single_call_with_flag_indexed(call_data, api_key, semaphore, campaign_id))
 
             # Execute batch
             await asyncio.gather(*retry_tasks)
@@ -1489,7 +1493,7 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
     return final_results
 
 
-async def process_single_call_with_flag_indexed(call_data, api_key, semaphore):
+async def process_single_call_with_flag_indexed(call_data, api_key, semaphore, campaign_id):
     """Process a single call with index tracking and update its flag based on success"""
     call_request = call_data['call_request']
     call_data['attempts'] += 1
@@ -1499,7 +1503,7 @@ async def process_single_call_with_flag_indexed(call_data, api_key, semaphore):
 
     try:
         # Make the call
-        result = await make_single_call_async(call_request, api_key, semaphore)
+        result = await make_single_call_async(call_request, api_key, semaphore, campaign_id)
 
         if result.success and result.call_id:
             # Call was initiated successfully, now check the actual outcome
@@ -1584,7 +1588,7 @@ async def process_single_call_with_flag_indexed(call_data, api_key, semaphore):
 # Keep the original function for backward compatibility (in case it's used elsewhere)
 async def process_calls_with_retry(call_requests, api_key, max_attempts, retry_interval_minutes, campaign_name):
     """Legacy function - now redirects to new batching function"""
-    return await process_calls_with_retry_and_batching(call_requests, api_key, max_attempts, retry_interval_minutes, campaign_name)
+    return await process_calls_with_retry_and_batching(call_requests, api_key, max_attempts, retry_interval_minutes, campaign_name, campaign_id)
 
 
 async def send_final_voicemail(call_request: CallRequest, api_key: str):
@@ -1858,7 +1862,7 @@ async def process_csv(file: UploadFile = File(...),
 
             for call_request in call_requests:
                 try:
-                    result = await make_single_call_async(call_request, api_key, semaphore)
+                    result = await make_single_call_async(call_request, api_key, semaphore, campaign_id)
                     call_results.append(result)
 
                     print(f"📞 Call to {call_request.patient_name}: {'SUCCESS' if result.success else 'FAILED'}")
@@ -2726,54 +2730,47 @@ async def view_campaign_results(campaign_id: str):
 
 @app.post("/bland_webhook")
 async def bland_webhook(request: Request):
-            """Webhook to receive Bland AI call updates"""
-            try:
-                data = await request.json()
-                event_type = data.get("type")
-                call_id = data.get("call_id")
-                campaign_id = data.get("campaign_id")
-                bland_status = data.get("status", "").lower()
+                  """Webhook to receive Bland AI call updates and update the main results DB."""
+                  try:
+                      data = await request.json()
+                      print(f"🔔 Webhook received: {data}")
 
-                # Get transcript from any possible field
-                transcript = (
-                    data.get("transcript")
-                    or data.get("call", {}).get("transcript")
-                    or data.get("event", {}).get("transcript")
-                )
+                      call_id = data.get("call_id")
+                      request_data = data.get("request_data", {})
+                      campaign_id = request_data.get("campaign_id") # <-- Get campaign_id from request_data
 
-                # Finalize only when call is completed
-                if event_type == "call.completed":
-                    final_summary = extract_final_summary(transcript) if transcript else ""
-                    appointment_status = (
-                        analyze_call_transcript(transcript) if transcript else "Unknown"
-                    )
+                      if not call_id or not campaign_id:
+                          print("Webhook ignored: Missing call_id or campaign_id in request_data")
+                          return {"success": False, "reason": "Missing call_id or campaign_id"}
 
-                    # If no transcript, fallback to bland status
-                    if not transcript:
-                        if bland_status in ["busy", "voicemail"]:
-                            appointment_status = "Busy/Voicemail"
+                      # Find the campaign in our main results database
+                      if campaign_id in campaign_results_db:
+                          # Find the specific call within that campaign's results
+                          for result in campaign_results_db[campaign_id].get("results", []):
+                              if result.get("call_id") == call_id:
+                                  # Update this call's data with the final results
+                                  transcript = data.get('transcript', '')
+                                  final_status = analyze_call_transcript(transcript) if transcript else "busy_voicemail"
+                                  final_summary = extract_final_summary(transcript)
+                                  duration = parse_duration(data.get('call_length', 0))
 
-                    # Ensure campaign log exists
-                    if campaign_id not in campaign_logs:
-                        campaign_logs[campaign_id] = []
+                                  result.update({
+                                      "transcript": transcript,
+                                      "call_status": final_status,
+                                      "final_summary": final_summary,
+                                      "duration": duration
+                                  })
+                                  print(f"✅ Webhook updated call {call_id} in campaign {campaign_id} with status: {final_status}")
 
-                    # Append new call record instead of overwriting
-                    campaign_logs[campaign_id].append({
-                        "call_id": call_id,
-                        "status": appointment_status,
-                        "summary": final_summary,
-                        "transcript": transcript,
-                        "duration": data.get("duration", 0),
-                        "timestamp": datetime.utcnow().isoformat()
-                    })
+                                  # Persist the changes to the JSON file
+                                  save_campaign_results_db(campaign_results_db)
+                                  break
 
-                    print(f"📞 Call completed | {appointment_status} | ID: {call_id}")
+                      return {"success": True}
 
-                return {"success": True}
-
-            except Exception as e:
-                print(f"💥 Webhook error: {str(e)}")
-                return {"success": False, "error": str(e)}
+                  except Exception as e:
+                      print(f"💥 Webhook error: {str(e)}")
+                      return {"success": False, "error": str(e)}
 
 
 @app.get("/docs")
