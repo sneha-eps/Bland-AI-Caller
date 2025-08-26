@@ -1219,14 +1219,18 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
             def safe_str(value):
                 return str(value).strip() if value is not None else ''
 
-            # Get office location and try to map to full address
-            raw_office_location = safe_str(row.get('office_location', ''))
-            full_address = clinic_manager.find_clinic_address(raw_office_location)
+            # Use office_location from uploaded file as foreign key to lookup full address
+            office_location_key = safe_str(row.get('office_location', ''))
+            full_address = clinic_manager.find_clinic_address(office_location_key)
             
-            # Use full address if found, otherwise use original
-            office_location = full_address if full_address else raw_office_location
-            
-            print(f"📍 Office location mapping: '{raw_office_location}' -> '{office_location}'")
+            if full_address:
+                # Found foreign key mapping - use full address from clinic locations
+                office_location = full_address
+                print(f"📍 Campaign Foreign Key Mapping: '{office_location_key}' -> '{office_location}'")
+            else:
+                # No foreign key mapping found - use original and warn
+                office_location = office_location_key
+                print(f"⚠️ Campaign Foreign Key NOT FOUND: '{office_location_key}' - using as-is (consider adding to clinic locations)")
 
             call_request = CallRequest(
                 phone_number=formatted_phone,
@@ -1890,14 +1894,18 @@ async def process_csv(file: UploadFile = File(...),
                 value_str = str(value).strip()
                 return value_str if value_str.lower() not in ['nan', 'null'] else ''
 
-            # Get office location and try to map to full address
-            raw_office_location = safe_str(row.get('office_location', ''))
-            full_address = clinic_manager.find_clinic_address(raw_office_location)
+            # Use office_location from CSV as foreign key to lookup full address
+            office_location_key = safe_str(row.get('office_location', ''))
+            full_address = clinic_manager.find_clinic_address(office_location_key)
             
-            # Use full address if found, otherwise use original
-            office_location = full_address if full_address else raw_office_location
-            
-            print(f"📍 CSV Office location mapping: '{raw_office_location}' -> '{office_location}'")
+            if full_address:
+                # Found mapping - use full address from clinic locations CSV
+                office_location = full_address
+                print(f"📍 CSV Foreign Key Mapping: '{office_location_key}' -> '{office_location}'")
+            else:
+                # No mapping found - use original value and log warning
+                office_location = office_location_key
+                print(f"⚠️ CSV Foreign Key NOT FOUND: '{office_location_key}' - using as-is (consider adding to clinic locations)")
 
             call_request = CallRequest(
                 phone_number=formatted_phone,

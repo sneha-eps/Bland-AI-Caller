@@ -72,27 +72,34 @@ class ClinicDataManager:
                             self.location_aliases[part.lower()] = office_name
     
     def find_clinic_address(self, location_input: str) -> Optional[str]:
-        """Find the full address for a given location input"""
+        """Find the full address for a given location input (foreign key lookup)"""
         if not location_input:
             return None
             
         location_lower = location_input.lower().strip()
         
-        # Direct match
+        # Direct match with aliases (foreign key lookup)
         if location_lower in self.location_aliases:
             clinic_name = self.location_aliases[location_lower]
-            return self.clinic_locations.get(clinic_name)
+            address = self.clinic_locations.get(clinic_name)
+            print(f"🔗 Foreign Key FOUND: '{location_input}' -> '{clinic_name}' -> '{address}'")
+            return address
         
         # Fuzzy matching - check if input contains any known location
         for alias, clinic_name in self.location_aliases.items():
             if alias in location_lower or location_lower in alias:
-                return self.clinic_locations.get(clinic_name)
+                address = self.clinic_locations.get(clinic_name)
+                print(f"🔗 Foreign Key FUZZY MATCH: '{location_input}' -> '{alias}' -> '{clinic_name}' -> '{address}'")
+                return address
                 
         # Last resort - partial matching with clinic names
         for clinic_name, address in self.clinic_locations.items():
             if location_input.lower() in clinic_name.lower():
+                print(f"🔗 Foreign Key PARTIAL MATCH: '{location_input}' -> '{clinic_name}' -> '{address}'")
                 return address
-                
+        
+        print(f"❌ Foreign Key NOT FOUND: '{location_input}' not found in clinic locations database")
+        print(f"   Available aliases: {list(self.location_aliases.keys())}")
         return None
     
     def get_all_locations(self) -> List[Tuple[str, str]]:
