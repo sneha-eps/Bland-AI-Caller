@@ -21,6 +21,7 @@ import importlib.util
 import re
 import hashlib
 import secrets
+from clinic_data import clinic_manager
 
 # Check if 'blandai' package is available (optional since we're using requests directly)
 try:
@@ -1218,13 +1219,22 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
             def safe_str(value):
                 return str(value).strip() if value is not None else ''
 
+            # Get office location and try to map to full address
+            raw_office_location = safe_str(row.get('office_location', ''))
+            full_address = clinic_manager.find_clinic_address(raw_office_location)
+            
+            # Use full address if found, otherwise use original
+            office_location = full_address if full_address else raw_office_location
+            
+            print(f"📍 Office location mapping: '{raw_office_location}' -> '{office_location}'")
+
             call_request = CallRequest(
                 phone_number=formatted_phone,
                 patient_name=safe_str(row.get('patient_name', '')),
                 provider_name=safe_str(row.get('provider_name', '')),
                 appointment_date=safe_str(row.get('date', '')),
                 appointment_time=safe_str(row.get('time', '')),
-                office_location=safe_str(row.get('office_location', '')))
+                office_location=office_location)
             call_requests.append(call_request)
 
         # Process all valid calls with retry logic and batch delays
@@ -1687,6 +1697,105 @@ async def voice_preview(voice_name: str):
                             return {"success": False, "error": "Invalid response format from voice API"}
 
                 elif response.status == 404:
+
+
+@app.get("/api/clinic_locations")
+async def get_clinic_locations():
+    """Get all available clinic locations"""
+    try:
+        locations = clinic_manager.get_all_locations()
+        return {
+            "success": True,
+            "locations": [{"name": name, "address": address} for name, address in locations]
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Error loading clinic locations: {str(e)}"
+        }
+
+@app.get("/api/providers")
+async def get_providers():
+    """Get all available providers"""
+    try:
+        providers = clinic_manager.get_all_providers()
+        return {
+            "success": True,
+            "providers": providers
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Error loading providers: {str(e)}"
+        }
+
+@app.get("/api/providers_by_location/{location}")
+async def get_providers_by_location(location: str):
+    """Get providers available at a specific location"""
+    try:
+        providers = clinic_manager.find_providers_by_location(location)
+        return {
+            "success": True,
+            "location": location,
+            "providers": providers
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Error finding providers for location: {str(e)}"
+        }
+
+@app.post("/admin/upload_clinic_data")
+async def upload_clinic_data(
+    request: Request,
+    clinic_file: UploadFile = File(None),
+    provider_file: UploadFile = File(None)
+):
+    """Admin endpoint to upload updated clinic and provider data"""
+    user = require_admin(request)
+    
+    results = {"clinic_data": False, "provider_data": False}
+    
+    try:
+        if clinic_file and clinic_file.filename:
+            if clinic_file.filename.endswith('.csv'):
+                content = await clinic_file.read()
+                csv_content = content.decode('utf-8')
+                if clinic_manager.load_clinic_data_from_csv(csv_content):
+                    results["clinic_data"] = True
+            elif clinic_file.filename.endswith('.xlsx'):
+                content = await clinic_file.read()
+                df = pd.read_excel(io.BytesIO(content))
+                csv_content = df.to_csv(index=False)
+                if clinic_manager.load_clinic_data_from_csv(csv_content):
+                    results["clinic_data"] = True
+        
+        if provider_file and provider_file.filename:
+            if provider_file.filename.endswith('.csv'):
+                content = await provider_file.read()
+                csv_content = content.decode('utf-8')
+                if clinic_manager.load_provider_data_from_csv(csv_content):
+                    results["provider_data"] = True
+            elif provider_file.filename.endswith('.xlsx'):
+                content = await provider_file.read()
+                df = pd.read_excel(io.BytesIO(content))
+                csv_content = df.to_csv(index=False)
+                if clinic_manager.load_provider_data_from_csv(csv_content):
+                    results["provider_data"] = True
+        
+        return {
+            "success": any(results.values()),
+            "results": results,
+            "message": "Data upload completed"
+        }
+        
+    except Exception as e:
+        return {
+            "success": False,
+            "message": f"Error uploading clinic data: {str(e)}"
+        }
+
+
                     return {"success": False, "error": f"Voice ID '{voice_id}' not found in Bland AI"}
                 elif response.status == 401:
                     return {"success": False, "error": "Invalid API key"}
@@ -1781,13 +1890,22 @@ async def process_csv(file: UploadFile = File(...),
                 value_str = str(value).strip()
                 return value_str if value_str.lower() not in ['nan', 'null'] else ''
 
+            # Get office location and try to map to full address
+            raw_office_location = safe_str(row.get('office_location', ''))
+            full_address = clinic_manager.find_clinic_address(raw_office_location)
+            
+            # Use full address if found, otherwise use original
+            office_location = full_address if full_address else raw_office_location
+            
+            print(f"📍 CSV Office location mapping: '{raw_office_location}' -> '{office_location}'")
+
             call_request = CallRequest(
                 phone_number=formatted_phone,
                 patient_name=safe_str(row.get('patient_name', '')),
                 provider_name=safe_str(row.get('provider_name', '')),
                 appointment_date=safe_str(row.get('date', '')),
                 appointment_time=safe_str(row.get('time', '')),
-                office_location=safe_str(row.get('office_location', ''))
+                office_location=office_location
             )
 
             call_requests.append(call_request)
