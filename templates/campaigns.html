@@ -1481,7 +1481,7 @@
                             <option value="+20">🇪🇬 Egypt (+20)</option>
                             <option value="+971">🇦🇪 UAE (+971)</option>
                             <option value="+966">🇸🇦 Saudi Arabia (+966)</option>
-                            <option value="+65">🇸🇬 Singapore (+65)</option>
+                            <option value="+65">🇸🇸 Singapore (+65)</option>
                             <option value="+60">🇲🇾 Malaysia (+60)</option>
                             <option value="+66">🇹🇭 Thailand (+66)</option>
                             <option value="+84">🇻🇳 Vietnam (+84)</option>
@@ -1861,7 +1861,7 @@
         async function loadCampaignAnalytics(campaignId) {
             try {
                 console.log('Loading analytics for campaign:', campaignId);
-                
+
                 // Show loading state
                 document.getElementById('totalCalls').textContent = 'Loading...';
                 document.getElementById('totalDuration').textContent = 'Loading...';
@@ -1870,7 +1870,7 @@
 
                 const response = await fetch(`/campaign_analytics/${campaignId}`);
                 console.log('Analytics response status:', response.status);
-                
+
                 const data = await response.json();
                 console.log('Analytics data:', data);
 
@@ -1900,7 +1900,7 @@
                     // Show no calls message
                     document.getElementById('noCallsMessage').style.display = 'block';
                     document.querySelector('.calls-table-container').style.display = 'none';
-                    
+
                     // Reset score cards to zero
                     document.getElementById('totalCalls').textContent = '0';
                     document.getElementById('totalDuration').textContent = '0s';
@@ -1914,7 +1914,7 @@
             } catch (error) {
                 console.error('Error loading campaign analytics:', error);
                 alert('Error loading campaign analytics: ' + error.message);
-                
+
                 // Show error state
                 document.getElementById('totalCalls').textContent = 'Error';
                 document.getElementById('totalDuration').textContent = 'Error';
@@ -1936,75 +1936,94 @@
             document.querySelector('.calls-table-container').style.display = 'block';
 
             calls.forEach((call, index) => {
-                const row = document.createElement('tr');
-
-                // Use the call_status from analytics data if available
+                // Use the call_status from transcript analysis
                 let callStatus = call.call_status || 'busy_voicemail';
                 let statusIcon = 'fa-phone-slash';
                 let statusClass = 'busy_voicemail';
+                let statusNote = '';
 
-                // Set appropriate icon and class based on status
+                // Set appropriate icon, class, and note based on transcript-analyzed status
                 switch (callStatus) {
                     case 'confirmed':
                         statusIcon = 'fa-check-circle';
                         statusClass = 'confirmed';
+                        statusNote = 'Confirmed via transcript analysis';
                         break;
                     case 'cancelled':
                         statusIcon = 'fa-times-circle';
                         statusClass = 'cancelled';
+                        statusNote = 'Cancelled via transcript analysis';
                         break;
                     case 'rescheduled':
                         statusIcon = 'fa-calendar-alt';
                         statusClass = 'rescheduled';
-                        break;
-                    case 'busy_voicemail':
-                        statusIcon = 'fa-phone-slash';
-                        statusClass = 'busy_voicemail';
+                        statusNote = 'Rescheduled via transcript analysis';
                         break;
                     case 'not_available':
                         statusIcon = 'fa-user-clock';
                         statusClass = 'not_available';
+                        statusNote = 'Not available via transcript analysis';
                         break;
                     case 'wrong_number':
                         statusIcon = 'fa-phone-times';
                         statusClass = 'wrong_number';
+                        statusNote = 'Wrong number via transcript analysis';
+                        break;
+                    case 'busy_voicemail':
+                        statusIcon = 'fa-phone-slash';
+                        statusClass = 'busy_voicemail';
+                        statusNote = call.transcript ? 'Voicemail detected in transcript' : 'No transcript - likely voicemail';
                         break;
                     case 'busy':
                         statusIcon = 'fa-phone-slash';
                         statusClass = 'busy';
                         callStatus = 'busy_voicemail'; // Normalize display
+                        statusNote = 'Busy/voicemail via transcript analysis';
                         break;
                     case 'completed':
                         statusIcon = 'fa-check';
                         statusClass = 'confirmed';
+                        statusNote = 'Call completed successfully';
                         break;
                     case 'failed':
                         statusIcon = 'fa-exclamation-triangle';
                         statusClass = 'busy_voicemail';
+                        statusNote = 'Call failed to connect';
                         break;
                     default:
                         statusIcon = 'fa-phone-slash';
                         statusClass = 'busy_voicemail';
                         callStatus = 'busy_voicemail';
+                        statusNote = 'Status unknown - defaulted to busy/voicemail';
                 }
 
-                // Create final summary display
+                // Create final summary display based on transcript analysis
                 let finalSummarySection = '';
-                if (call.final_summary && call.final_summary.trim()) {
+                if (call.final_summary && call.final_summary.trim() && call.final_summary !== "No transcript available") {
                     const summaryPreview = call.final_summary.length > 80 
                         ? call.final_summary.substring(0, 80) + '...' 
                         : call.final_summary;
-                    
+
                     finalSummarySection = `
                         <div class="final-summary-preview" onclick="showFullSummary('${encodeURIComponent(call.final_summary)}', '${call.patient_name}')" 
-                             style="background: var(--bg-secondary); padding: 0.5rem; border-radius: 6px; border-left: 3px solid var(--success-color); font-size: 0.875rem; line-height: 1.4; cursor: pointer; transition: var(--transition);">
-                            <strong style="color: var(--success-color);">📋 Agent Summary:</strong><br>
-                            "${summaryPreview}"
-                            ${call.final_summary.length > 80 ? '<br><small style="color: var(--primary-color); text-decoration: underline;">Click to view full summary</small>' : ''}
+                             style="background: var(--bg-secondary); padding: 0.75rem; border-radius: 8px; border-left: 4px solid var(--success-color); font-size: 0.875rem; line-height: 1.4; cursor: pointer; transition: var(--transition); box-shadow: var(--shadow-sm);">
+                            <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
+                                <i class="fas fa-robot" style="color: var(--success-color);"></i>
+                                <strong style="color: var(--success-color);">AI Call Analysis</strong>
+                            </div>
+                            <div style="color: var(--text-primary); font-weight: 500;">
+                                "${summaryPreview}"
+                            </div>
+                            ${call.final_summary.length > 80 ? '<div style="margin-top: 0.5rem;"><small style="color: var(--primary-color); text-decoration: underline;">Click to view full analysis</small></div>' : ''}
                         </div>
                     `;
                 } else {
-                    finalSummarySection = `<div style="color: var(--text-tertiary); font-size: 0.875rem;">No summary available</div>`;
+                    finalSummarySection = `
+                        <div style="color: var(--text-tertiary); font-size: 0.875rem; padding: 0.5rem; background: var(--bg-tertiary); border-radius: 6px; text-align: center;">
+                            <i class="fas fa-phone-slash" style="margin-right: 0.5rem;"></i>
+                            No call analysis available
+                        </div>
+                    `;
                 }
 
                 // Create transcript preview with better handling
@@ -2015,7 +2034,7 @@
                     transcriptPreview = call.transcript.length > 100 
                         ? call.transcript.substring(0, 100) + '...' 
                         : call.transcript;
-                    
+
                     transcriptSection = `
                         <div class="transcript-preview" onclick="showFullTranscript('${encodeURIComponent(call.transcript)}', '${call.patient_name}')" 
                              style="cursor: pointer; color: var(--primary-color); text-decoration: underline;">
@@ -2032,7 +2051,7 @@
                     transcriptSection = `<div class="transcript-preview" style="color: var(--text-tertiary);">${transcriptPreview}</div>`;
                 }
 
-                // Format status display
+                // Format status display with transcript analysis context
                 let statusDisplay;
                 switch(callStatus) {
                     case 'busy_voicemail':
@@ -2052,10 +2071,15 @@
                     <td style="font-weight: 600;">${call.patient_name || 'Unknown'}</td>
                     <td style="font-family: monospace;">${call.phone_number || 'Unknown'}</td>
                     <td>
-                        <span class="call-status ${statusClass}">
-                            <i class="fas ${statusIcon}"></i>
-                            ${statusDisplay}
-                        </span>
+                        <div style="display: flex; flex-direction: column; gap: 0.25rem;">
+                            <span class="call-status ${statusClass}" title="${statusNote}">
+                                <i class="fas ${statusIcon}"></i>
+                                ${statusDisplay}
+                            </span>
+                            <small style="color: var(--text-tertiary); font-size: 0.75rem;">
+                                ${call.transcript ? 'From transcript' : 'No transcript'}
+                            </small>
+                        </div>
                     </td>
                     <td style="font-family: monospace; font-weight: 600;">${formatDuration(call.duration || 0)}</td>
                     <td style="font-size: 0.875rem;">${call.created_at ? new Date(call.created_at).toLocaleString() : 'N/A'}</td>
@@ -2073,7 +2097,7 @@
 
         function showFullTranscript(encodedTranscript, patientName) {
             const transcript = decodeURIComponent(encodedTranscript);
-            
+
             // Create a modal-like dialog for full transcript
             const modal = document.createElement('div');
             modal.style.cssText = `
@@ -2081,14 +2105,14 @@
                 background: rgba(0,0,0,0.7); z-index: 3000; display: flex;
                 align-items: center; justify-content: center; backdrop-filter: blur(4px);
             `;
-            
+
             const content = document.createElement('div');
             content.style.cssText = `
                 background: var(--bg-primary); border-radius: 12px; max-width: 80%;
                 max-height: 80%; padding: 2rem; box-shadow: var(--shadow-xl);
                 border: 1px solid var(--border-color); overflow-y: auto;
             `;
-            
+
             content.innerHTML = `
                 <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
                     <h3 style="margin: 0; color: var(--text-primary);">Full Transcript - ${patientName}</h3>
@@ -2101,11 +2125,11 @@
                     ${transcript}
                 </div>
             `;
-            
+
             modal.className = 'transcript-modal';
             modal.appendChild(content);
             document.body.appendChild(modal);
-            
+
             // Close on background click
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) {
@@ -2116,7 +2140,7 @@
 
         function showFullSummary(encodedSummary, patientName) {
             const summary = decodeURIComponent(encodedSummary);
-            
+
             // Create a modal-like dialog for full summary
             const modal = document.createElement('div');
             modal.style.cssText = `
@@ -2124,14 +2148,14 @@
                 background: rgba(0,0,0,0.7); z-index: 3000; display: flex;
                 align-items: center; justify-content: center; backdrop-filter: blur(4px);
             `;
-            
+
             const content = document.createElement('div');
             content.style.cssText = `
                 background: var(--bg-primary); border-radius: 12px; max-width: 70%;
                 max-height: 70%; padding: 2rem; box-shadow: var(--shadow-xl);
                 border: 1px solid var(--border-color); overflow-y: auto;
             `;
-            
+
             content.innerHTML = `
                 <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
                     <h3 style="margin: 0; color: var(--text-primary);"><i class="fas fa-clipboard-check" style="color: var(--success-color); margin-right: 0.5rem;"></i>Agent's Final Summary - ${patientName}</h3>
@@ -2150,11 +2174,11 @@
                     This is the final summary statement delivered by the AI agent at the end of the call, confirming the appointment outcome.
                 </div>
             `;
-            
+
             modal.className = 'summary-modal';
             modal.appendChild(content);
             document.body.appendChild(modal);
-            
+
             // Close on background click
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) {

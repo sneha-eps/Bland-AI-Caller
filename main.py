@@ -1284,7 +1284,7 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
     """Process calls with index-based traversal and flag-based retry system"""
     print(f"🚀 Starting index-based traversal with flag-based retry system for campaign '{campaign_name}'")
     print(f"📊 Total contacts in sheet: {len(call_requests)} (Index 0 to {len(call_requests)-1})")
-    
+
     # Create call tracker with index-based traversal - ALL NUMBERS START WITH success=False
     call_tracker = []
     for sheet_index, call_request in enumerate(call_requests):
@@ -1302,9 +1302,9 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
             'processing_status': 'queued'  # queued -> processing -> completed/failed
         })
         print(f"📋 [Index {sheet_index:03d}] Initialized {call_request.patient_name} ({call_request.phone_number}) - Flag: False (needs processing)")
-    
+
     print(f"📊 Sheet traversal setup complete: Index 0 → {len(call_requests)-1} with flag-based processing")
-    
+
     # Status tracking
     status_counts = {
         'confirmed': 0,
@@ -1315,64 +1315,64 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
         'wrong_number': 0,
         'failed': 0
     }
-    
+
     # Semaphore for concurrency control
     semaphore = asyncio.Semaphore(2)  # Reduced concurrency for international rate limits
-    
+
     attempt_round = 0
-    
+
     while True:
         attempt_round += 1
-        
+
         # Get all calls that need retry (success = False and haven't exceeded max attempts)
         calls_to_retry = [
-            call for call in call_tracker 
+            call for call in call_tracker
             if not call['success'] and call['attempts'] < call['max_attempts']
         ]
-        
+
         if not calls_to_retry:
             print(f"🎯 Flag-based retry complete! No more calls need retry.")
             break
-        
+
         print(f"\n🔄 RETRY ROUND {attempt_round}: Processing {len(calls_to_retry)} calls with success=False")
-        
+
         # Process calls in batches of 5 with index-based traversal for international rate limits
         batch_size = 5
-        
+
         # Sort calls by sheet index to maintain traversal order
         calls_to_retry_sorted = sorted(calls_to_retry, key=lambda x: x['sheet_index'])
-        
+
         for i in range(0, len(calls_to_retry_sorted), batch_size):
             batch = calls_to_retry_sorted[i:i + batch_size]
             batch_start_idx = batch[0]['sheet_index']
             batch_end_idx = batch[-1]['sheet_index']
-            
+
             print(f"🔄 Processing batch {i//batch_size + 1} of {(len(calls_to_retry_sorted) + batch_size - 1)//batch_size}")
             print(f"   📍 Sheet traversal: Index [{batch_start_idx:03d}] to [{batch_end_idx:03d}] ({len(batch)} calls)")
-            
+
             # Mark calls as processing
             for call_data in batch:
                 call_data['processing_status'] = 'processing'
-            
+
             retry_tasks = []
             for call_data in batch:
                 retry_tasks.append(process_single_call_with_flag_indexed(call_data, api_key, semaphore))
-            
+
             # Execute batch
             await asyncio.gather(*retry_tasks)
-            
+
             # Mark completed calls
             for call_data in batch:
                 if call_data['success']:
                     call_data['processing_status'] = 'completed'
                 else:
                     call_data['processing_status'] = 'retry_needed'
-            
+
             # Add 30-second delay between batches (except for last batch)
             if i + batch_size < len(calls_to_retry_sorted):
                 print(f"⏰ Waiting 30 seconds before next batch for international rate limit protection...")
                 await asyncio.sleep(30)
-        
+
         # Update status counts after this round
         for call_data in call_tracker:
             if call_data['success'] and call_data['call_status']:
@@ -1382,17 +1382,17 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
                     if status not in call_data.get('counted_statuses', set()):
                         status_counts[status] += 1
                         call_data.setdefault('counted_statuses', set()).add(status)
-        
+
         # Check completion status and show flag breakdown
         successful_calls = sum(1 for call in call_tracker if call['success'])
         total_calls = len(call_tracker)
         flag_true_calls = [c for c in call_tracker if c['success']]
         flag_false_calls = [c for c in call_tracker if not c['success']]
-        
+
         print(f"📊 Round {attempt_round} complete: {successful_calls}/{total_calls} calls successful")
         print(f"🏁 Flag=True (Completed): {len(flag_true_calls)} calls")
         print(f"⏳ Flag=False (Need retry): {len(flag_false_calls)} calls")
-        
+
         # Show status breakdown for Flag=True calls
         if flag_true_calls:
             status_breakdown = {}
@@ -1400,18 +1400,18 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
                 status = call.get('call_status', 'unknown')
                 status_breakdown[status] = status_breakdown.get(status, 0) + 1
             print(f"   ✅ Completed statuses: {dict(status_breakdown)}")
-        
+
         # Show remaining retries
         remaining_retries = [c for c in call_tracker if not c['success'] and c['attempts'] < c['max_attempts']]
         print(f"🔄 Calls still needing retry: {len(remaining_retries)} calls")
-        
+
         # If there are more calls to retry, wait for retry interval + 2 extra minutes for international protection
         remaining_retries = [c for c in call_tracker if not c['success'] and c['attempts'] < c['max_attempts']]
         if remaining_retries:
             extended_interval = retry_interval_minutes + 2  # Add 2 extra minutes for international rate limits
             print(f"⏰ Waiting {extended_interval} minutes before next retry round (includes 2-min international protection)...")
             await asyncio.sleep(extended_interval * 60)
-    
+
     # Handle calls that exhausted all attempts (send voicemail and change flag)
     exhausted_calls = [call for call in call_tracker if not call['success'] and call['attempts'] >= call['max_attempts']]
     if exhausted_calls:
@@ -1447,7 +1447,7 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
                 )
                 status_counts['failed'] += 1
                 print(f"🔄 FLAG CHANGED: {call_data['patient_name']} - Flag: {old_flag} → True (max attempts reached)")
-    
+
     # Generate final results
     final_results = []
     for call_data in call_tracker:
@@ -1462,11 +1462,11 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
                 phone_number=call_data['phone_number'],
                 message="Processed by flag-based retry system"
             ))
-    
+
     # Generate traversal summary with index statistics
     completed_indexes = [c['sheet_index'] for c in call_tracker if c['success']]
     failed_indexes = [c['sheet_index'] for c in call_tracker if not c['success']]
-    
+
     print(f"\n🎯 Index-based traversal completed for '{campaign_name}'!")
     print(f"   📊 Sheet Coverage: Index 0 → {len(call_tracker)-1} (Total: {len(call_tracker)} contacts)")
     print(f"   ✅ Completed Indexes: {len(completed_indexes)} contacts")
@@ -1479,13 +1479,13 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
     print(f"   🚫 Not Available: {status_counts['not_available']}")
     print(f"   📱 Wrong Number: {status_counts['wrong_number']}")
     print(f"   💥 Failed: {status_counts['failed']}")
-    
+
     # Show index ranges for debugging
     if completed_indexes:
         print(f"   📍 Completed range: {min(completed_indexes)} - {max(completed_indexes)}")
     if failed_indexes:
         print(f"   📍 Failed range: {min(failed_indexes)} - {max(failed_indexes)}")
-    
+
     return final_results
 
 
@@ -1494,29 +1494,17 @@ async def process_single_call_with_flag_indexed(call_data, api_key, semaphore):
     call_request = call_data['call_request']
     call_data['attempts'] += 1
     sheet_index = call_data['sheet_index']
-    
+
     print(f"📞 [Index {sheet_index:03d}] Attempt {call_data['attempts']}/{call_data['max_attempts']} for {call_data['patient_name']} ({call_data['phone_number']})")
 
-async def process_single_call_with_flag(call_data, api_key, semaphore):
-    """Legacy function - redirects to indexed version"""
-    return await process_single_call_with_flag_indexed(call_data, api_key, semaphore)
-
-async def process_single_call_with_flag_indexed(call_data, api_key, semaphore):
-    """Process a single call with index tracking and update its flag based on success"""
-    call_request = call_data['call_request']
-    call_data['attempts'] += 1
-    sheet_index = call_data['sheet_index']
-    
-    print(f"📞 [Index {sheet_index:03d}] Attempt {call_data['attempts']}/{call_data['max_attempts']} for {call_data['patient_name']} ({call_data['phone_number']})")
-    
     try:
         # Make the call
         result = await make_single_call_async(call_request, api_key, semaphore)
-        
+
         if result.success and result.call_id:
             # Call was initiated successfully, now check the actual outcome
             await asyncio.sleep(3)  # Wait for call to process
-            
+
             # Get call details to determine final status
             async with aiohttp.ClientSession() as session:
                 async with session.get(
@@ -1524,23 +1512,27 @@ async def process_single_call_with_flag_indexed(call_data, api_key, semaphore):
                     headers={"Authorization": f"Bearer {api_key}"},
                     timeout=aiohttp.ClientTimeout(total=15)
                 ) as response:
-                    
+
                     if response.status == 200:
                         call_data_api = await response.json()
                         transcript = call_data_api.get('transcript', '')
-                        
+
                         if transcript and transcript.strip():
                             call_status = analyze_call_transcript(transcript)
                             final_summary = extract_final_summary(transcript)
+                            print(f"📋 [Index {sheet_index:03d}] Transcript Analysis: {call_data['patient_name']}")
+                            print(f"   📝 Status from transcript: {call_status}")
+                            print(f"   📄 Final summary: {final_summary[:100]}{'...' if len(final_summary) > 100 else ''}")
                         else:
                             call_status = 'busy_voicemail'
-                            final_summary = "No transcript available"
-                        
+                            final_summary = "No transcript available - likely voicemail or no answer"
+                            print(f"📋 [Index {sheet_index:03d}] No transcript: {call_data['patient_name']} - Status: {call_status}")
+
                         # Update result with analysis
                         result.transcript = transcript
                         result.call_status = call_status
                         result.final_summary = final_summary
-                        
+
                         # Determine if this is a successful completion and change flag accordingly
                         if call_status in ['confirmed', 'cancelled', 'rescheduled', 'not_available', 'wrong_number']:
                             # These are definitive responses - change flag to True (no more retries needed)
@@ -1556,13 +1548,13 @@ async def process_single_call_with_flag_indexed(call_data, api_key, semaphore):
                             call_data['call_status'] = call_status
                             print(f"🔄 [Index {sheet_index:03d}] FLAG UNCHANGED: {call_data['patient_name']} - Flag remains: False - Status: {call_status}")
                             print(f"⏳ [Index {sheet_index:03d}] RETRY NEEDED: {call_data['patient_name']} - Will retry in next round")
-                    
+
                     else:
                         # API error - keep success=False for retry
                         call_data['success'] = False
                         call_data['call_status'] = 'failed'
                         print(f"⏳ RETRY NEEDED (Flag=False): {call_data['patient_name']} - API Error")
-        
+
         else:
             # Call initiation failed - keep flag as False for retry
             old_flag = call_data['success']
@@ -1571,7 +1563,7 @@ async def process_single_call_with_flag_indexed(call_data, api_key, semaphore):
             call_data['final_result'] = result
             print(f"🔄 [Index {sheet_index:03d}] FLAG UNCHANGED: {call_data['patient_name']} - Flag remains: {old_flag} → False")
             print(f"⏳ [Index {sheet_index:03d}] RETRY NEEDED: {call_data['patient_name']} - Call initiation failed: {result.error}")
-    
+
     except Exception as e:
         # Exception occurred - keep flag as False for retry
         old_flag = call_data['success']
@@ -1585,7 +1577,7 @@ async def process_single_call_with_flag_indexed(call_data, api_key, semaphore):
         )
         print(f"🔄 [Index {sheet_index:03d}] FLAG UNCHANGED: {call_data['patient_name']} - Flag remains: {old_flag} → False")
         print(f"⏳ [Index {sheet_index:03d}] RETRY NEEDED: {call_data['patient_name']} - Exception: {str(e)}")
-    
+
     # Extended delay for international rate limit protection
     await asyncio.sleep(3)
 
@@ -1802,16 +1794,16 @@ async def process_csv(file: UploadFile = File(...),
         # Prepare call requests with validation
         validation_failures = []
         call_requests = []
-        
+
         print(f"📋 Validating ALL {len(rows)} rows from CSV/Excel file")
-        
+
         for row_index, row in enumerate(rows):
             actual_row_number = row_index + 1  # 1-based numbering for user display
-            
+
             # Validate required fields
             required_fields = ['phone_number', 'patient_name', 'date', 'time', 'provider_name', 'office_location']
             missing_fields = []
-            
+
             for field in required_fields:
                 field_value = row.get(field)
                 if field_value is None or str(field_value).strip() == '' or str(field_value).strip().lower() in ['nan', 'null']:
@@ -1834,7 +1826,7 @@ async def process_csv(file: UploadFile = File(...),
             phone_number_str = str(phone_number_raw).strip()
             safe_country_code = country_code or '+1'
             formatted_phone = format_phone_number(phone_number_str, safe_country_code)
-            
+
             # Create call request
             def safe_str(value):
                 if value is None:
@@ -1850,7 +1842,7 @@ async def process_csv(file: UploadFile = File(...),
                 appointment_time=safe_str(row.get('time', '')),
                 office_location=safe_str(row.get('office_location', ''))
             )
-            
+
             call_requests.append(call_request)
             print(f"✅ Row {actual_row_number} VALID - {call_request.patient_name} at {formatted_phone}")
 
@@ -1860,22 +1852,22 @@ async def process_csv(file: UploadFile = File(...),
         call_results = []
         if call_requests:
             print(f"📞 Processing {len(call_requests)} calls using flag-based system...")
-            
+
             # For CSV uploads, we'll do a single attempt per call (no retry)
             semaphore = asyncio.Semaphore(2)  # Reduced concurrency for international rate limits
-            
+
             for call_request in call_requests:
                 try:
                     result = await make_single_call_async(call_request, api_key, semaphore)
                     call_results.append(result)
-                    
+
                     print(f"📞 Call to {call_request.patient_name}: {'SUCCESS' if result.success else 'FAILED'}")
                     if not result.success:
                         print(f"   Error: {result.error}")
-                    
+
                     # Increased delay to prevent international rate limiting
                     await asyncio.sleep(3)
-                    
+
                 except Exception as e:
                     error_result = CallResult(
                         success=False,
@@ -1888,7 +1880,7 @@ async def process_csv(file: UploadFile = File(...),
 
         # Combine all results
         results = validation_failures + call_results
-        
+
         print(f"\n📊 FINAL CSV PROCESSING SUMMARY:")
         print(f"   Total rows processed: {len(rows)}")
         print(f"   Validation failures: {len(validation_failures)}")
