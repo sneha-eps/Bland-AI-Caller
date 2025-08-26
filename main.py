@@ -1852,6 +1852,9 @@ async def process_csv(file: UploadFile = File(...),
 
         print(f"📊 Validation complete: {len(validation_failures)} failures, {len(call_requests)} valid calls")
 
+        # Initialize session ID for CSV upload
+        csv_session_id = f"csv_upload_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
         # Process valid calls using flag-based retry system (simplified for CSV)
         call_results = []
         if call_requests:
@@ -1859,7 +1862,6 @@ async def process_csv(file: UploadFile = File(...),
 
             # For CSV uploads, we'll do a single attempt per call (no retry)
             semaphore = asyncio.Semaphore(2)  # Reduced concurrency for international rate limits
-            csv_session_id = f"csv_upload_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
 
             for call_request in call_requests:
                 try:
