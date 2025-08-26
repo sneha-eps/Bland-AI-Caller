@@ -585,7 +585,7 @@ async def make_single_call_async(call_request: CallRequest, api_key: str,
                 "voice": selected_voice,
                 "request_data": {
                   **call_data,
-                  "campaign_id": campaign_id 
+                  "campaign_id": campaign_id
                 }
             }
 
@@ -1231,7 +1231,7 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
             # Use office_location from uploaded file as foreign key to lookup full address
             office_location_key = safe_str(row.get('office_location', ''))
             full_address = clinic_manager.find_clinic_address(office_location_key)
-            
+
             if full_address:
                 # Found foreign key mapping - use full address from clinic locations
                 office_location = full_address
@@ -1292,7 +1292,6 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
         campaign_results_db[campaign_id] = campaign_results
         save_campaign_results_db(campaign_results_db)
         print(f"✅ Stored campaign results for {campaign_id}. Total campaigns with results: {len(campaign_results_db)}")
-        print(f"✅ Campaign results keys: {list(campaign_results_db.keys())}")
         print(f"✅ This campaign results: Total={len(results)}, Success={successful_calls}, Failed={failed_calls}")
 
         return {
@@ -1310,7 +1309,7 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Error starting campaign: {str(e)}")
-        
+
 
 
 async def process_calls_with_retry_and_batching(call_requests, api_key, max_attempts, retry_interval_minutes, campaign_name, campaign_id):
@@ -1787,9 +1786,9 @@ async def upload_clinic_data(
 ):
     """Admin endpoint to upload updated clinic and provider data"""
     user = require_admin(request)
-    
+
     results = {"clinic_data": False, "provider_data": False}
-    
+
     try:
         if clinic_file and clinic_file.filename:
             if clinic_file.filename.endswith('.csv'):
@@ -1803,7 +1802,7 @@ async def upload_clinic_data(
                 csv_content = df.to_csv(index=False)
                 if clinic_manager.load_clinic_data_from_csv(csv_content):
                     results["clinic_data"] = True
-        
+
         if provider_file and provider_file.filename:
             if provider_file.filename.endswith('.csv'):
                 content = await provider_file.read()
@@ -1816,13 +1815,13 @@ async def upload_clinic_data(
                 csv_content = df.to_csv(index=False)
                 if clinic_manager.load_provider_data_from_csv(csv_content):
                     results["provider_data"] = True
-        
+
         return {
             "success": any(results.values()),
             "results": results,
             "message": "Data upload completed"
         }
-        
+
     except Exception as e:
         return {
             "success": False,
@@ -1910,7 +1909,7 @@ async def process_csv(file: UploadFile = File(...),
             # Use office_location from CSV as foreign key to lookup full address
             office_location_key = safe_str(row.get('office_location', ''))
             full_address = clinic_manager.find_clinic_address(office_location_key)
-            
+
             if full_address:
                 # Found mapping - use full address from clinic locations CSV
                 office_location = full_address
@@ -1981,7 +1980,7 @@ async def process_csv(file: UploadFile = File(...),
         successful_calls = sum(1 for r in results if r.success)
         failed_calls = len(results) - successful_calls
 
-        # Store results in a format similar to campaigns so dashboard can display them  
+        # Store results in a format similar to campaigns so dashboard can display them
         csv_results = {
             "campaign_id": csv_session_id,
             "campaign_name": f"CSV Upload - {datetime.now().strftime('%Y-%m-%d %H:%M')}",

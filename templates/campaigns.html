@@ -2325,15 +2325,23 @@
                     body: formData
                 });
 
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                }
+
                 const result = await response.json();
 
                 if (result.success) {
                     alert(`Campaign started successfully! Total calls: ${result.total_calls}, Successful: ${result.successful_calls}, Failed: ${result.failed_calls}`);
                     closeStartCampaignModal();
+                    // Refresh the page to show updated results
+                    window.location.reload();
                 } else {
-                    alert('Error starting campaign: ' + (result.detail || 'Unknown error'));
+                    alert('Error starting campaign: ' + (result.detail || result.message || 'Unknown error'));
                 }
             } catch (error) {
+                console.error('Campaign start error:', error);
                 alert('Error starting campaign: ' + error.message);
             }
             });
