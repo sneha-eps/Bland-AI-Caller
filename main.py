@@ -1586,7 +1586,7 @@ async def process_single_call_with_flag_indexed(call_data, api_key, semaphore, c
     await asyncio.sleep(3)
 
 # Keep the original function for backward compatibility (in case it's used elsewhere)
-async def process_calls_with_retry(call_requests, api_key, max_attempts, retry_interval_minutes, campaign_name):
+async def process_calls_with_retry(call_requests, api_key, max_attempts, retry_interval_minutes, campaign_name, campaign_id):
     """Legacy function - now redirects to new batching function"""
     return await process_calls_with_retry_and_batching(call_requests, api_key, max_attempts, retry_interval_minutes, campaign_name, campaign_id)
 
