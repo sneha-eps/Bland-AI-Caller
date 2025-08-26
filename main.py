@@ -1800,21 +1800,21 @@ async def upload_clinic_data(
         }
 
 
-                    return {"success": False, "error": f"Voice ID '{voice_id}' not found in Bland AI"}
-                elif response.status == 401:
-                    return {"success": False, "error": "Invalid API key"}
-                elif response.status == 429:
-                    return {"success": False, "error": "Rate limit exceeded. Please try again later."}
-                else:
-                    error_text = await response.text()
-                    print(f"❌ Bland AI voice sample error: Status {response.status}, Response: {error_text}")
-                    return {"success": False, "error": f"API error: {error_text}"}
+    return {"success": False, "error": f"Voice ID '{voice_id}' not found in Bland AI"}
+            elif response.status == 401:
+                return {"success": False, "error": "Invalid API key"}
+            elif response.status == 429:
+                return {"success": False, "error": "Rate limit exceeded. Please try again later."}
+            else:
+                error_text = await response.text()
+                print(f"❌ Bland AI voice sample error: Status {response.status}, Response: {error_text}")
+                return {"success": False, "error": f"API error: {error_text}"}
 
-    except asyncio.TimeoutError:
-        return {"success": False, "error": "Request timeout. Please try again."}
-    except Exception as e:
-        print(f"💥 Exception generating voice sample: {str(e)}")
-        return {"success": False, "error": f"Error generating voice sample: {str(e)}"}
+except asyncio.TimeoutError:
+    return {"success": False, "error": "Request timeout. Please try again."}
+except Exception as e:
+    print(f"💥 Exception generating voice sample: {str(e)}")
+    return {"success": False, "error": f"Error generating voice sample: {str(e)}"}
 
 
 @app.post("/process_csv")
