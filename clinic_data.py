@@ -59,7 +59,7 @@ class ClinicDataManager:
         """Gets all provider information."""
         if self.providers_df.empty:
             return []
-        return self.providers_df.to_dict(orient='records')
+        return self.providers_df.to_dict('records')
 
     def find_providers_by_location(self, location: str) -> List[Dict]:
         """Finds providers available at a specific location (requires 'location' column in Providers sheet)."""
