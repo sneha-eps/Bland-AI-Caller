@@ -59,7 +59,7 @@ class ClinicDataManager:
         """Gets all provider information."""
         if self.providers_df.empty:
             return []
-        return self.providers_df.to_dict('records')
+        return self.providers_df.to_dict(orient='records')
 
     def find_providers_by_location(self, location: str) -> List[Dict]:
         """Finds providers available at a specific location (requires 'location' column in Providers sheet)."""
@@ -67,7 +67,7 @@ class ClinicDataManager:
             return []
 
         matching_providers = self.providers_df[self.providers_df['location'].str.lower() == location.lower()]
-        return matching_providers.to_dict('records')
+        return matching_providers.to_dict(orient='records')
 
     def load_clinic_data_from_csv(self, csv_content: str) -> bool:
         """Updates clinic locations from CSV content (e.g., from an admin upload)."""
