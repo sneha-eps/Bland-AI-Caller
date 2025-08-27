@@ -268,11 +268,22 @@ def get_call_prompt(city_name: str = "",
                     patient_name: str = "[patient name]",
                     appointment_date: str = "[date]",
                     appointment_time: str = "[time]",
-                    provider_name: str = "[provider name]"):
+                    provider_name: str = "[provider name]",
+                    available_providers: str = ""):
     """Return the call prompt"""
+    
+    # Add provider information if available
+    provider_info_section = ""
+    if available_providers:
+        provider_info_section = f"""
+    AVAILABLE PROVIDERS AT THIS LOCATION
+    {available_providers}
+    
+    """
+    
     return f"""
     ROLE & PERSONA
-    You are an AI voice agent calling from [clinic name]. You are professional, polite, and empathetic. Speak in complete, natural sentences and combine related thoughts smoothly. Always wait for the patient's full response before continuing or ending the call. Do not skip or reorder steps.
+    You are an AI voice agent calling from Hillside Primary Care. You are professional, polite, and empathetic. Speak in complete, natural sentences and combine related thoughts smoothly. Always wait for the patient's full response before continuing or ending the call. Do not skip or reorder steps.
 
     CLINIC DETAILS (USE AS-IS WHEN NEEDED)
     • Website: w w w dot hill side primary care dot com
@@ -280,6 +291,8 @@ def get_call_prompt(city_name: str = "",
     • Email: live oak office @ hill side primary care dot com
     • Hours: 8 a.m. to 5 p.m., Monday to Friday
     • Address: {full_address}
+    
+    {provider_info_section}
 
     DELIVERY RULES
     • Speak naturally like a real person having a conversation - don't sound like you're reading a script
@@ -575,6 +588,24 @@ async def make_single_call_async(call_request: CallRequest, api_key: str,
             selected_voice = VOICE_MAP.get("Paige",
                                            "default_voice_id")
 
+            # Get available providers for this location
+            office_location_key = getattr(call_request, 'office_location_key', call_request.office_location)
+            available_providers_list = clinic_manager.find_providers_by_location(office_location_key)
+            
+            # Format provider information for the prompt
+            available_providers_text = ""
+            if available_providers_list:
+                provider_lines = []
+                for provider in available_providers_list:
+                    name = provider.get('name', provider.get('provider_name', 'Unknown'))
+                    specialty = provider.get('specialty', provider.get('specialization', ''))
+                    if specialty:
+                        provider_lines.append(f"• Dr. {name} - {specialty}")
+                    else:
+                        provider_lines.append(f"• Dr. {name}")
+                available_providers_text = "\n".join(provider_lines)
+                print(f"📋 Including {len(available_providers_list)} providers in call prompt for {call_request.office_location}")
+
             payload = {
                 "phone_number": call_request.phone_number,
                 "task": get_call_prompt(
@@ -583,7 +614,8 @@ async def make_single_call_async(call_request: CallRequest, api_key: str,
                     patient_name=call_request.patient_name,
                     appointment_date=call_request.appointment_date,
                     appointment_time=call_request.appointment_time,
-                    provider_name=call_request.provider_name
+                    provider_name=call_request.provider_name,
+                    available_providers=available_providers_text
                 ),
                 "voice": selected_voice,
                 "request_data": {
@@ -678,6 +710,24 @@ def make_single_call(call_request: CallRequest, api_key: str) -> CallResult:
         selected_voice = VOICE_MAP.get("Paige",
                                        "default_voice_id")
 
+        # Get available providers for this location
+        office_location_key = getattr(call_request, 'office_location_key', call_request.office_location)
+        available_providers_list = clinic_manager.find_providers_by_location(office_location_key)
+        
+        # Format provider information for the prompt
+        available_providers_text = ""
+        if available_providers_list:
+            provider_lines = []
+            for provider in available_providers_list:
+                name = provider.get('name', provider.get('provider_name', 'Unknown'))
+                specialty = provider.get('specialty', provider.get('specialization', ''))
+                if specialty:
+                    provider_lines.append(f"• Dr. {name} - {specialty}")
+                else:
+                    provider_lines.append(f"• Dr. {name}")
+            available_providers_text = "\n".join(provider_lines)
+            print(f"📋 Including {len(available_providers_list)} providers in call prompt for {call_request.office_location}")
+
         payload = {
             "phone_number": call_request.phone_number,
             "task": get_call_prompt(
@@ -685,7 +735,8 @@ def make_single_call(call_request: CallRequest, api_key: str) -> CallResult:
                 patient_name=call_request.patient_name,
                 appointment_date=call_request.appointment_date,
                 appointment_time=call_request.appointment_time,
-                provider_name=call_request.provider_name
+                provider_name=call_request.provider_name,
+                available_providers=available_providers_text
             ),
             "voice": selected_voice,
             "request_data": call_data
@@ -1259,8 +1310,9 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
                 appointment_time=safe_str(row.get('time', '')),
                 office_location=city_name  # Pass the CITY NAME to the object
             )
-            # Dynamically attach the full address so we can pass it to the prompt separately
+            # Dynamically attach the full address and office location key for provider lookup
             call_request.full_address = full_address
+            call_request.office_location_key = office_location_key  # Keep the original key for provider lookup
             call_requests.append(call_request)
             print(f"📊 Validation complete: {len(validation_failures)} failures, {len(call_requests)} valid calls")
 
@@ -1947,6 +1999,8 @@ async def process_csv(file: UploadFile = File(...),
                 appointment_time=safe_str(row.get('time', '')),
                 office_location=office_location
             )
+            # Store the original office_location_key for provider lookup
+            call_request.office_location_key = office_location_key
 
             call_requests.append(call_request)
             print(f"✅ Row {actual_row_number} VALID - {call_request.patient_name} at {formatted_phone}")
@@ -2218,14 +2272,25 @@ def get_voicemail_prompt(patient_name: str = "[patient name]",
         appointment_date: str = "[date]",
         appointment_time: str = "[time]",
         provider_name: str = "[provider name]",
-        office_location: str = "[office location]") -> str:
+        office_location: str = "[office location]",
+        available_providers: str = "") -> str:
     """Get the voicemail message prompt"""
+    
+    # Add provider information if available
+    provider_info_section = ""
+    if available_providers:
+        provider_info_section = f"""
+    
+    OTHER AVAILABLE PROVIDERS AT THIS LOCATION:
+    {available_providers}
+    """
+    
     return f"""
     ROLE & PERSONA
     You are an AI voice agent leaving a voicemail message from Hillside Medical Group. You are professional, clear, and concise.
 
     VOICEMAIL MESSAGE
-    Hi Good Morning, I am calling from Hillside Medical Group. This call is for {patient_name} to remind him/her of an upcoming appointment on {appointment_date} at {appointment_time} with {provider_name} at {office_location}. Please make sure to arrive 15 minutes prior to your appointment. Also, Please make sure to email us your insurance information ASAP so that we can get it verified and avoid any delays on the day of your appointment. If you wish to cancel or reschedule your appointment, please inform us at least 24 hours in advance to avoid cancellation charge of $25.00. For more information, you can call us back on 210-742-6555. Thank you and have a blessed day.
+    Hi Good Morning, I am calling from Hillside Medical Group. This call is for {patient_name} to remind him/her of an upcoming appointment on {appointment_date} at {appointment_time} with {provider_name} at {office_location}. Please make sure to arrive 15 minutes prior to your appointment. Also, Please make sure to email us your insurance information ASAP so that we can get it verified and avoid any delays on the day of your appointment. If you wish to cancel or reschedule your appointment, please inform us at least 24 hours in advance to avoid cancellation charge of $25.00. For more information, you can call us back on 210-742-6555. Thank you and have a blessed day.{provider_info_section}
 
     DELIVERY RULES
     • Speak clearly and at a moderate pace
