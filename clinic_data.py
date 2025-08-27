@@ -67,7 +67,7 @@ class ClinicDataManager:
             return []
 
         matching_providers = self.providers_df[self.providers_df['location'].str.lower() == location.lower()]
-        return matching_providers.to_dict(orient='records')
+        return matching_providers.to_dict('records')
 
     def load_clinic_data_from_csv(self, csv_content: str) -> bool:
         """Updates clinic locations from CSV content (e.g., from an admin upload)."""
