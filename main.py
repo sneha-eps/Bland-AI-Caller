@@ -2660,7 +2660,7 @@ async def get_call_details(call_id: str):
         print(f"🔍 Fetching call details for {call_id}")
 
         # Initialize stored_call_data to None
-        stored_call_data = None
+        stored_call_data = None  # Ensure it's defined even if not found
 
         # First check if we have stored data in our campaign results
         for campaign_id, campaign_results in campaign_results_db.items():
