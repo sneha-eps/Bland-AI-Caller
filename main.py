@@ -262,11 +262,13 @@ def get_voice_id(name) -> str:
         VOICE_MAP["Paige"])  # Default to Paige
 
 
-def get_call_prompt(office_location: str = "",
-        patient_name: str = "[patient name]",
-        appointment_date: str = "[date]",
-        appointment_time: str = "[time]",
-        provider_name: str = "[provider name]"):
+def get_call_prompt(city_name: str = "",
+                    full_address: str = "",
+                    office_location: str = "[office_location]",
+                    patient_name: str = "[patient name]",
+                    appointment_date: str = "[date]",
+                    appointment_time: str = "[time]",
+                    provider_name: str = "[provider name]"):
     """Return the call prompt"""
     return f"""
     ROLE & PERSONA
@@ -277,7 +279,7 @@ def get_call_prompt(office_location: str = "",
     • Phone: 2 1 0 7 4 2 6 5 5 5
     • Email: live oak office @ hill side primary care dot com
     • Hours: 8 a.m. to 5 p.m., Monday to Friday
-    • Address: {office_location if office_location else '[address]'}
+    • Address: {full_address}
 
     DELIVERY RULES
     • Speak naturally like a real person having a conversation - don't sound like you're reading a script
@@ -315,7 +317,7 @@ def get_call_prompt(office_location: str = "",
     • If identity confirmed: proceed.
 
     3) APPOINTMENT CONFIRMATION QUESTION
-    Say: "Perfect! The reason for my call is to confirm your upcoming appointment on {appointment_date} at {appointment_time} with {provider_name} at our clinic located at {office_location}. Will you be able to make it to your appointment?"
+    Say: "Perfect! The reason for my call is to confirm your upcoming appointment on {appointment_date} at {appointment_time} with {provider_name} at our {city_name} clinic. Will you be able to make it to your appointment?"
     Then stop and wait.
 
     ⚠️ CRITICAL CANCELLATION RULE ⚠️
@@ -384,7 +386,7 @@ def get_call_prompt(office_location: str = "",
 
     FINAL SUMMARY RULE:
     • Before the call ends, always provide a short summary of the outcome of the conversation:
-        – If appointment was CONFIRMED: say "Just to confirm, your appointment on {appointment_date} at {appointment_time} with {provider_name} at {office_location} is confirmed."
+        – If appointment was CONFIRMED: say "Just to confirm, your appointment on {appointment_date} at {appointment_time} with {provider_name} at {city_name} is confirmed."
         – If appointment was CANCELLED: say "Just to confirm, your appointment on {appointment_date} at {appointment_time} with {provider_name} has been cancelled."
         – If appointment will be RESCHEDULED: say "Just to confirm, your appointment will be rescheduled and our scheduling agent will call you soon to arrange a new time."
     • Deliver this summary immediately before the goodbye phrase (e.g., "Have a great day!") so the patient leaves with a clear understanding.
@@ -399,20 +401,20 @@ class CallRequest(BaseModel):
     appointment_date: str
     appointment_time: str
     office_location: str
+    full_address: Optional[str] = None
 
 
 class CallResult(BaseModel):
     success: bool
     call_id: Optional[str] = None
-    status: Optional[str] = None
-    call_status: Optional[
-        str] = None  # confirmed, rescheduled, cancelled, voicemail, busy
+    status: Optional[str] = 'initiated'
     transcript: Optional[str] = None
-    final_summary: Optional[str] = None # Added for final summary
+    final_summary: Optional[str] = None
     message: Optional[str] = None
     error: Optional[str] = None
     patient_name: str
     phone_number: str
+    duration: int = 0
 
 
 class Client(BaseModel):
@@ -576,7 +578,8 @@ async def make_single_call_async(call_request: CallRequest, api_key: str,
             payload = {
                 "phone_number": call_request.phone_number,
                 "task": get_call_prompt(
-                    office_location=call_request.office_location,
+                    city_name=call_request.office_location,  # This now correctly holds just the city name
+                    full_address=getattr(call_request, 'full_address', call_request.office_location), # This gets the full address we attached
                     patient_name=call_request.patient_name,
                     appointment_date=call_request.appointment_date,
                     appointment_time=call_request.appointment_time,
@@ -1229,25 +1232,35 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
                 return str(value).strip() if value is not None else ''
 
             # Use office_location from uploaded file as foreign key to lookup full address
+            # Use the 'office_location' from the campaign file as the lookup key
             office_location_key = safe_str(row.get('office_location', ''))
+
+            # --- NEW LOGIC TO SEPARATE CITY AND FULL ADDRESS ---
+
+            # 1. Extract just the city name from the key for the initial prompt greeting.
+            # This assumes the city is the last word in your 'office_location' column.
+            city_name = office_location_key.split(" ")[-1] if " " in office_location_key else office_location_key
+
+            # 2. Use the clinic_manager to find the full address for on-demand use by the AI.
             full_address = clinic_manager.find_clinic_address(office_location_key)
 
-            if full_address:
-                # Found foreign key mapping - use full address from clinic locations
-                office_location = full_address
-                print(f"📍 Campaign Foreign Key Mapping: '{office_location_key}' -> '{office_location}'")
-            else:
-                # No foreign key mapping found - use original and warn
-                office_location = office_location_key
-                print(f"⚠️ Campaign Foreign Key NOT FOUND: '{office_location_key}' - using as-is (consider adding to clinic locations)")
+            if not full_address:
+                print(f"⚠️ Full address not found for key '{office_location_key}'. Using the key as a fallback for the address.")
+                full_address = office_location_key # Use the original value if lookup fails
 
+            print(f"📍 Location Mapping: For greeting, AI will use city='{city_name}'. If asked, it will use address='{full_address}'")
+
+            # Create the request object
             call_request = CallRequest(
                 phone_number=formatted_phone,
                 patient_name=safe_str(row.get('patient_name', '')),
                 provider_name=safe_str(row.get('provider_name', '')),
                 appointment_date=safe_str(row.get('date', '')),
                 appointment_time=safe_str(row.get('time', '')),
-                office_location=office_location)
+                office_location=city_name  # Pass the CITY NAME to the object
+            )
+            # Dynamically attach the full address so we can pass it to the prompt separately
+            call_request.full_address = full_address 
             call_requests.append(call_request)
             print(f"📊 Validation complete: {len(validation_failures)} failures, {len(call_requests)} valid calls")
 
@@ -1459,7 +1472,7 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
                 print(f"🔄 FLAG CHANGED: {call_data['patient_name']} - Flag: {old_flag} → True (voicemail sent)")
                 call_data['final_result'] = CallResult(
                     success=True,
-                    call_status='busy_voicemail',
+                    status='busy_voicemail',
                     patient_name=call_data['patient_name'],
                     phone_number=call_data['phone_number'],
                     message="Voicemail sent after max attempts"
@@ -1489,7 +1502,7 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
             # Create a default result for calls without final_result
             final_results.append(CallResult(
                 success=call_data['success'],
-                call_status=call_data.get('call_status', 'unknown'),
+                status=call_data.get('call_status', 'unknown'),
                 patient_name=call_data['patient_name'],
                 phone_number=call_data['phone_number'],
                 message="Processed by flag-based retry system"

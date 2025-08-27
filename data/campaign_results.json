@@ -4,18 +4,19 @@
     "campaign_name": "Testing",
     "client_name": "Hillside Primary Care",
     "total_calls": 1,
-    "successful_calls": 0,
-    "failed_calls": 1,
-    "started_at": "2025-08-23T07:12:03.000862",
+    "successful_calls": 1,
+    "failed_calls": 0,
+    "started_at": "2025-08-27T05:45:29.275240",
     "results": [
       {
-        "success": false,
-        "call_id": null,
-        "status": null,
-        "call_status": null,
+        "success": true,
+        "call_id": "c797e983-5827-4289-9419-779b9549def5",
+        "status": "success",
+        "call_status": "initiated",
         "transcript": null,
-        "message": null,
-        "error": "Rate limit exceeded - please try again later",
+        "final_summary": null,
+        "message": "Call successfully queued.",
+        "error": null,
         "patient_name": "Sneha",
         "phone_number": "+917014608325"
       }
