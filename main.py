@@ -1319,9 +1319,16 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
 
     except Exception as e:
         print(f"❌ Error starting campaign {campaign_id}: {str(e)}")
+        print(f"❌ Campaign details: {campaign.get('name', 'Unknown')} for client {campaign.get('client_id', 'Unknown')}")
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Error starting campaign: {str(e)}")
+        
+        # More specific error message
+        error_detail = f"Campaign start failed: {str(e)}"
+        if "Failed to fetch" in str(e):
+            error_detail = "Network connection error - please check your API key and internet connection"
+        
+        raise HTTPException(status_code=500, detail=error_detail)
 
 
 

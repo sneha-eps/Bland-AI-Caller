@@ -25,7 +25,15 @@ class ClinicDataManager:
                 print(f"✅ Successfully loaded {len(self.providers_df)} providers.")
 
         except FileNotFoundError:
-            print(f"⚠️ Warning: '{file_path}' not found. The application will run without pre-loaded clinic data.")
+            print(f"⚠️ Warning: '{file_path}' not found. Trying CSV fallback...")
+            # Try loading from the attached CSV file
+            try:
+                csv_file = "attached_assets/hillside_clinic_data - Clinic Locations_1756207573609.csv"
+                self.locations_df = pd.read_csv(csv_file)
+                self.locations_df.columns = [col.strip() for col in self.locations_df.columns]
+                print(f"✅ Successfully loaded {len(self.locations_df)} clinic locations from CSV.")
+            except Exception as csv_error:
+                print(f"⚠️ Warning: Could not load CSV fallback: {csv_error}. The application will run without pre-loaded clinic data.")
         except Exception as e:
             print(f"💥 Error loading data from Excel file: {e}")
 
@@ -35,7 +43,7 @@ class ClinicDataManager:
             return None
 
         location_key_lower = location_key.strip().lower()
-        match = self.locations_df[self.locations_df['office_locations'].str.strip().str.lower() == location_key_lower]
+        match = self.locations_df[self.locations_df['office_location'].str.strip().str.lower() == location_key_lower]
 
         if not match.empty:
             return str(match.iloc[0]['Address'])
@@ -45,7 +53,7 @@ class ClinicDataManager:
         """Gets all clinic locations as (name, address) tuples."""
         if self.locations_df.empty:
             return []
-        return [(row['office_locations'], row['Address']) for index, row in self.locations_df.iterrows()]
+        return [(row['office_location'], row['Address']) for index, row in self.locations_df.iterrows()]
 
     def get_all_providers(self) -> List[Dict]:
         """Gets all provider information."""
