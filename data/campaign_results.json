@@ -6,19 +6,19 @@
     "total_calls": 1,
     "successful_calls": 1,
     "failed_calls": 0,
-    "started_at": "2025-08-27T05:45:29.275240",
+    "started_at": "2025-08-27T09:24:31.237909",
     "results": [
       {
         "success": true,
-        "call_id": "c797e983-5827-4289-9419-779b9549def5",
-        "status": "success",
-        "call_status": "initiated",
+        "call_id": null,
+        "status": "busy_voicemail",
         "transcript": null,
         "final_summary": null,
-        "message": "Call successfully queued.",
+        "message": "Voicemail sent after max attempts",
         "error": null,
         "patient_name": "Sneha",
-        "phone_number": "+917014608325"
+        "phone_number": "+917014608325",
+        "duration": 0
       }
     ]
   }

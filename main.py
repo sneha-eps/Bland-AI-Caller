@@ -2661,6 +2661,7 @@ async def get_call_details(call_id: str):
         
         # First check if we have stored data in our campaign results
         stored_call_data = None
+        
         for campaign_id, campaign_results in campaign_results_db.items():
             for result in campaign_results.get("results", []):
                 if result.get("call_id") == call_id:
