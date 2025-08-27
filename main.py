@@ -287,7 +287,7 @@ def get_call_prompt(city_name: str = "",
     • Convert 24-hour time to natural 12-hour format: "15:00" becomes "3 PM", "09:30" becomes "9:30 AM", etc.
     • Say times naturally like a person would: "3 PM" not "fifteen hundred", "9:30 AM" not "oh nine thirty"
     • Be helpful and friendly, but keep it casual and conversational
-    • If someone interrupts or speaks over you, wait for them to finish, then acknowledge, answer them and then continue from where you left off
+    • If someone interrupts or speaks over you, wait for them to finish, acknowledge, answer them and then continue from where you left off
     • If someone says "hi" or "hello" during the call, just acknowledge it warmly and keep going
     • Sound genuinely interested in helping, not mechanical
 
@@ -1260,7 +1260,7 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
                 office_location=city_name  # Pass the CITY NAME to the object
             )
             # Dynamically attach the full address so we can pass it to the prompt separately
-            call_request.full_address = full_address 
+            call_request.full_address = full_address
             call_requests.append(call_request)
             print(f"📊 Validation complete: {len(validation_failures)} failures, {len(call_requests)} valid calls")
 
@@ -1322,12 +1322,12 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
         print(f"❌ Campaign details: {campaign.get('name', 'Unknown')} for client {campaign.get('client_id', 'Unknown')}")
         import traceback
         traceback.print_exc()
-        
+
         # More specific error message
         error_detail = f"Campaign start failed: {str(e)}"
         if "Failed to fetch" in str(e):
             error_detail = "Network connection error - please check your API key and internet connection"
-        
+
         raise HTTPException(status_code=500, detail=error_detail)
 
 
@@ -2506,8 +2506,8 @@ async def get_campaign_analytics(campaign_id: str):
                                     call_length = call_data.get('call_length', call_data.get('duration', 0))
 
                                     # Parse duration more robustly - try multiple fields
-                                    raw_duration = (call_length or 
-                                                  call_data.get('duration', 0) or 
+                                    raw_duration = (call_length or
+                                                  call_data.get('duration', 0) or
                                                   call_data.get('call_duration', 0) or
                                                   call_data.get('length', 0))
                                     duration_seconds = parse_duration(raw_duration)
@@ -2518,7 +2518,7 @@ async def get_campaign_analytics(campaign_id: str):
                                     # Check if call already has stored status from webhook
                                     stored_status = result.get('call_status')
                                     stored_transcript = result.get('transcript', '')
-                                    
+
                                     if stored_status and stored_transcript:
                                         # Use stored data from webhook
                                         call_status = stored_status
@@ -2658,10 +2658,11 @@ async def get_call_details(call_id: str):
 
     try:
         print(f"🔍 Fetching call details for {call_id}")
-        
-        # First check if we have stored data in our campaign results
+
+        # Initialize stored_call_data to None
         stored_call_data = None
-        
+
+        # First check if we have stored data in our campaign results
         for campaign_id, campaign_results in campaign_results_db.items():
             for result in campaign_results.get("results", []):
                 if result.get("call_id") == call_id:
@@ -2685,10 +2686,10 @@ async def get_call_details(call_id: str):
             print(f"📊 API call data keys: {list(call_data.keys())}")
 
             # Get transcript from multiple possible fields
-            transcript = (call_data.get("transcript", "") or 
+            transcript = (call_data.get("transcript", "") or
                          call_data.get("concatenated_transcript", "") or
                          (stored_call_data.get("transcript", "") if stored_call_data else ""))
-            
+
             # Use stored data if available, otherwise analyze fresh
             if stored_call_data and stored_call_data.get("call_status"):
                 call_status = stored_call_data.get("call_status")
@@ -2698,7 +2699,7 @@ async def get_call_details(call_id: str):
                 final_summary = extract_final_summary(transcript)
 
             # Handle duration from multiple fields
-            raw_duration = (call_data.get("call_length", 0) or 
+            raw_duration = (call_data.get("call_length", 0) or
                            call_data.get("duration", 0) or
                            call_data.get("length", 0))
             duration = parse_duration(raw_duration)
@@ -2748,7 +2749,7 @@ async def get_call_details(call_id: str):
                 }
             else:
                 raise HTTPException(status_code=response.status_code, detail=error_detail)
-                
+
     except requests.RequestException as e:
         print(f"💥 Network error fetching call details: {str(e)}")
         # Try to return stored data if network fails
@@ -2829,7 +2830,7 @@ async def debug_campaign_results():
                     "final_summary": result.get("final_summary"),
                     "webhook_received": bool(result.get("webhook_received_at"))
                 })
-            
+
             debug_info["campaign_details"][campaign_id] = {
                 "campaign_name": results.get("campaign_name", "Unknown"),
                 "client_name": results.get("client_name", "Unknown"),
@@ -2856,7 +2857,7 @@ async def debug_call_data(call_id: str):
     """Debug endpoint to check specific call data storage"""
     try:
         found_calls = []
-        
+
         # Search in all campaigns
         for campaign_id, results in campaign_results_db.items():
             for result in results.get("results", []):
@@ -2866,7 +2867,7 @@ async def debug_call_data(call_id: str):
                         "campaign_name": results.get("campaign_name", "Unknown"),
                         "stored_data": result
                     })
-        
+
         return {
             "success": True,
             "call_id": call_id,
@@ -2973,7 +2974,7 @@ async def bland_webhook(request: Request):
 
         # Update call in all campaigns if campaign_id not provided
         campaigns_to_check = [campaign_id] if campaign_id else list(campaign_results_db.keys())
-        
+
         call_updated = False
         for check_campaign_id in campaigns_to_check:
             if check_campaign_id in campaign_results_db:
@@ -2983,7 +2984,7 @@ async def bland_webhook(request: Request):
                         # Update this call's data with the final results
                         transcript = data.get('transcript', '')
                         call_status = data.get('status', 'completed')
-                        
+
                         # Analyze transcript for better status determination
                         if transcript and transcript.strip():
                             analyzed_status = analyze_call_transcript(transcript)
@@ -2991,7 +2992,7 @@ async def bland_webhook(request: Request):
                         else:
                             analyzed_status = 'busy_voicemail'
                             final_summary = "No transcript available"
-                        
+
                         duration = parse_duration(data.get('call_length', data.get('duration', 0)))
 
                         # Update the result with complete data
@@ -3003,12 +3004,12 @@ async def bland_webhook(request: Request):
                             "webhook_status": call_status,
                             "webhook_received_at": datetime.now().isoformat()
                         })
-                        
+
                         print(f"✅ Webhook updated call {call_id} in campaign {check_campaign_id}")
                         print(f"   Status: {analyzed_status}, Transcript length: {len(transcript)}")
                         call_updated = True
                         break
-                
+
                 if call_updated:
                     # Persist the changes to the JSON file
                     save_campaign_results_db(campaign_results_db)
