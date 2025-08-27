@@ -1238,8 +1238,8 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
             # --- NEW LOGIC TO SEPARATE CITY AND FULL ADDRESS ---
 
             # 1. Extract just the city name from the key for the initial prompt greeting.
-            # This assumes the city is the last word in your 'office_location' column.
-            city_name = office_location_key.split(" ")[20::] if " " in office_location_key else office_location_key
+            # This assumes the city name starts from index 20 in your 'office_location' column.
+            city_name = " ".join(office_location_key.split(" ")[20:]) if " " in office_location_key and len(office_location_key.split(" ")) > 20 else office_location_key
 
             # 2. Use the clinic_manager to find the full address for on-demand use by the AI.
             full_address = clinic_manager.find_clinic_address(office_location_key)
