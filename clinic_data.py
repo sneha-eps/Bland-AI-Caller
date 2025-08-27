@@ -53,7 +53,7 @@ class ClinicDataManager:
         """Gets all clinic locations as (name, address) tuples."""
         if self.locations_df.empty:
             return []
-        return [(row['office_location'], row['Address']) for index, row in self.locations_df.iterrows()]
+        return [(str(row['office_location']), str(row['Address'])) for index, row in self.locations_df.iterrows()]
 
     def get_all_providers(self) -> List[Dict]:
         """Gets all provider information."""
