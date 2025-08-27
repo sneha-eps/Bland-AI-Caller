@@ -271,16 +271,16 @@ def get_call_prompt(city_name: str = "",
                     provider_name: str = "[provider name]",
                     available_providers: str = ""):
     """Return the call prompt"""
-    
+
     # Add provider information if available
     provider_info_section = ""
     if available_providers:
         provider_info_section = f"""
     AVAILABLE PROVIDERS AT THIS LOCATION
     {available_providers}
-    
+
     """
-    
+
     return f"""
     ROLE & PERSONA
     You are an AI voice agent calling from Hillside Primary Care. You are professional, polite, and empathetic. Speak in complete, natural sentences and combine related thoughts smoothly. Always wait for the patient's full response before continuing or ending the call. Do not skip or reorder steps.
@@ -291,7 +291,7 @@ def get_call_prompt(city_name: str = "",
     • Email: live oak office @ hill side primary care dot com
     • Hours: 8 a.m. to 5 p.m., Monday to Friday
     • Address: {full_address}
-    
+
     {provider_info_section}
 
     DELIVERY RULES
@@ -574,7 +574,7 @@ def format_duration_display(total_duration_seconds):
 
 
 async def make_single_call_async(call_request: CallRequest, api_key: str,
-                                 semaphore: asyncio.Semaphore, campaign_id: Optional[str] = None) -> CallResult:
+                                 semaphore: asyncio.Semaphore, campaign_id: Optional[str] = None, client_voice: Optional[str] = None) -> CallResult:
     """Make a single call asynchronously with concurrency control"""
     async with semaphore:  # Limit concurrent calls to 10
         call_data = {
@@ -585,13 +585,15 @@ async def make_single_call_async(call_request: CallRequest, api_key: str,
         }
 
         try:
-            selected_voice = VOICE_MAP.get("Paige",
-                                           "default_voice_id")
+            # Use client voice if provided, otherwise default to Paige
+            voice_name = client_voice or "Paige"
+            selected_voice = VOICE_MAP.get(voice_name, VOICE_MAP.get("Paige", "default_voice_id"))
+            print(f"🎤 Selected voice: {voice_name} (ID: {selected_voice})")
 
             # Get available providers for this location
             office_location_key = getattr(call_request, 'office_location_key', call_request.office_location)
             available_providers_list = clinic_manager.find_providers_by_location(office_location_key)
-            
+
             # Format provider information for the prompt
             available_providers_text = ""
             if available_providers_list:
@@ -697,7 +699,7 @@ async def make_single_call_async(call_request: CallRequest, api_key: str,
                               phone_number=call_request.phone_number)
 
 
-def make_single_call(call_request: CallRequest, api_key: str) -> CallResult:
+def make_single_call(call_request: CallRequest, api_key: str, client_voice: Optional[str] = None) -> CallResult:
     """Make a single call and return the result"""
     call_data = {
         "patient name": call_request.patient_name,
@@ -707,13 +709,15 @@ def make_single_call(call_request: CallRequest, api_key: str) -> CallResult:
     }
 
     try:
-        selected_voice = VOICE_MAP.get("Paige",
-                                       "default_voice_id")
+        # Use client voice if provided, otherwise default to Paige
+        voice_name = client_voice or "Paige"
+        selected_voice = VOICE_MAP.get(voice_name, VOICE_MAP.get("Paige", "default_voice_id"))
+        print(f"🎤 Selected voice: {voice_name} (ID: {selected_voice})")
 
         # Get available providers for this location
         office_location_key = getattr(call_request, 'office_location_key', call_request.office_location)
         available_providers_list = clinic_manager.find_providers_by_location(office_location_key)
-        
+
         # Format provider information for the prompt
         available_providers_text = ""
         if available_providers_list:
@@ -831,8 +835,17 @@ async def make_call(call_request: CallRequest, country_code: str = "+1"):
         # Update the call request with formatted phone number
         call_request.phone_number = formatted_phone
 
+        # Fetch client voice preference if client_id is available in request or implicitly
+        client_voice = None
+        # This part needs to be more robust, e.g., looking up client by phone number or known identifier.
+        # For now, let's assume client_id might be implicitly available or we'd need a way to pass it.
+        # If we had a client_id in the call_request or associated with the campaign, we'd do:
+        # client_id = get_client_id_for_call(call_request) # Hypothetical function
+        # if client_id and client_id in clients_db:
+        #     client_voice = clients_db[client_id].get("voice")
+
         # Make the call
-        result = make_single_call(call_request, api_key)
+        result = make_single_call(call_request, api_key, client_voice)
 
         return {
             "success": result.success,
@@ -1219,6 +1232,7 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
         raise HTTPException(status_code=404, detail="Client not found")
 
     client = clients_db[client_id]
+    client_voice = client.get("voice") # Get the client's preferred voice
 
     try:
         # Use stored file or new upload
@@ -1333,7 +1347,8 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
                 max_attempts,
                 retry_interval_minutes,
                 campaign['name'],
-                campaign_id
+                campaign_id,
+                client_voice # Pass client_voice here
             )
             results = validation_failures + call_results
 
@@ -1384,7 +1399,7 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
 
 
 
-async def process_calls_with_retry_and_batching(call_requests, api_key, max_attempts, retry_interval_minutes, campaign_name, campaign_id):
+async def process_calls_with_retry_and_batching(call_requests, api_key, max_attempts, retry_interval_minutes, campaign_name, campaign_id, client_voice: Optional[str] = None):
     """Process calls with index-based traversal and flag-based retry system"""
     print(f"🚀 Starting index-based traversal with flag-based retry system for campaign '{campaign_name}'")
     print(f"📊 Total contacts in sheet: {len(call_requests)} (Index 0 to {len(call_requests)-1})")
@@ -1460,7 +1475,7 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
 
             retry_tasks = []
             for call_data in batch:
-                retry_tasks.append(process_single_call_with_flag_indexed(call_data, api_key, semaphore, campaign_id))
+                retry_tasks.append(process_single_call_with_flag_indexed(call_data, api_key, semaphore, campaign_id, client_voice))
 
             # Execute batch
             await asyncio.gather(*retry_tasks)
@@ -1522,7 +1537,7 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
         print(f"📬 Processing {len(exhausted_calls)} calls that exhausted retry attempts...")
         for call_data in exhausted_calls:
             try:
-                await send_final_voicemail(call_data['call_request'], api_key)
+                await send_final_voicemail(call_data['call_request'], api_key, client_voice)
                 print(f"📬 Voicemail sent to {call_data['patient_name']}")
                 # Change flag to True - voicemail sent, no more processing needed
                 old_flag = call_data['success']
@@ -1593,7 +1608,7 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
     return final_results
 
 
-async def process_single_call_with_flag_indexed(call_data, api_key, semaphore, campaign_id):
+async def process_single_call_with_flag_indexed(call_data, api_key, semaphore, campaign_id, client_voice: Optional[str] = None):
     """Process a single call and update its flag based ONLY on successful initiation."""
     call_request = call_data['call_request']
     call_data['attempts'] += 1
@@ -1602,8 +1617,8 @@ async def process_single_call_with_flag_indexed(call_data, api_key, semaphore, c
     print(f"📞 [Index {sheet_index:03d}] Attempt {call_data['attempts']}/{call_data['max_attempts']} for {call_data['patient_name']}")
 
     try:
-        # Pass campaign_id to the async call function
-        result = await make_single_call_async(call_request, api_key, semaphore, campaign_id)
+        # Pass campaign_id and client_voice to the async call function
+        result = await make_single_call_async(call_request, api_key, semaphore, campaign_id, client_voice)
 
         # The ONLY goal here is to see if the call was successfully QUEUED.
         # The final status will be handled by the webhook.
@@ -1634,10 +1649,13 @@ async def process_calls_with_retry(call_requests, api_key, max_attempts, retry_i
     return await process_calls_with_retry_and_batching(call_requests, api_key, max_attempts, retry_interval_minutes, campaign_name, campaign_id)
 
 
-async def send_final_voicemail(call_request: CallRequest, api_key: str):
+async def send_final_voicemail(call_request: CallRequest, api_key: str, client_voice: Optional[str] = None):
     """Send final voicemail using the updated template after all retry attempts"""
     try:
-        selected_voice = VOICE_MAP.get("Paige", "default_voice_id")
+        # Use client voice if provided, otherwise default to Paige
+        voice_name = client_voice or "Paige"
+        selected_voice = VOICE_MAP.get(voice_name, VOICE_MAP.get("Paige", "default_voice_id"))
+        print(f"🎤 Selected voice for voicemail: {voice_name} (ID: {selected_voice})")
 
         # Updated voicemail template as per your request
         voicemail_template = f"""
@@ -1653,8 +1671,7 @@ async def send_final_voicemail(call_request: CallRequest, api_key: str):
                 "appointment_date": call_request.appointment_date,
                 "appointment_time": call_request.appointment_time,
                 "provider_name": call_request.provider_name,
-                "office_location": call_request.office_location,
-                "message_type": "final_voicemail"
+                "office_location": call_request.office_location
             }
         }
 
@@ -2020,6 +2037,7 @@ async def process_csv(file: UploadFile = File(...),
 
             for call_request in call_requests:
                 try:
+                    # No client_voice is passed here as CSV uploads are not client-specific in this context
                     result = await make_single_call_async(call_request, api_key, semaphore, csv_session_id)
                     call_results.append(result)
 
@@ -2235,7 +2253,7 @@ def analyze_call_transcript(transcript: str) -> str:
         "voicemail", "voice mail", "leave a message", "after the beep", "beep",
         "mailbox", "voice message", "recording", "automated", "please leave",
         "can't come to the phone", "not available", "busy", "no answer",
-        "disconnected", "line busy", "hung up", "dial tone", "no response"
+        "disconnected", "line busy", "dial tone", "no response"
     ]
 
     if any(indicator in transcript_lower for indicator in voicemail_indicators):
@@ -2275,16 +2293,16 @@ def get_voicemail_prompt(patient_name: str = "[patient name]",
         office_location: str = "[office location]",
         available_providers: str = "") -> str:
     """Get the voicemail message prompt"""
-    
+
     # Add provider information if available
     provider_info_section = ""
     if available_providers:
         provider_info_section = f"""
-    
+
     OTHER AVAILABLE PROVIDERS AT THIS LOCATION:
     {available_providers}
     """
-    
+
     return f"""
     ROLE & PERSONA
     You are an AI voice agent leaving a voicemail message from Hillside Medical Group. You are professional, clear, and concise.
@@ -2299,10 +2317,13 @@ def get_voicemail_prompt(patient_name: str = "[patient name]",
     • End the call after delivering the complete message
     """
 
-async def send_automatic_voicemail(call_request: CallRequest, api_key: str):
+async def send_automatic_voicemail(call_request: CallRequest, api_key: str, client_voice: Optional[str] = None):
     """Send a voicemail message to a patient, used for automatic follow-ups"""
     try:
-        selected_voice = VOICE_MAP.get("Paige", "default_voice_id")
+        # Use client voice if provided, otherwise default to Paige
+        voice_name = client_voice or "Paige"
+        selected_voice = VOICE_MAP.get(voice_name, VOICE_MAP.get("Paige", "default_voice_id"))
+        print(f"🎤 Selected voice for voicemail: {voice_name} (ID: {selected_voice})")
 
         payload = {
             "phone_number": call_request.phone_number,
@@ -2720,9 +2741,9 @@ async def get_call_details(call_id: str):
     if not api_key:
         raise HTTPException(status_code=400,
                             detail="BLAND_API_KEY not found in Secrets.")
-        
+
     stored_call_data = None
-    
+
     try:
         print(f"🔍 Fetching call details for {call_id}")
 
