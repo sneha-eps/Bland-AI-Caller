@@ -2492,41 +2492,50 @@ async def get_campaign_analytics(campaign_id: str):
                             async with session.get(
                                 f"https://api.bland.ai/v1/calls/{result['call_id']}",
                                 headers={"Authorization": f"Bearer {api_key}"},
-                                timeout=aiohttp.ClientTimeout(total=45)
+                                timeout=aiohttp.ClientTimeout(total=30)
                             ) as call_response:
+
+                                print(f"🔍 API Response Status: {call_response.status} for call {result['call_id']}")
 
                                 if call_response.status == 200:
                                     call_data = await call_response.json()
+                                    print(f"📊 Call data keys: {list(call_data.keys())}")
 
-                                    # Get transcript and other details
-                                    transcript = call_data.get('transcript', '')
+                                    # Get transcript and other details with better field handling
+                                    transcript = call_data.get('transcript', call_data.get('concatenated_transcript', ''))
                                     call_length = call_data.get('call_length', call_data.get('duration', 0))
 
                                     # Parse duration more robustly - try multiple fields
-                                    raw_duration = call_length or call_data.get('duration', 0) or call_data.get('call_duration', 0)
+                                    raw_duration = (call_length or 
+                                                  call_data.get('duration', 0) or 
+                                                  call_data.get('call_duration', 0) or
+                                                  call_data.get('length', 0))
                                     duration_seconds = parse_duration(raw_duration)
 
                                     call_details['duration'] = duration_seconds
                                     total_duration += duration_seconds
 
-                                    # Analyze transcript for status using our enhanced function
-                                    if transcript and transcript.strip():
-                                        call_status = analyze_call_transcript(transcript)
-                                        final_summary = extract_final_summary(transcript)
-                                        call_details['analysis_notes'] = f"Analyzed {len(transcript)} characters of transcript"
-                                        call_details['final_summary'] = final_summary
+                                    # Check if call already has stored status from webhook
+                                    stored_status = result.get('call_status')
+                                    stored_transcript = result.get('transcript', '')
+                                    
+                                    if stored_status and stored_transcript:
+                                        # Use stored data from webhook
+                                        call_status = stored_status
+                                        transcript = stored_transcript
+                                        final_summary = result.get('final_summary', extract_final_summary(transcript))
+                                        call_details['analysis_notes'] = "Used stored webhook data"
                                     else:
-                                        call_status = 'busy_voicemail'
-                                        final_summary = ""
-                                        call_details['analysis_notes'] = "No transcript available - likely voicemail or no answer"
-                                        call_details['final_summary'] = ""
+                                        # Analyze fresh transcript
+                                        if transcript and transcript.strip():
+                                            call_status = analyze_call_transcript(transcript)
+                                            final_summary = extract_final_summary(transcript)
+                                            call_details['analysis_notes'] = f"Analyzed {len(transcript)} characters from API"
+                                        else:
+                                            call_status = 'busy_voicemail'
+                                            final_summary = "No transcript available"
+                                            call_details['analysis_notes'] = "No transcript in API response"
 
-                                    # Update result with transcript and status
-                                    result.transcript = transcript
-                                    result.call_status = call_status
-                                    result.final_summary = final_summary
-
-                                    # Store call status in call details
                                     call_details['call_status'] = call_status
                                     call_details['transcript'] = transcript
                                     call_details['final_summary'] = final_summary
@@ -2535,16 +2544,15 @@ async def get_campaign_analytics(campaign_id: str):
                                     if call_status in status_counts:
                                         status_counts[call_status] += 1
                                     else:
-                                        # Fallback for unexpected statuses
                                         status_counts['busy_voicemail'] += 1
                                         call_details['call_status'] = 'busy_voicemail'
 
-                                    print(f"✅ Call details retrieved for {call_details['patient_name']}: Status={call_details['call_status']}, Duration={duration_seconds}s, Transcript length={len(transcript)}")
+                                    print(f"✅ Call details for {call_details['patient_name']}: Status={call_status}, Duration={duration_seconds}s, Transcript={len(transcript)} chars")
 
                                 elif call_response.status == 404:
-                                    print(f"⚠️ Call {result.get('call_id')} not found in Bland AI")
-                                    call_details['call_status'] = 'busy_voicemail'
-                                    call_details['analysis_notes'] = "Call not found in API"
+                                    print(f"⚠️ Call {result.get('call_id')} not found in Bland AI - may still be processing")
+                                    call_details['call_status'] = 'processing'
+                                    call_details['analysis_notes'] = "Call not found in API - may still be processing"
                                     status_counts['busy_voicemail'] += 1
                                 elif call_response.status == 429:
                                     print(f"⏳ Rate limit hit, waiting and retrying...")
@@ -2649,41 +2657,116 @@ async def get_call_details(call_id: str):
                             detail="BLAND_API_KEY not found in Secrets.")
 
     try:
+        print(f"🔍 Fetching call details for {call_id}")
+        
+        # First check if we have stored data in our campaign results
+        stored_call_data = None
+        for campaign_id, campaign_results in campaign_results_db.items():
+            for result in campaign_results.get("results", []):
+                if result.get("call_id") == call_id:
+                    stored_call_data = result
+                    print(f"📊 Found stored data for call {call_id} in campaign {campaign_id}")
+                    break
+            if stored_call_data:
+                break
+
+        # Try to get fresh data from Bland AI API
         response = requests.get(f"https://api.bland.ai/v1/calls/{call_id}",
                                 headers={
                                     "Authorization": f"Bearer {api_key}",
                                 },
-                                timeout=15)
+                                timeout=20)
+
+        print(f"📊 Bland AI API response status: {response.status_code}")
 
         if response.status_code == 200:
             call_data = response.json()
+            print(f"📊 API call data keys: {list(call_data.keys())}")
 
-            # Use our improved transcript analysis function
-            transcript = call_data.get("transcript", "")
-            call_status = analyze_call_transcript(transcript)
-            final_summary = extract_final_summary(transcript) # Extract final summary
+            # Get transcript from multiple possible fields
+            transcript = (call_data.get("transcript", "") or 
+                         call_data.get("concatenated_transcript", "") or
+                         (stored_call_data.get("transcript", "") if stored_call_data else ""))
+            
+            # Use stored data if available, otherwise analyze fresh
+            if stored_call_data and stored_call_data.get("call_status"):
+                call_status = stored_call_data.get("call_status")
+                final_summary = stored_call_data.get("final_summary", "")
+            else:
+                call_status = analyze_call_transcript(transcript) if transcript else "busy_voicemail"
+                final_summary = extract_final_summary(transcript)
 
-            # Handle duration formatting consistently
-            raw_duration = call_data.get("duration", 0)
+            # Handle duration from multiple fields
+            raw_duration = (call_data.get("call_length", 0) or 
+                           call_data.get("duration", 0) or
+                           call_data.get("length", 0))
             duration = parse_duration(raw_duration)
 
             return {
                 "call_id": call_id,
                 "status": call_data.get("status", "unknown"),
                 "call_status": call_status,
-                "final_summary": final_summary, # Include final summary
+                "final_summary": final_summary,
                 "transcript": transcript,
                 "duration": duration,
                 "created_at": call_data.get("created_at", ""),
-                "phone_number": call_data.get("phone_number", ""),
+                "phone_number": call_data.get("to", call_data.get("phone_number", "")),
+                "data_source": "api_with_stored_fallback"
             }
+        elif response.status_code == 404:
+            # Call not found in API, use stored data if available
+            if stored_call_data:
+                print(f"📊 Using stored data for call {call_id} (not found in API)")
+                return {
+                    "call_id": call_id,
+                    "status": stored_call_data.get("status", "completed"),
+                    "call_status": stored_call_data.get("call_status", "busy_voicemail"),
+                    "final_summary": stored_call_data.get("final_summary", ""),
+                    "transcript": stored_call_data.get("transcript", ""),
+                    "duration": stored_call_data.get("duration", 0),
+                    "created_at": stored_call_data.get("created_at", ""),
+                    "phone_number": stored_call_data.get("phone_number", ""),
+                    "data_source": "stored_only"
+                }
+            else:
+                raise HTTPException(status_code=404, detail="Call not found in API or stored data")
         else:
-            raise HTTPException(
-                status_code=response.status_code,
-                detail=f"Failed to get call details: {response.text}")
+            error_detail = f"API error: Status {response.status_code}, Response: {response.text}"
+            if stored_call_data:
+                print(f"⚠️ API error, falling back to stored data: {error_detail}")
+                return {
+                    "call_id": call_id,
+                    "status": stored_call_data.get("status", "completed"),
+                    "call_status": stored_call_data.get("call_status", "busy_voicemail"),
+                    "final_summary": stored_call_data.get("final_summary", ""),
+                    "transcript": stored_call_data.get("transcript", ""),
+                    "duration": stored_call_data.get("duration", 0),
+                    "created_at": stored_call_data.get("created_at", ""),
+                    "phone_number": stored_call_data.get("phone_number", ""),
+                    "data_source": "stored_fallback"
+                }
+            else:
+                raise HTTPException(status_code=response.status_code, detail=error_detail)
+                
+    except requests.RequestException as e:
+        print(f"💥 Network error fetching call details: {str(e)}")
+        # Try to return stored data if network fails
+        if stored_call_data:
+            return {
+                "call_id": call_id,
+                "status": stored_call_data.get("status", "completed"),
+                "call_status": stored_call_data.get("call_status", "busy_voicemail"),
+                "final_summary": stored_call_data.get("final_summary", ""),
+                "transcript": stored_call_data.get("transcript", ""),
+                "duration": stored_call_data.get("duration", 0),
+                "created_at": stored_call_data.get("created_at", ""),
+                "phone_number": stored_call_data.get("phone_number", ""),
+                "data_source": "stored_network_fallback"
+            }
+        raise HTTPException(status_code=500, detail=f"Network error: {str(e)}")
     except Exception as e:
-        raise HTTPException(status_code=500,
-                            detail=f"Error fetching call details: {str(e)}")
+        print(f"💥 Unexpected error fetching call details: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error fetching call details: {str(e)}")
 
 
 @app.get("/api/clients")
@@ -2734,6 +2817,18 @@ async def debug_campaign_results():
         }
 
         for campaign_id, results in campaign_results_db.items():
+            call_details = []
+            for result in results.get("results", []):
+                call_details.append({
+                    "patient_name": result.get("patient_name", "Unknown"),
+                    "call_id": result.get("call_id"),
+                    "success": result.get("success", False),
+                    "has_transcript": bool(result.get("transcript", "")),
+                    "call_status": result.get("call_status"),
+                    "final_summary": result.get("final_summary"),
+                    "webhook_received": bool(result.get("webhook_received_at"))
+                })
+            
             debug_info["campaign_details"][campaign_id] = {
                 "campaign_name": results.get("campaign_name", "Unknown"),
                 "client_name": results.get("client_name", "Unknown"),
@@ -2741,12 +2836,41 @@ async def debug_campaign_results():
                 "successful_calls": results.get("successful_calls", 0),
                 "started_at": results.get("started_at", "Unknown"),
                 "results_count": len(results.get("results", [])),
-                "is_csv_upload": campaign_id.startswith("csv_upload_")
+                "is_csv_upload": campaign_id.startswith("csv_upload_"),
+                "call_details": call_details
             }
 
         return {
             "success": True,
             "debug_info": debug_info
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@app.get("/debug/call_data/{call_id}")
+async def debug_call_data(call_id: str):
+    """Debug endpoint to check specific call data storage"""
+    try:
+        found_calls = []
+        
+        # Search in all campaigns
+        for campaign_id, results in campaign_results_db.items():
+            for result in results.get("results", []):
+                if result.get("call_id") == call_id:
+                    found_calls.append({
+                        "campaign_id": campaign_id,
+                        "campaign_name": results.get("campaign_name", "Unknown"),
+                        "stored_data": result
+                    })
+        
+        return {
+            "success": True,
+            "call_id": call_id,
+            "found_in_campaigns": len(found_calls),
+            "call_data": found_calls
         }
     except Exception as e:
         return {
@@ -2840,39 +2964,64 @@ async def bland_webhook(request: Request):
 
         call_id = data.get("call_id")
         request_data = data.get("request_data", {})
-        campaign_id = request_data.get("campaign_id") # <-- Get campaign_id from request_data
+        campaign_id = request_data.get("campaign_id")
 
-        if not call_id or not campaign_id:
-            print("Webhook ignored: Missing call_id or campaign_id in request_data")
-            return {"success": False, "reason": "Missing call_id or campaign_id"}
+        if not call_id:
+            print(f"⚠️ Webhook ignored: Missing call_id")
+            return {"success": False, "reason": "Missing call_id"}
 
-        # Find the campaign in our main results database
-        if campaign_id in campaign_results_db:
-            # Find the specific call within that campaign's results
-            for result in campaign_results_db[campaign_id].get("results", []):
-                if result.get("call_id") == call_id:
-                    # Update this call's data with the final results
-                    transcript = data.get('transcript', '')
-                    final_status = analyze_call_transcript(transcript) if transcript else "busy_voicemail"
-                    final_summary = extract_final_summary(transcript)
-                    duration = parse_duration(data.get('call_length', 0))
+        # Update call in all campaigns if campaign_id not provided
+        campaigns_to_check = [campaign_id] if campaign_id else list(campaign_results_db.keys())
+        
+        call_updated = False
+        for check_campaign_id in campaigns_to_check:
+            if check_campaign_id in campaign_results_db:
+                # Find the specific call within that campaign's results
+                for result in campaign_results_db[check_campaign_id].get("results", []):
+                    if result.get("call_id") == call_id:
+                        # Update this call's data with the final results
+                        transcript = data.get('transcript', '')
+                        call_status = data.get('status', 'completed')
+                        
+                        # Analyze transcript for better status determination
+                        if transcript and transcript.strip():
+                            analyzed_status = analyze_call_transcript(transcript)
+                            final_summary = extract_final_summary(transcript)
+                        else:
+                            analyzed_status = 'busy_voicemail'
+                            final_summary = "No transcript available"
+                        
+                        duration = parse_duration(data.get('call_length', data.get('duration', 0)))
 
-                    result.update({
-                        "transcript": transcript,
-                        "call_status": final_status,
-                        "final_summary": final_summary,
-                        "duration": duration
-                    })
-                    print(f"✅ Webhook updated call {call_id} in campaign {campaign_id} with status: {final_status}")
-
+                        # Update the result with complete data
+                        result.update({
+                            "transcript": transcript,
+                            "call_status": analyzed_status,
+                            "final_summary": final_summary,
+                            "duration": duration,
+                            "webhook_status": call_status,
+                            "webhook_received_at": datetime.now().isoformat()
+                        })
+                        
+                        print(f"✅ Webhook updated call {call_id} in campaign {check_campaign_id}")
+                        print(f"   Status: {analyzed_status}, Transcript length: {len(transcript)}")
+                        call_updated = True
+                        break
+                
+                if call_updated:
                     # Persist the changes to the JSON file
                     save_campaign_results_db(campaign_results_db)
                     break
 
-        return {"success": True}
+        if not call_updated:
+            print(f"⚠️ Call {call_id} not found in any campaign results")
+
+        return {"success": True, "call_updated": call_updated}
 
     except Exception as e:
         print(f"💥 Webhook error: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return {"success": False, "error": str(e)}
 
 
