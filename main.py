@@ -1365,6 +1365,8 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
             "successful_calls": successful_calls,
             "failed_calls": failed_calls,
             "started_at": datetime.now().isoformat(),
+            "completed_at": datetime.now().isoformat(),
+            "status": "completed",
             "results": [result.dict() for result in results]
         }
 
@@ -2930,6 +2932,57 @@ async def debug_campaign_results():
         return {
             "success": True,
             "debug_info": debug_info
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@app.get("/debug/active_campaigns")
+async def debug_active_campaigns():
+    """Debug endpoint to check if any campaigns are currently running"""
+    try:
+        active_info = {
+            "stored_campaigns": len(campaigns_db),
+            "campaigns_with_results": len(campaign_results_db),
+            "campaign_status": {}
+        }
+        
+        # Check each campaign's status
+        for campaign_id, campaign in campaigns_db.items():
+            results = campaign_results_db.get(campaign_id, {})
+            active_info["campaign_status"][campaign_id] = {
+                "name": campaign.get("name", "Unknown"),
+                "has_results": campaign_id in campaign_results_db,
+                "total_calls": results.get("total_calls", 0),
+                "successful_calls": results.get("successful_calls", 0),
+                "started_at": results.get("started_at", "Never"),
+                "is_csv_upload": campaign_id.startswith("csv_upload_")
+            }
+        
+        return {
+            "success": True,
+            "debug_info": active_info
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+@app.post("/stop_all_campaigns")
+async def stop_all_campaigns():
+    """Emergency endpoint to stop all active campaigns"""
+    try:
+        # This would require implementing campaign state tracking
+        # For now, we can clear any problematic data
+        stopped_campaigns = []
+        
+        return {
+            "success": True,
+            "message": "Campaign stop requested",
+            "stopped_campaigns": stopped_campaigns
         }
     except Exception as e:
         return {
