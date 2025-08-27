@@ -415,6 +415,7 @@ class CallRequest(BaseModel):
     appointment_time: str
     office_location: str
     full_address: Optional[str] = None
+    office_location_key: Optional[str] = None
 
 
 class CallResult(BaseModel):
@@ -587,7 +588,7 @@ async def make_single_call_async(call_request: CallRequest, api_key: str,
         try:
             # Use client voice if provided, otherwise default to Paige
             voice_name = client_voice or "Paige"
-            selected_voice = VOICE_MAP.get(voice_name, VOICE_MAP.get("Paige", "default_voice_id"))
+            selected_voice = get_voice_id(voice_name)
             print(f"🎤 Selected voice: {voice_name} (ID: {selected_voice})")
 
             # Get available providers for this location
@@ -711,7 +712,7 @@ def make_single_call(call_request: CallRequest, api_key: str, client_voice: Opti
     try:
         # Use client voice if provided, otherwise default to Paige
         voice_name = client_voice or "Paige"
-        selected_voice = VOICE_MAP.get(voice_name, VOICE_MAP.get("Paige", "default_voice_id"))
+        selected_voice = get_voice_id(voice_name)
         print(f"🎤 Selected voice: {voice_name} (ID: {selected_voice})")
 
         # Get available providers for this location
@@ -1322,11 +1323,10 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
                 provider_name=safe_str(row.get('provider_name', '')),
                 appointment_date=safe_str(row.get('date', '')),
                 appointment_time=safe_str(row.get('time', '')),
-                office_location=city_name  # Pass the CITY NAME to the object
+                office_location=city_name,  # Pass the CITY NAME to the object
+                full_address=full_address,
+                office_location_key=office_location_key  # Keep the original key for provider lookup
             )
-            # Dynamically attach the full address and office location key for provider lookup
-            call_request.full_address = full_address
-            call_request.office_location_key = office_location_key  # Keep the original key for provider lookup
             call_requests.append(call_request)
             print(f"📊 Validation complete: {len(validation_failures)} failures, {len(call_requests)} valid calls")
 
