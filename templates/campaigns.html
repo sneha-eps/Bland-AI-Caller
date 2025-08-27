@@ -1881,11 +1881,17 @@
                     document.getElementById('campaignRuns').textContent = data.analytics.campaign_runs;
                     document.getElementById('successRate').textContent = data.analytics.success_rate + '%';
 
-                    // Update status counts
-                    document.getElementById('confirmedCount').textContent = data.analytics.status_counts.confirmed || 0;
-                    document.getElementById('cancelledCount').textContent = data.analytics.status_counts.cancelled || 0;
-                    document.getElementById('rescheduledCount').textContent = data.analytics.status_counts.rescheduled || 0;
-                    document.getElementById('busyVoicemailCount').textContent = data.analytics.status_counts.busy_voicemail || 0;
+                    // Update status counts with safe access
+                    const statusCounts = data.analytics.status_counts || {};
+                    const confirmedElement = document.getElementById('confirmedCount');
+                    const cancelledElement = document.getElementById('cancelledCount');
+                    const rescheduledElement = document.getElementById('rescheduledCount');
+                    const busyVoicemailElement = document.getElementById('busyVoicemailCount');
+
+                    if (confirmedElement) confirmedElement.textContent = statusCounts.confirmed || 0;
+                    if (cancelledElement) cancelledElement.textContent = statusCounts.cancelled || 0;
+                    if (rescheduledElement) rescheduledElement.textContent = statusCounts.rescheduled || 0;
+                    if (busyVoicemailElement) busyVoicemailElement.textContent = statusCounts.busy_voicemail || 0;
 
                     // Populate calls table
                     populateCallsTable(data.analytics.calls);
@@ -1896,30 +1902,18 @@
 
                     console.log('Analytics loaded successfully');
                 } else {
-                    console.log('No analytics data available:', data.message);
-                    // Show no calls message
-                    document.getElementById('noCallsMessage').style.display = 'block';
-                    document.querySelector('.calls-table-container').style.display = 'none';
+                    console.error('Error loading campaign analytics:', data.message || 'Unknown error');
+                    alert('Error loading campaign analytics: ' + (data.message || 'Unknown error'));
 
-                    // Reset score cards to zero
-                    document.getElementById('totalCalls').textContent = '0';
-                    document.getElementById('totalDuration').textContent = '0s';
-                    document.getElementById('campaignRuns').textContent = '0';
-                    document.getElementById('successRate').textContent = '0%';
-                    document.getElementById('confirmedCount').textContent = '0';
-                    document.getElementById('cancelledCount').textContent = '0';
-                    document.getElementById('rescheduledCount').textContent = '0';
-                    document.getElementById('busyVoicemailCount').textContent = '0';
+                    // Show error state
+                    document.getElementById('totalCalls').textContent = 'Error';
+                    document.getElementById('totalDuration').textContent = 'Error';
+                    document.getElementById('campaignRuns').textContent = 'Error';
+                    document.getElementById('successRate').textContent = 'Error';
                 }
             } catch (error) {
                 console.error('Error loading campaign analytics:', error);
-                alert('Error loading campaign analytics: ' + error.message);
-
-                // Show error state
-                document.getElementById('totalCalls').textContent = 'Error';
-                document.getElementById('totalDuration').textContent = 'Error';
-                document.getElementById('campaignRuns').textContent = 'Error';
-                document.getElementById('successRate').textContent = 'Error';
+                alert('Error loading campaign analytics: ' + (error && error.message ? error.message : 'Unknown error'));
             }
         }
 
@@ -1936,6 +1930,7 @@
             document.querySelector('.calls-table-container').style.display = 'block';
 
             calls.forEach((call, index) => {
+                const row = document.createElement('tr');
                 // Use the call_status from transcript analysis
                 let callStatus = call.call_status || 'busy_voicemail';
                 let statusIcon = 'fa-phone-slash';
