@@ -1239,7 +1239,7 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
 
             # 1. Extract just the city name from the key for the initial prompt greeting.
             # This assumes the city is the last word in your 'office_location' column.
-            city_name = office_location_key.split(" ")[-1] if " " in office_location_key else office_location_key
+            city_name = office_location_key.split(" ")[20::] if " " in office_location_key else office_location_key
 
             # 2. Use the clinic_manager to find the full address for on-demand use by the AI.
             full_address = clinic_manager.find_clinic_address(office_location_key)
@@ -2655,15 +2655,11 @@ async def get_call_details(call_id: str):
     if not api_key:
         raise HTTPException(status_code=400,
                             detail="BLAND_API_KEY not found in Secrets.")
-
+        
+    stored_call_data = None
+    
     try:
         print(f"🔍 Fetching call details for {call_id}")
-
-        # Initialize stored_call_data to None
-        stored_call_data = None  # Ensure it's defined even if not found
-
-        # Initialize stored_call_data to None
-        stored_call_data = None  # Ensure it's defined even if not found
 
         # First check if we have stored data in our campaign results
         for campaign_id, campaign_results in campaign_results_db.items():
