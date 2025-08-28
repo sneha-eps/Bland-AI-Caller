@@ -1372,7 +1372,7 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
 
         # Store in the global results database
         campaign_results_db[campaign_id] = campaign_results
-        save_campaign_results_db(campaign_results_db)
+        save_campaigns_results_db(campaign_results_db)
         print(f"✅ Stored campaign results for {campaign_id}. Total campaigns with results: {len(campaign_results_db)}")
         print(f"✅ This campaign results: Total={len(results)}, Success={successful_calls}, Failed={failed_calls}")
 
@@ -1661,7 +1661,7 @@ async def send_final_voicemail(call_request: CallRequest, api_key: str, client_v
 
         # Updated voicemail template as per your request
         voicemail_template = f"""
-        Hi Good Morning, I am calling from Hillside Medical Group. This call is for {call_request.patient_name} to remind him/her of an upcoming appointment on {call_request.appointment_date} at {call_request.appointment_time} with {call_request.provider_name} at {call_request.office_location}. Please make sure to arrive 15 minutes prior to your appointment. Also, Please make sure to email us your insurance information ASAP so that we can get it verified and avoid any delays on the day of your appointment. If you wish to cancel or reschedule your appointment, please inform us at least 24 hours in advance to avoid cancellation charge of $25.00. For more information, you can call us back on 210-742-6555 and press the prompt that says "Appointment Setters". Thank you and have a blessed day.
+        Hi Good Morning, I am calling from Hillside Medical Group. This call is for {call_request.patient_name} to remind him/her of an upcoming appointment on {call_request.appointment_date} at {call_request.appointment_time} with {call_request.provider_name} at {call_request.office_location}. Please make sure to arrive 15 minutes prior to your appointment. Also, Please make sure to email us your insurance information ASAP so that we can get it verified and avoid any delays on the day of your appointment. If you wish to cancel or reschedule your appointment, please inform us at least 24 hours in advance to avoid cancellation charge of $25.00. For more information, you can call us back on 210-742-6555. Thank you and have a blessed day.
         """
 
         payload = {
@@ -2571,6 +2571,13 @@ async def get_campaign_analytics(campaign_id: str):
                     'analysis_notes': ''
                 }
 
+                stored_call_id = result.get('call_id')
+                print(f"📞 ANALYTICS CALL ID TRACKING:")
+                print(f"   Patient: {result.get('patient_name', 'Unknown')}")
+                print(f"   Stored Call ID: {stored_call_id}")
+                print(f"   Call ID Type: {type(stored_call_id)}")
+                print(f"   Success Flag: {result.get('success', False)}")
+
                 # If call was successful and has call_id, try to get detailed info
                 if result.get('success') and result.get('call_id'):
                     try:
@@ -2948,7 +2955,7 @@ async def debug_active_campaigns():
             "campaigns_with_results": len(campaign_results_db),
             "campaign_status": {}
         }
-        
+
         # Check each campaign's status
         for campaign_id, campaign in campaigns_db.items():
             results = campaign_results_db.get(campaign_id, {})
@@ -2960,7 +2967,7 @@ async def debug_active_campaigns():
                 "started_at": results.get("started_at", "Never"),
                 "is_csv_upload": campaign_id.startswith("csv_upload_")
             }
-        
+
         return {
             "success": True,
             "debug_info": active_info
@@ -2978,7 +2985,7 @@ async def stop_all_campaigns():
         # This would require implementing campaign state tracking
         # For now, we can clear any problematic data
         stopped_campaigns = []
-        
+
         return {
             "success": True,
             "message": "Campaign stop requested",
