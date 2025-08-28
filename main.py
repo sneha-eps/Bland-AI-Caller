@@ -422,7 +422,6 @@ class CallResult(BaseModel):
     success: bool
     call_id: Optional[str] = None
     status: Optional[str] = 'initiated'
-    call_status: Optional[str] = 'pending'
     transcript: Optional[str] = None
     final_summary: Optional[str] = None
     message: Optional[str] = None
