@@ -422,6 +422,7 @@ class CallResult(BaseModel):
     success: bool
     call_id: Optional[str] = None
     status: Optional[str] = 'initiated'
+    call_status: Optional[str] = None
     transcript: Optional[str] = None
     final_summary: Optional[str] = None
     message: Optional[str] = None
@@ -1627,7 +1628,7 @@ async def process_single_call_with_flag_indexed(call_data, api_key, semaphore, c
         if result.success and result.call_id:
             call_data['success'] = True  # Flag TRUE means successfully initiated
             call_data['final_result'] = result
-            result.call_status = 'initiated'  # Set initial status
+            call_data['call_status'] = 'initiated'  # Set initial status in call_data
             print(f"✅ [Index {sheet_index:03d}] INITIATED: {call_data['patient_name']} - Call ID: {result.call_id}")
         else:
             call_data['success'] = False  # Flag FALSE means it failed to initiate
