@@ -1372,7 +1372,7 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
 
         # Store in the global results database
         campaign_results_db[campaign_id] = campaign_results
-        save_campaigns_results_db(campaign_results_db)
+        save_campaign_results_db(campaign_results_db)
         print(f"✅ Stored campaign results for {campaign_id}. Total campaigns with results: {len(campaign_results_db)}")
         print(f"✅ This campaign results: Total={len(results)}, Success={successful_calls}, Failed={failed_calls}")
 
