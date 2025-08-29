@@ -2149,15 +2149,15 @@ async def process_csv(file: UploadFile = File(...),
 
 def extract_final_summary(transcript: str) -> str:
     """
-    Extract a final summary from the call transcript by looking at the AI assistant's final statements.
-    This function analyzes the transcript and returns the AI's concluding summary.
+    Extract the AI assistant's final summary statement from the call transcript.
+    This looks for the actual final confirmation/summary statement made by the AI.
     """
     if not transcript or transcript.strip() == "":
-        return "No summary available - no transcript"
+        return "No summary available"
 
     transcript_lines = transcript.strip().split('\n')
     
-    # Look for the AI assistant's final statements (usually at the end)
+    # Look for the AI assistant's final summary statements - specifically the "Just to confirm..." pattern
     assistant_final_statements = []
     
     # Process lines in reverse to find the most recent assistant statements
@@ -2166,62 +2166,78 @@ def extract_final_summary(transcript: str) -> str:
         if line.startswith('assistant:'):
             # Remove the "assistant:" prefix and clean up
             statement = line.replace('assistant:', '').strip()
-            if statement and len(statement) > 10:  # Meaningful statement
+            if statement and len(statement) > 15:  # Meaningful statement
                 assistant_final_statements.append(statement)
+                
+                # Check if this is a final summary statement
+                statement_lower = statement.lower()
+                if any(phrase in statement_lower for phrase in [
+                    "just to confirm", "to confirm", "i will cancel", "our scheduling agent will call",
+                    "appointment has been cancelled", "appointment is confirmed"
+                ]):
+                    # Found a final summary statement - return it directly
+                    return statement
         elif line.startswith('user:') and assistant_final_statements:
             # Stop when we hit user input after finding assistant statements
             break
     
-    # If we found final assistant statements, analyze them
+    # If we found assistant statements but no clear final summary, look for specific patterns
     if assistant_final_statements:
-        # Take the last few meaningful statements from the assistant
-        final_statements = assistant_final_statements[:3]  # Last 3 statements
-        combined_final = ' '.join(reversed(final_statements))
+        # Check the last few statements for summary patterns
+        for statement in assistant_final_statements[:3]:  # Check last 3 statements
+            statement_lower = statement.lower()
+            
+            # Look for final confirmation patterns
+            if any(phrase in statement_lower for phrase in [
+                "have a great day", "you're welcome", "see you then", "thank you",
+                "we are glad to have you", "feel free to contact us"
+            ]):
+                # This might be the closing, look for the previous confirmation statement
+                continue
+            elif len(statement) > 30:  # Substantial statement
+                return statement
         
-        # Look for confirmation patterns in the final statements
-        final_lower = combined_final.lower()
-        
-        if any(phrase in final_lower for phrase in [
-            "just to confirm, your appointment", "your appointment is confirmed", 
-            "we are glad to have you", "see you then", "have a great day"
-        ]):
-            return "Patient confirmed appointment - AI provided confirmation details"
-        elif any(phrase in final_lower for phrase in [
-            "i will cancel this appointment", "appointment has been cancelled",
-            "feel free to contact us anytime", "cancelled for you"
-        ]):
-            return "Patient cancelled appointment - AI processed cancellation"
-        elif any(phrase in final_lower for phrase in [
-            "our scheduling agent will call you", "will call you to find a new time",
-            "someone will be in touch", "reschedule"
-        ]):
-            return "Patient requested to reschedule - Follow-up call arranged"
-        elif any(phrase in final_lower for phrase in [
-            "my apologies for the confusion", "thank you for your time",
-            "wrong person", "wrong number"
-        ]):
-            return "Wrong number or incorrect contact information"
-        else:
-            # Return the actual final statement from the AI
-            return final_statements[0] if final_statements else "Call completed - see transcript for details"
+        # Return the most substantial statement
+        substantial_statements = [s for s in assistant_final_statements if len(s) > 30]
+        if substantial_statements:
+            return substantial_statements[0]
     
-    # Fallback: Look for key patterns anywhere in the transcript
-    transcript_lower = transcript.lower().strip()
+    # Fallback: Look for final summary patterns anywhere in the transcript
+    transcript_lower = transcript.lower()
     
-    if "just to confirm, your appointment" in transcript_lower:
-        return "Patient confirmed appointment"
-    elif "i will cancel this appointment" in transcript_lower:
+    # Look for "Just to confirm" statements specifically
+    for line in transcript_lines:
+        if line.startswith('assistant:'):
+            statement = line.replace('assistant:', '').strip()
+            if statement.lower().startswith('just to confirm'):
+                return statement
+    
+    # Other confirmation patterns
+    if "i will cancel this appointment" in transcript_lower:
+        # Find the actual cancellation statement
+        for line in transcript_lines:
+            if line.startswith('assistant:') and 'cancel' in line.lower():
+                return line.replace('assistant:', '').strip()
         return "Patient cancelled appointment"
     elif "our scheduling agent will call you" in transcript_lower:
+        # Find the actual reschedule statement
+        for line in transcript_lines:
+            if line.startswith('assistant:') and 'scheduling agent' in line.lower():
+                return line.replace('assistant:', '').strip()
         return "Patient requested to reschedule"
+    elif "appointment is confirmed" in transcript_lower or "we are glad to have you" in transcript_lower:
+        return "Patient confirmed appointment"
     elif "my apologies for the confusion" in transcript_lower:
-        return "Wrong number or patient not found"
+        return "Wrong number or patient not available"
     else:
-        # Return a portion of the transcript as summary
-        summary = transcript.strip()[:200]
-        if len(transcript.strip()) > 200:
-            summary += "..."
-        return summary
+        # Return the last substantial assistant statement
+        for line in reversed(transcript_lines):
+            if line.startswith('assistant:'):
+                statement = line.replace('assistant:', '').strip()
+                if len(statement) > 20 and not any(word in statement.lower() for word in ['hello', 'hi', 'good morning']):
+                    return statement
+        
+        return "Call completed - no clear summary available"
 
 
 def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -> str:
