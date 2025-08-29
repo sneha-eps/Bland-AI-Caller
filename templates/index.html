@@ -1164,7 +1164,7 @@
                             <td>${call.success ? (call.message || call.status) : call.error}</td>
                             <td>
                                 ${call.success && call.call_id ? 
-                                    `<button class="btn-small" onclick="viewTranscript('${call.call_id}', '${call.patient_name}')">
+                                    `<button class="btn-small" onclick="viewTranscript('${call.call_id}', '${encodeURIComponent(call.patient_name)}')">
                                         <i class="fas fa-eye"></i> View Details
                                      </button>` : 
                                     '<span style="color: var(--text-tertiary);">N/A</span>'}
@@ -1205,7 +1205,8 @@
             submitBtn.disabled = false;
         });
 
-        async function viewTranscript(callId, patientName) {
+        async function viewTranscript(callId, encodedPatientName) {
+            const patientName = decodeURIComponent(encodedPatientName);
             const modal = document.getElementById('transcriptModal');
             const modalTitle = document.getElementById('modalTitle');
             const callDetails = document.getElementById('callDetails');

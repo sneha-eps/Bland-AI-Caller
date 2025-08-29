@@ -2000,7 +2000,7 @@
                         : call.final_summary;
 
                     finalSummarySection = `
-                        <div class="final-summary-preview" onclick="showFullSummary('${encodeURIComponent(call.final_summary)}', '${call.patient_name}')" 
+                        <div class="final-summary-preview" onclick="showFullSummary('${encodeURIComponent(call.final_summary)}', '${encodeURIComponent(call.patient_name)}')" 
                              style="background: var(--bg-secondary); padding: 0.75rem; border-radius: 8px; border-left: 4px solid var(--success-color); font-size: 0.875rem; line-height: 1.4; cursor: pointer; transition: var(--transition); box-shadow: var(--shadow-sm);">
                             <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
                                 <i class="fas fa-robot" style="color: var(--success-color);"></i>
@@ -2203,7 +2203,8 @@
             document.addEventListener('keydown', handleEscape);
         }
 
-        function showFullSummary(encodedSummary, patientName) {
+        function showFullSummary(encodedSummary, encodedPatientName) {
+            const patientName = decodeURIComponent(encodedPatientName);
             const summary = decodeURIComponent(encodedSummary);
 
             // Create a modal-like dialog for full summary
