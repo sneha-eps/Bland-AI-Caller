@@ -1999,8 +1999,11 @@
                         ? call.final_summary.substring(0, 80) + '...' 
                         : call.final_summary;
 
+                    const encodedSummary = encodeURIComponent(call.final_summary);
+                    const encodedPatientNameForSummary = encodeURIComponent(call.patient_name);
+                    
                     finalSummarySection = `
-                        <div class="final-summary-preview" onclick="showFullSummary('${encodeURIComponent(call.final_summary)}', '${encodeURIComponent(call.patient_name)}')" 
+                        <div class="final-summary-preview" onclick="showFullSummary('${encodedSummary}', '${encodedPatientNameForSummary}')" 
                              style="background: var(--bg-secondary); padding: 0.75rem; border-radius: 8px; border-left: 4px solid var(--success-color); font-size: 0.875rem; line-height: 1.4; cursor: pointer; transition: var(--transition); box-shadow: var(--shadow-sm);">
                             <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
                                 <i class="fas fa-robot" style="color: var(--success-color);"></i>
@@ -2030,9 +2033,12 @@
                         ? call.transcript.substring(0, 150) + '...' 
                         : call.transcript;
 
+                    const encodedTranscript = encodeURIComponent(call.transcript || '');
+                    const encodedPatientName = encodeURIComponent(call.patient_name || '');
+                    
                     transcriptSection = `
                         <div class="transcript-container" style="max-width: 300px;">
-                            <div class="transcript-preview" onclick="showFullTranscript(${JSON.stringify(encodeURIComponent(call.transcript))}, ${JSON.stringify(encodeURIComponent(call.patient_name))})" 
+                            <div class="transcript-preview" onclick="showFullTranscript('${encodedTranscript}', '${encodedPatientName}')" 
                                  style="cursor: pointer; color: var(--primary-color); text-decoration: underline; padding: 0.5rem; background: var(--bg-secondary); border-radius: 6px; border-left: 3px solid var(--primary-color); line-height: 1.4; font-size: 0.875rem; transition: var(--transition);"
                                  onmouseover="this.style.backgroundColor='var(--bg-tertiary)'"
                                  onmouseout="this.style.backgroundColor='var(--bg-secondary)'">
