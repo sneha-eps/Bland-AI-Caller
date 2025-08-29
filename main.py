@@ -2252,13 +2252,13 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
 
     summary_lower = final_summary.lower().strip()
 
-    # Check for AI confirmation patterns (these indicate successful confirmations)
+    # Check for AI reschedule processing patterns FIRST (higher priority than confirmation)
     if any(phrase in summary_lower for phrase in [
-        "patient confirmed", "appointment confirmed", "confirmed appointment", 
-        "ai provided confirmation", "confirmation details", "we are glad to have you",
-        "just to confirm, your appointment", "your appointment is confirmed"
+        "appointment will be rescheduled", "will be rescheduled", "reschedule", "rescheduled",
+        "scheduling agent will call", "will call you to find a new time", "someone will be in touch",
+        "follow-up call arranged", "patient requested to reschedule", "arrange a new time"
     ]):
-        return 'confirmed'
+        return 'rescheduled'
 
     # Check for AI cancellation processing patterns
     if any(phrase in summary_lower for phrase in [
@@ -2268,13 +2268,24 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
     ]):
         return 'cancelled'
 
-    # Check for AI reschedule processing patterns
+    # Check for AI confirmation patterns (these indicate successful confirmations)
+    # BUT exclude cases that mention rescheduling
     if any(phrase in summary_lower for phrase in [
-        "follow-up call arranged", "patient requested to reschedule", 
-        "scheduling agent will call", "will call you to find a new time",
-        "someone will be in touch", "reschedule"
+        "patient confirmed", "appointment confirmed", "confirmed appointment", 
+        "ai provided confirmation", "confirmation details", "we are glad to have you"
+    ]) and not any(reschedule_word in summary_lower for reschedule_word in [
+        "reschedule", "rescheduled", "scheduling agent", "arrange a new time"
     ]):
-        return 'rescheduled'
+        return 'confirmed'
+    
+    # Special case: "just to confirm" can be either confirmation OR reschedule summary
+    if "just to confirm" in summary_lower:
+        if any(phrase in summary_lower for phrase in [
+            "will be rescheduled", "reschedule", "scheduling agent", "arrange a new time"
+        ]):
+            return 'rescheduled'
+        elif "is confirmed" in summary_lower or "appointment on" in summary_lower:
+            return 'confirmed'
 
     # Check for wrong number patterns from AI response
     if any(phrase in summary_lower for phrase in [
