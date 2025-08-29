@@ -1499,8 +1499,8 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
 
         print(f"\n🔄 RETRY ROUND {attempt_round}: Processing {len(calls_to_retry)} calls with success=False")
 
-        # Process calls in batches of 5 with index-based traversal for international rate limits
-        batch_size = 5
+        # Process calls one by one for strict international rate limits
+        batch_size = 1  # Process 1 call at a time for international numbers
 
         # Sort calls by sheet index to maintain traversal order
         calls_to_retry_sorted = sorted(calls_to_retry, key=lambda x: x['sheet_index'])
@@ -1510,31 +1510,27 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
             batch_start_idx = batch[0]['sheet_index']
             batch_end_idx = batch[-1]['sheet_index']
 
-            print(f"🔄 Processing batch {i//batch_size + 1} of {(len(calls_to_retry_sorted) + batch_size - 1)//batch_size}")
-            print(f"   📍 Sheet traversal: Index [{batch_start_idx:03d}] to [{batch_end_idx:03d}] ({len(batch)} calls)")
+            print(f"🔄 Processing call {i + 1} of {len(calls_to_retry_sorted)} (SEQUENTIAL)")
+            print(f"   📍 Sheet traversal: Index [{batch_start_idx:03d}] to [{batch_end_idx:03d}] (1 call at a time)")
 
             # Mark calls as processing
             for call_data in batch:
                 call_data['processing_status'] = 'processing'
 
-            retry_tasks = []
+            # Process calls sequentially instead of concurrently
             for call_data in batch:
-                retry_tasks.append(process_single_call_with_flag_indexed(call_data, api_key, semaphore, campaign_id, client_voice))
+                await process_single_call_with_flag_indexed(call_data, api_key, semaphore, campaign_id, client_voice)
 
-            # Execute batch
-            await asyncio.gather(*retry_tasks)
-
-            # Mark completed calls
-            for call_data in batch:
+                # Mark completed immediately after each call
                 if call_data['success']:
                     call_data['processing_status'] = 'completed'
                 else:
                     call_data['processing_status'] = 'retry_needed'
 
-            # Add 30-second delay between batches (except for last batch)
+            # Add 60-second delay between each call for international rate limits
             if i + batch_size < len(calls_to_retry_sorted):
-                print(f"⏰ Waiting 30 seconds before next batch for international rate limit protection...")
-                await asyncio.sleep(30)
+                print(f"⏰ Waiting 60 seconds before next call for international rate limit protection...")
+                await asyncio.sleep(60)
 
         # Update status counts after this round
         for call_data in call_tracker:
@@ -2291,7 +2287,11 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
     # Check for wrong number patterns from AI response
     if any(phrase in summary_lower for phrase in [
         "wrong number", "incorrect contact", "my apologies for the confusion",
-        "no one by that name", "nobody by that name", "not the right person"
+        "no one by that name", "nobody by that name", "don't know", "never heard of",
+        "no such person", "no one here by that name", "nobody here by that name",
+        "you must have the wrong", "this isn't", "that's not me", "i'm not",
+        "who is this", "who are you looking for", "there's no", "nobody named",
+        "no one named", "you must have the wrong", "i think you have the wrong"
     ]):
         return 'wrong_number', "Wrong number or patient not available"
 
@@ -2299,7 +2299,7 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
     if any(phrase in summary_lower for phrase in [
         "not here right now", "isn't here", "is not here", "not available",
         "not home", "isn't home", "is not home", "out right now",
-        "can't come to phone", "cannot come to phone", "busy right now",
+        "can't come to the phone", "cannot come to the phone", "busy right now",
         "in a meeting", "at work", "not in", "stepped out", "away from",
         "will be back", "call back later", "try calling later", "not around",
         "unavailable", "sleeping", "napping", "can you call back",
