@@ -1529,8 +1529,8 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
 
             # Add 60-second delay between each call for international rate limits
             if i + batch_size < len(calls_to_retry_sorted):
-                print(f"⏰ Waiting 60 seconds before next call for international rate limit protection...")
-                await asyncio.sleep(60)
+                print(f"⏰ Waiting 120 seconds before next call for international rate limit protection...")
+                await asyncio.sleep(120)
 
         # Update status counts after this round
         for call_data in call_tracker:
