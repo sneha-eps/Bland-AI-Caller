@@ -2000,7 +2000,7 @@
                         : call.final_summary;
 
                     finalSummarySection = `
-                        <div class="final-summary-preview" onclick="showFullSummary('${encodeURIComponent(call.final_summary)}', '${call.patient_name}')" 
+                        <div class="final-summary-preview" onclick="showFullSummary('${encodeURIComponent(call.final_summary)}', '${encodeURIComponent(call.patient_name)}')" 
                              style="background: var(--bg-secondary); padding: 0.75rem; border-radius: 8px; border-left: 4px solid var(--success-color); font-size: 0.875rem; line-height: 1.4; cursor: pointer; transition: var(--transition); box-shadow: var(--shadow-sm);">
                             <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
                                 <i class="fas fa-robot" style="color: var(--success-color);"></i>
@@ -2032,7 +2032,7 @@
 
                     transcriptSection = `
                         <div class="transcript-container" style="max-width: 300px;">
-                            <div class="transcript-preview" onclick="showFullTranscript('${encodeURIComponent(call.transcript)}', '${call.patient_name}')" 
+                            <div class="transcript-preview" onclick="showFullTranscript('${encodeURIComponent(call.transcript)}', '${encodeURIComponent(call.patient_name)}')" 
                                  style="cursor: pointer; color: var(--primary-color); text-decoration: underline; padding: 0.5rem; background: var(--bg-secondary); border-radius: 6px; border-left: 3px solid var(--primary-color); line-height: 1.4; font-size: 0.875rem; transition: var(--transition);"
                                  onmouseover="this.style.backgroundColor='var(--bg-tertiary)'"
                                  onmouseout="this.style.backgroundColor='var(--bg-secondary)'">
@@ -2103,7 +2103,7 @@
                         </div>
                     </td>
                     <td style="font-family: monospace; font-weight: 600;">${formatDuration(call.duration || 0)}</td>
-                    <td style="font-size: 0.875rem;">${call.created_at ? new Date(call.created_at).toLocaleString() : 'N/A'}</td>
+                    <td style="font-size: 0.875rem;">${convertToIST(call.created_at) || 'N/A'}</td>
                     <td style="max-width: 250px;">
                         ${finalSummarySection}
                     </td>
@@ -2116,8 +2116,9 @@
             });
         }
 
-        function showFullTranscript(encodedTranscript, patientName) {
+        function showFullTranscript(encodedTranscript, encodedPatientName) {
             const transcript = decodeURIComponent(encodedTranscript);
+            const patientName = decodeURIComponent(encodedPatientName);
 
             // Create a modal-like dialog for full transcript
             const modal = document.createElement('div');
@@ -2202,8 +2203,9 @@
             document.addEventListener('keydown', handleEscape);
         }
 
-        function showFullSummary(encodedSummary, patientName) {
+        function showFullSummary(encodedSummary, encodedPatientName) {
             const summary = decodeURIComponent(encodedSummary);
+            const patientName = decodeURIComponent(encodedPatientName);
 
             // Create a modal-like dialog for full summary
             const modal = document.createElement('div');
