@@ -2032,7 +2032,7 @@
 
                     transcriptSection = `
                         <div class="transcript-container" style="max-width: 300px;">
-                            <div class="transcript-preview" onclick="showFullTranscript('${encodeURIComponent(call.transcript)}', '${encodeURIComponent(call.patient_name)}')" 
+                            <div class="transcript-preview" onclick="showFullTranscript(${JSON.stringify(encodeURIComponent(call.transcript))}, ${JSON.stringify(encodeURIComponent(call.patient_name))})" 
                                  style="cursor: pointer; color: var(--primary-color); text-decoration: underline; padding: 0.5rem; background: var(--bg-secondary); border-radius: 6px; border-left: 3px solid var(--primary-color); line-height: 1.4; font-size: 0.875rem; transition: var(--transition);"
                                  onmouseover="this.style.backgroundColor='var(--bg-tertiary)'"
                                  onmouseout="this.style.backgroundColor='var(--bg-secondary)'">
