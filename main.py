@@ -2149,33 +2149,77 @@ async def process_csv(file: UploadFile = File(...),
 
 def extract_final_summary(transcript: str) -> str:
     """
-    Extract a final summary from the call transcript.
-    This function analyzes the transcript and returns a brief summary of the call outcome.
+    Extract a final summary from the call transcript by looking at the AI assistant's final statements.
+    This function analyzes the transcript and returns the AI's concluding summary.
     """
     if not transcript or transcript.strip() == "":
         return "No summary available - no transcript"
 
+    transcript_lines = transcript.strip().split('\n')
+    
+    # Look for the AI assistant's final statements (usually at the end)
+    assistant_final_statements = []
+    
+    # Process lines in reverse to find the most recent assistant statements
+    for line in reversed(transcript_lines):
+        line = line.strip()
+        if line.startswith('assistant:'):
+            # Remove the "assistant:" prefix and clean up
+            statement = line.replace('assistant:', '').strip()
+            if statement and len(statement) > 10:  # Meaningful statement
+                assistant_final_statements.append(statement)
+        elif line.startswith('user:') and assistant_final_statements:
+            # Stop when we hit user input after finding assistant statements
+            break
+    
+    # If we found final assistant statements, analyze them
+    if assistant_final_statements:
+        # Take the last few meaningful statements from the assistant
+        final_statements = assistant_final_statements[:3]  # Last 3 statements
+        combined_final = ' '.join(reversed(final_statements))
+        
+        # Look for confirmation patterns in the final statements
+        final_lower = combined_final.lower()
+        
+        if any(phrase in final_lower for phrase in [
+            "just to confirm, your appointment", "your appointment is confirmed", 
+            "we are glad to have you", "see you then", "have a great day"
+        ]):
+            return "Patient confirmed appointment - AI provided confirmation details"
+        elif any(phrase in final_lower for phrase in [
+            "i will cancel this appointment", "appointment has been cancelled",
+            "feel free to contact us anytime", "cancelled for you"
+        ]):
+            return "Patient cancelled appointment - AI processed cancellation"
+        elif any(phrase in final_lower for phrase in [
+            "our scheduling agent will call you", "will call you to find a new time",
+            "someone will be in touch", "reschedule"
+        ]):
+            return "Patient requested to reschedule - Follow-up call arranged"
+        elif any(phrase in final_lower for phrase in [
+            "my apologies for the confusion", "thank you for your time",
+            "wrong person", "wrong number"
+        ]):
+            return "Wrong number or incorrect contact information"
+        else:
+            # Return the actual final statement from the AI
+            return final_statements[0] if final_statements else "Call completed - see transcript for details"
+    
+    # Fallback: Look for key patterns anywhere in the transcript
     transcript_lower = transcript.lower().strip()
-
-    # If transcript is very short, return it as is
-    if len(transcript.strip()) < 50:
-        return transcript.strip()
-
-    # Look for key outcome phrases in the transcript
-    if any(phrase in transcript_lower for phrase in ["appointment confirmed", "confirmed", "see you then", "will be there"]):
+    
+    if "just to confirm, your appointment" in transcript_lower:
         return "Patient confirmed appointment"
-    elif any(phrase in transcript_lower for phrase in ["cancel", "cancelled", "can't make it", "won't make it"]):
+    elif "i will cancel this appointment" in transcript_lower:
         return "Patient cancelled appointment"
-    elif any(phrase in transcript_lower for phrase in ["reschedule", "different time", "change the time", "move the appointment"]):
+    elif "our scheduling agent will call you" in transcript_lower:
         return "Patient requested to reschedule"
-    elif any(phrase in transcript_lower for phrase in ["voicemail", "leave a message", "beep", "not available"]):
-        return "Reached voicemail or patient not available"
-    elif any(phrase in transcript_lower for phrase in ["wrong number", "no one by that name", "you have the wrong"]):
+    elif "my apologies for the confusion" in transcript_lower:
         return "Wrong number or patient not found"
     else:
-        # Return first 150 characters as a general summary
-        summary = transcript.strip()[:150]
-        if len(transcript.strip()) > 150:
+        # Return a portion of the transcript as summary
+        summary = transcript.strip()[:200]
+        if len(transcript.strip()) > 200:
             summary += "..."
         return summary
 
@@ -2192,33 +2236,34 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
 
     summary_lower = final_summary.lower().strip()
 
-    # Check for confirmation patterns in summary
+    # Check for AI confirmation patterns (these indicate successful confirmations)
     if any(phrase in summary_lower for phrase in [
         "patient confirmed", "appointment confirmed", "confirmed appointment", 
-        "will be there", "see you then", "appointment is confirmed"
+        "ai provided confirmation", "confirmation details", "we are glad to have you",
+        "just to confirm, your appointment", "your appointment is confirmed"
     ]):
         return 'confirmed'
 
-    # Check for cancellation patterns in summary
+    # Check for AI cancellation processing patterns
     if any(phrase in summary_lower for phrase in [
-        "patient cancelled", "cancelled appointment", "appointment cancelled",
-        "patient canceled", "canceled appointment", "appointment canceled",
-        "can't make it", "cannot make it", "won't make it", "unable to attend"
+        "ai processed cancellation", "patient cancelled", "cancelled appointment", 
+        "appointment cancelled", "i will cancel this appointment", 
+        "appointment has been cancelled", "cancelled for you"
     ]):
         return 'cancelled'
 
-    # Check for reschedule patterns in summary
+    # Check for AI reschedule processing patterns
     if any(phrase in summary_lower for phrase in [
-        "patient requested to reschedule", "requested reschedule", "wants to reschedule",
-        "reschedule appointment", "reschedule the appointment", "different time",
-        "change the time", "move the appointment", "find new time"
+        "follow-up call arranged", "patient requested to reschedule", 
+        "scheduling agent will call", "will call you to find a new time",
+        "someone will be in touch", "reschedule"
     ]):
         return 'rescheduled'
 
-    # Check for wrong number patterns
+    # Check for wrong number patterns from AI response
     if any(phrase in summary_lower for phrase in [
-        "wrong number", "no one by that name", "nobody by that name",
-        "incorrect number", "not the right person"
+        "wrong number", "incorrect contact", "my apologies for the confusion",
+        "no one by that name", "nobody by that name", "not the right person"
     ]):
         return 'wrong_number'
 
@@ -2233,12 +2278,42 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
     if any(phrase in summary_lower for phrase in [
         "voicemail", "voice mail", "reached voicemail", "left message",
         "no answer", "line busy", "busy signal", "disconnected",
-        "no response", "automated message"
+        "no response", "automated message", "no transcript available"
     ]):
         return 'busy_voicemail'
 
-    # If summary doesn't match patterns, fallback to transcript analysis
+    # Enhanced transcript analysis as fallback
     if transcript and transcript.strip():
+        # Look specifically for AI assistant's final confirmation statements
+        transcript_lower = transcript.lower()
+        
+        # Check for AI's final confirmation patterns
+        if any(phrase in transcript_lower for phrase in [
+            "just to confirm, your appointment", "we are glad to have you",
+            "have a great day", "see you then", "you're welcome"
+        ]):
+            return 'confirmed'
+        
+        # Check for AI's cancellation processing
+        if any(phrase in transcript_lower for phrase in [
+            "i will cancel this appointment", "appointment has been cancelled",
+            "feel free to contact us anytime"
+        ]):
+            return 'cancelled'
+        
+        # Check for AI's reschedule processing
+        if any(phrase in transcript_lower for phrase in [
+            "our scheduling agent will call you", "someone will be in touch soon",
+            "to find a new time", "will call you shortly"
+        ]):
+            return 'rescheduled'
+        
+        # Check for AI's wrong number handling
+        if any(phrase in transcript_lower for phrase in [
+            "my apologies for the confusion", "thank you for your time"
+        ]):
+            return 'wrong_number'
+        
         return analyze_call_transcript(transcript)
 
     # Default to busy_voicemail if we can't determine
