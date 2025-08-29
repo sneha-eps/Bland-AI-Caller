@@ -1392,9 +1392,14 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
         successful_calls = sum(1 for r in results if r.success)
         failed_calls = len(results) - successful_calls
 
-        # Store campaign results (in production, use a database)
+        # Create a unique run ID for this campaign execution
+        run_timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        campaign_run_id = f"{campaign_id}_run_{run_timestamp}"
+
+        # Store campaign results with unique run ID
         campaign_results = {
             "campaign_id": campaign_id,
+            "campaign_run_id": campaign_run_id,
             "campaign_name": campaign['name'],
             "client_name": client['name'],
             "total_calls": len(results),
@@ -1403,11 +1408,12 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
             "started_at": datetime.now().isoformat(),
             "completed_at": datetime.now().isoformat(),
             "status": "completed",
+            "run_number": len([k for k in campaign_results_db.keys() if k.startswith(campaign_id)]) + 1,
             "results": [result.dict() for result in results]
         }
 
-        # Store in the global results database
-        campaign_results_db[campaign_id] = campaign_results
+        # Store in the global results database with unique run ID
+        campaign_results_db[campaign_run_id] = campaign_results
         save_campaign_results_db(campaign_results_db)
         print(f"✅ Stored campaign results for {campaign_id}. Total campaigns with results: {len(campaign_results_db)}")
         print(f"✅ This campaign results: Total={len(results)}, Success={successful_calls}, Failed={failed_calls}")
@@ -2603,11 +2609,13 @@ async def get_campaign_analytics(campaign_id: str):
         for stored_id in campaign_results_db.keys():
             print(f"🔍 Stored ID: {stored_id} (type: {type(stored_id)})")
 
-        # First, try to get results from stored campaign results
-        if campaign_id in campaign_results_db:
-            campaign_results = campaign_results_db[campaign_id]
-            print(f"📊 Found stored results for campaign {campaign_name} with {len(campaign_results.get('results', []))} calls")
-        else:
+        # Find all runs for this campaign ID
+        campaign_runs = {}
+        for stored_key, stored_results in campaign_results_db.items():
+            if stored_key == campaign_id or stored_key.startswith(f"{campaign_id}_run_"):
+                campaign_runs[stored_key] = stored_results
+
+        if not campaign_runs:
             print(f"🔍 No stored results found for campaign {campaign_name}. Available campaigns in results_db: {list(campaign_results_db.keys())}")
 
             # If no stored results, return empty analytics structure
@@ -2633,6 +2641,14 @@ async def get_campaign_analytics(campaign_id: str):
                 }
             }
 
+        # Aggregate all results from all runs of this campaign
+        all_results = []
+        total_runs = len(campaign_runs)
+        
+        for run_key, run_data in campaign_runs.items():
+            all_results.extend(run_data.get('results', []))
+            print(f"📊 Found run {run_key} with {len(run_data.get('results', []))} calls")
+
         # Get detailed call information for each call with batch processing
         calls_with_details = []
         total_duration = 0
@@ -2646,11 +2662,11 @@ async def get_campaign_analytics(campaign_id: str):
             'failed': 0
         }
 
-        print(f"🔍 Processing {len(campaign_results['results'])} calls for analytics")
+        print(f"🔍 Processing {len(all_results)} calls from {total_runs} runs for analytics")
 
         # Process calls in batches to avoid overwhelming the API
         batch_size = 5
-        results_list = campaign_results['results']
+        results_list = all_results
 
         for i in range(0, len(results_list), batch_size):
             batch = results_list[i:i + batch_size]
@@ -2818,8 +2834,8 @@ async def get_campaign_analytics(campaign_id: str):
             if i + batch_size < len(results_list):
                 await asyncio.sleep(5)
 
-        # Calculate analytics
-        total_calls = len(campaign_results['results'])
+        # Calculate analytics across all runs
+        total_calls = len(all_results)
         successful_calls = sum(1 for call in calls_with_details if call.get('success'))
         success_rate = round((successful_calls / total_calls * 100) if total_calls > 0 else 0, 1)
 
@@ -2830,7 +2846,7 @@ async def get_campaign_analytics(campaign_id: str):
             'total_calls': total_calls,
             'total_duration': total_duration,
             'formatted_duration': formatted_duration,
-            'campaign_runs': 1,  # For now, each entry represents one run
+            'campaign_runs': total_runs,  # Number of times campaign was run
             'success_rate': success_rate,
             'status_counts': status_counts,
             'calls': calls_with_details
@@ -3149,8 +3165,8 @@ async def get_dashboard_metrics():
         total_calls = 0
         total_duration_seconds = 0
 
-        # Aggregate data from all campaign results
-        for campaign_id, campaign_results in campaign_results_db.items():
+        # Aggregate data from all campaign results (including multiple runs)
+        for result_key, campaign_results in campaign_results_db.items():
             if 'results' in campaign_results:
                 total_calls += len(campaign_results['results'])
 
@@ -3229,7 +3245,12 @@ async def bland_webhook(request: Request):
             return {"success": False, "reason": "Missing call_id"}
 
         # Update call in all campaigns if campaign_id not provided
-        campaigns_to_check = [campaign_id] if campaign_id else list(campaign_results_db.keys())
+        # Also check for campaign run IDs that start with the campaign_id
+        campaigns_to_check = []
+        if campaign_id:
+            campaigns_to_check = [k for k in campaign_results_db.keys() if k == campaign_id or k.startswith(f"{campaign_id}_run_")]
+        else:
+            campaigns_to_check = list(campaign_results_db.keys())
 
         call_updated = False
         for check_campaign_id in campaigns_to_check:
