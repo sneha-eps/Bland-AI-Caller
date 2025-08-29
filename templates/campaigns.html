@@ -2026,24 +2026,50 @@
                 let transcriptSection = '';
 
                 if (call.transcript && call.transcript.trim()) {
-                    transcriptPreview = call.transcript.length > 100 
-                        ? call.transcript.substring(0, 100) + '...' 
+                    transcriptPreview = call.transcript.length > 150 
+                        ? call.transcript.substring(0, 150) + '...' 
                         : call.transcript;
 
                     transcriptSection = `
-                        <div class="transcript-preview" onclick="showFullTranscript('${encodeURIComponent(call.transcript)}', '${call.patient_name}')" 
-                             style="cursor: pointer; color: var(--primary-color); text-decoration: underline;">
-                            ${transcriptPreview}
+                        <div class="transcript-container" style="max-width: 300px;">
+                            <div class="transcript-preview" onclick="showFullTranscript('${encodeURIComponent(call.transcript)}', '${call.patient_name}')" 
+                                 style="cursor: pointer; color: var(--primary-color); text-decoration: underline; padding: 0.5rem; background: var(--bg-secondary); border-radius: 6px; border-left: 3px solid var(--primary-color); line-height: 1.4; font-size: 0.875rem; transition: var(--transition);"
+                                 onmouseover="this.style.backgroundColor='var(--bg-tertiary)'"
+                                 onmouseout="this.style.backgroundColor='var(--bg-secondary)'">
+                                <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.25rem;">
+                                    <i class="fas fa-file-alt" style="color: var(--primary-color);"></i>
+                                    <strong style="color: var(--primary-color);">Transcript</strong>
+                                </div>
+                                <div style="color: var(--text-primary);">
+                                    ${transcriptPreview}
+                                </div>
+                                ${call.transcript.length > 150 ? '<div style="margin-top: 0.25rem;"><small style="color: var(--primary-color);">Click to view full transcript</small></div>' : ''}
+                            </div>
                         </div>
                     `;
                 } else if (call.error) {
                     transcriptPreview = call.error;
-                    transcriptSection = `<div class="transcript-preview" style="color: var(--danger-color);">${transcriptPreview}</div>`;
+                    transcriptSection = `
+                        <div style="padding: 0.5rem; background: rgba(239, 68, 68, 0.1); border-radius: 6px; border-left: 3px solid var(--danger-color); color: var(--danger-color); font-size: 0.875rem;">
+                            <i class="fas fa-exclamation-triangle" style="margin-right: 0.5rem;"></i>
+                            ${transcriptPreview}
+                        </div>
+                    `;
                 } else if (call.analysis_notes) {
                     transcriptPreview = call.analysis_notes;
-                    transcriptSection = `<div class="transcript-preview" style="color: var(--text-tertiary);">${transcriptPreview}</div>`;
+                    transcriptSection = `
+                        <div style="padding: 0.5rem; background: var(--bg-tertiary); border-radius: 6px; color: var(--text-tertiary); font-size: 0.875rem; text-align: center;">
+                            <i class="fas fa-info-circle" style="margin-right: 0.5rem;"></i>
+                            ${transcriptPreview}
+                        </div>
+                    `;
                 } else {
-                    transcriptSection = `<div class="transcript-preview" style="color: var(--text-tertiary);">${transcriptPreview}</div>`;
+                    transcriptSection = `
+                        <div style="padding: 0.5rem; background: var(--bg-tertiary); border-radius: 6px; color: var(--text-tertiary); font-size: 0.875rem; text-align: center;">
+                            <i class="fas fa-phone-slash" style="margin-right: 0.5rem;"></i>
+                            ${transcriptPreview}
+                        </div>
+                    `;
                 }
 
                 // Format status display with transcript analysis context
@@ -2097,27 +2123,45 @@
             const modal = document.createElement('div');
             modal.style.cssText = `
                 position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-                background: rgba(0,0,0,0.7); z-index: 3000; display: flex;
-                align-items: center; justify-content: center; backdrop-filter: blur(4px);
+                background: rgba(0,0,0,0.8); z-index: 3000; display: flex;
+                align-items: center; justify-content: center; backdrop-filter: blur(6px);
+                animation: fadeIn 0.3s ease-out;
             `;
 
             const content = document.createElement('div');
             content.style.cssText = `
-                background: var(--bg-primary); border-radius: 12px; max-width: 80%;
-                max-height: 80%; padding: 2rem; box-shadow: var(--shadow-xl);
-                border: 1px solid var(--border-color); overflow-y: auto;
+                background: var(--bg-primary); border-radius: 16px; max-width: 85%;
+                max-height: 85%; padding: 0; box-shadow: var(--shadow-xl);
+                border: 1px solid var(--border-color); overflow: hidden;
+                animation: slideIn 0.3s ease-out;
             `;
 
             content.innerHTML = `
-                <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
-                    <h3 style="margin: 0; color: var(--text-primary);">Full Transcript - ${patientName}</h3>
+                <div style="background: linear-gradient(135deg, var(--primary-color) 0%, #7c3aed 100%); color: white; padding: 1.5rem 2rem; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <h3 style="margin: 0; font-size: 1.25rem; font-weight: 600;">
+                            <i class="fas fa-file-alt" style="margin-right: 0.5rem;"></i>
+                            Full Call Transcript
+                        </h3>
+                        <p style="margin: 0.25rem 0 0 0; opacity: 0.9; font-size: 0.875rem;">Patient: ${patientName}</p>
+                    </div>
                     <button onclick="this.closest('.transcript-modal').remove()" 
-                            style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary); margin-left: auto;">
+                            style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 1.25rem; cursor: pointer; padding: 0.5rem; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; transition: background 0.3s ease;"
+                            onmouseover="this.style.background='rgba(255,255,255,0.3)'"
+                            onmouseout="this.style.background='rgba(255,255,255,0.2)'">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
-                <div style="white-space: pre-wrap; line-height: 1.6; color: var(--text-primary); font-size: 0.95rem;">
-                    ${transcript}
+                <div style="padding: 2rem; max-height: 60vh; overflow-y: auto;">
+                    <div style="background: var(--bg-secondary); padding: 1.5rem; border-radius: 12px; border-left: 4px solid var(--primary-color);">
+                        <div style="white-space: pre-wrap; line-height: 1.7; color: var(--text-primary); font-size: 1rem; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;">
+                            ${transcript}
+                        </div>
+                    </div>
+                    <div style="margin-top: 1rem; padding: 1rem; background: rgba(79, 70, 229, 0.1); border-radius: 8px; font-size: 0.875rem; color: var(--text-secondary); text-align: center;">
+                        <i class="fas fa-info-circle" style="color: var(--primary-color); margin-right: 0.5rem;"></i>
+                        This is the complete conversation transcript from the AI call
+                    </div>
                 </div>
             `;
 
@@ -2125,12 +2169,37 @@
             modal.appendChild(content);
             document.body.appendChild(modal);
 
+            // Add CSS animations
+            const style = document.createElement('style');
+            style.textContent = `
+                @keyframes fadeIn {
+                    from { opacity: 0; }
+                    to { opacity: 1; }
+                }
+                @keyframes slideIn {
+                    from { transform: scale(0.9) translateY(-20px); opacity: 0; }
+                    to { transform: scale(1) translateY(0); opacity: 1; }
+                }
+            `;
+            document.head.appendChild(style);
+
             // Close on background click
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) {
-                    modal.remove();
+                    modal.style.animation = 'fadeOut 0.3s ease-out forwards';
+                    setTimeout(() => modal.remove(), 300);
                 }
             });
+
+            // Close on Escape key
+            const handleEscape = (e) => {
+                if (e.key === 'Escape') {
+                    modal.style.animation = 'fadeOut 0.3s ease-out forwards';
+                    setTimeout(() => modal.remove(), 300);
+                    document.removeEventListener('keydown', handleEscape);
+                }
+            };
+            document.addEventListener('keydown', handleEscape);
         }
 
         function showFullSummary(encodedSummary, patientName) {

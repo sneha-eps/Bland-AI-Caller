@@ -10,6 +10,7 @@ import asyncio
 import aiohttp
 import uuid
 from datetime import datetime, timedelta
+import pytz
 from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
@@ -573,6 +574,40 @@ def format_duration_display(total_duration_seconds):
         return f"{minutes}m {seconds}s"
     else:
         return f"{seconds}s"
+
+
+def convert_utc_to_ist(utc_datetime_str):
+    """Convert UTC datetime string to IST timezone"""
+    if not utc_datetime_str:
+        return "N/A"
+    
+    try:
+        # Parse the UTC datetime
+        if utc_datetime_str.endswith('Z'):
+            utc_datetime_str = utc_datetime_str[:-1] + '+00:00'
+        
+        # Handle various datetime formats
+        try:
+            utc_dt = datetime.fromisoformat(utc_datetime_str.replace('Z', '+00:00'))
+        except:
+            # Try parsing without timezone info and assume UTC
+            utc_dt = datetime.fromisoformat(utc_datetime_str.split('+')[0].split('Z')[0])
+            utc_dt = utc_dt.replace(tzinfo=pytz.UTC)
+        
+        # If datetime is naive, assume it's UTC
+        if utc_dt.tzinfo is None:
+            utc_dt = pytz.UTC.localize(utc_dt)
+        
+        # Convert to IST
+        ist_tz = pytz.timezone('Asia/Kolkata')
+        ist_dt = utc_dt.astimezone(ist_tz)
+        
+        # Format as readable string
+        return ist_dt.strftime('%Y-%m-%d %I:%M:%S %p IST')
+    
+    except Exception as e:
+        print(f"Error converting datetime {utc_datetime_str} to IST: {e}")
+        return utc_datetime_str
 
 
 async def make_single_call_async(call_request: CallRequest, api_key: str,
@@ -2139,6 +2174,71 @@ def extract_final_summary(transcript: str) -> str:
         return summary
 
 
+def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -> str:
+    """
+    Determine call status based on final summary content primarily, with transcript as fallback.
+    """
+    if not final_summary or final_summary.strip() == "":
+        # Fallback to transcript analysis if no summary
+        if transcript and transcript.strip():
+            return analyze_call_transcript(transcript)
+        return 'busy_voicemail'
+
+    summary_lower = final_summary.lower().strip()
+
+    # Check for confirmation patterns in summary
+    if any(phrase in summary_lower for phrase in [
+        "patient confirmed", "appointment confirmed", "confirmed appointment", 
+        "will be there", "see you then", "appointment is confirmed"
+    ]):
+        return 'confirmed'
+
+    # Check for cancellation patterns in summary
+    if any(phrase in summary_lower for phrase in [
+        "patient cancelled", "cancelled appointment", "appointment cancelled",
+        "patient canceled", "canceled appointment", "appointment canceled",
+        "can't make it", "cannot make it", "won't make it", "unable to attend"
+    ]):
+        return 'cancelled'
+
+    # Check for reschedule patterns in summary
+    if any(phrase in summary_lower for phrase in [
+        "patient requested to reschedule", "requested reschedule", "wants to reschedule",
+        "reschedule appointment", "reschedule the appointment", "different time",
+        "change the time", "move the appointment", "find new time"
+    ]):
+        return 'rescheduled'
+
+    # Check for wrong number patterns
+    if any(phrase in summary_lower for phrase in [
+        "wrong number", "no one by that name", "nobody by that name",
+        "incorrect number", "not the right person"
+    ]):
+        return 'wrong_number'
+
+    # Check for not available patterns
+    if any(phrase in summary_lower for phrase in [
+        "not available", "not here", "not home", "out right now",
+        "can't come to phone", "busy right now", "call back later"
+    ]):
+        return 'not_available'
+
+    # Check for voicemail/busy patterns
+    if any(phrase in summary_lower for phrase in [
+        "voicemail", "voice mail", "reached voicemail", "left message",
+        "no answer", "line busy", "busy signal", "disconnected",
+        "no response", "automated message"
+    ]):
+        return 'busy_voicemail'
+
+    # If summary doesn't match patterns, fallback to transcript analysis
+    if transcript and transcript.strip():
+        return analyze_call_transcript(transcript)
+
+    # Default to busy_voicemail if we can't determine
+    return 'busy_voicemail'
+
+
 def analyze_call_transcript(transcript: str) -> str:
     """
     Analyze transcript to determine final call status based on patient's ultimate decision.
@@ -2614,18 +2714,25 @@ async def get_campaign_analytics(campaign_id: str):
                                     # Check if call already has stored status from webhook
                                     stored_status = result.get('call_status')
                                     stored_transcript = result.get('transcript', '')
+                                    stored_final_summary = result.get('final_summary', '')
 
-                                    if stored_status and stored_transcript:
-                                        # Use stored data from webhook
+                                    if stored_final_summary and stored_final_summary.strip():
+                                        # Use stored final summary to determine status - this is the most accurate
+                                        call_status = analyze_call_status_from_summary(stored_final_summary, stored_transcript or transcript)
+                                        final_summary = stored_final_summary
+                                        transcript = stored_transcript or transcript
+                                        call_details['analysis_notes'] = "Status determined from stored final summary"
+                                    elif stored_status and stored_transcript:
+                                        # Use stored data from webhook if no final summary
                                         call_status = stored_status
                                         transcript = stored_transcript
-                                        final_summary = result.get('final_summary', extract_final_summary(transcript))
+                                        final_summary = extract_final_summary(transcript)
                                         call_details['analysis_notes'] = "Used stored webhook data"
                                     else:
-                                        # Analyze fresh transcript
+                                        # Analyze fresh transcript and extract final summary
                                         if transcript and transcript.strip():
-                                            call_status = analyze_call_transcript(transcript)
                                             final_summary = extract_final_summary(transcript)
+                                            call_status = analyze_call_status_from_summary(final_summary, transcript)
                                             call_details['analysis_notes'] = f"Analyzed {len(transcript)} characters from API"
                                         else:
                                             call_status = 'busy_voicemail'
@@ -2635,6 +2742,9 @@ async def get_campaign_analytics(campaign_id: str):
                                     call_details['call_status'] = call_status
                                     call_details['transcript'] = transcript
                                     call_details['final_summary'] = final_summary
+                                    
+                                    # Convert created_at to IST
+                                    call_details['created_at'] = convert_utc_to_ist(call_data.get('created_at', campaign_results.get('started_at', datetime.now().isoformat())))
 
                                     # Count the status
                                     if call_status in status_counts:
@@ -3131,10 +3241,11 @@ async def bland_webhook(request: Request):
                         transcript = data.get('transcript', '')
                         call_status = data.get('status', 'completed')
 
-                        # Analyze transcript for better status determination
+                        # Extract final summary first, then determine status based on it
                         if transcript and transcript.strip():
-                            analyzed_status = analyze_call_transcript(transcript)
                             final_summary = extract_final_summary(transcript)
+                            # Use final summary to determine status (more accurate)
+                            analyzed_status = analyze_call_status_from_summary(final_summary, transcript)
                         else:
                             analyzed_status = 'busy_voicemail'
                             final_summary = "No transcript available"
