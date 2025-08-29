@@ -7,10 +7,10 @@ run = ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port 5000"]
 
 [nix]
 channel = "stable-25_05"
-packages = ["libxcrypt", "psmisc"]
+packages = ["glibcLocales", "libxcrypt", "psmisc"]
 
 [workflows]
-runButton = "Install and Run"
+runButton = "Project"
 
 [[workflows.workflow]]
 name = "Run Flask App"
@@ -42,6 +42,27 @@ args = "pip install -r requirements.txt"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "uvicorn main:app --host 0.0.0.0 --port 5000 --reload"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "FastAPI Server"
+
+[[workflows.workflow]]
+name = "FastAPI Server"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "uvicorn main:app --host 0.0.0.0 --port 5000 --reload"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
 
 [[ports]]
 localPort = 5000

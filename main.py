@@ -2645,6 +2645,11 @@ async def get_campaign_analytics(campaign_id: str):
         all_results = []
         total_runs = len(campaign_runs)
         
+        # Get the first run's started_at as fallback for timestamps
+        first_run_started_at = datetime.now().isoformat()
+        if campaign_runs:
+            first_run_started_at = next(iter(campaign_runs.values())).get('started_at', datetime.now().isoformat())
+        
         for run_key, run_data in campaign_runs.items():
             all_results.extend(run_data.get('results', []))
             print(f"📊 Found run {run_key} with {len(run_data.get('results', []))} calls")
@@ -2684,7 +2689,7 @@ async def get_campaign_analytics(campaign_id: str):
                     'final_summary': None, # Added for final summary
                     'duration': 0,
                     'call_status': 'failed',
-                    'created_at': campaign_results.get('started_at', datetime.now().isoformat()),
+                    'created_at': first_run_started_at,
                     'analysis_notes': ''
                 }
 
@@ -2760,7 +2765,7 @@ async def get_campaign_analytics(campaign_id: str):
                                     call_details['final_summary'] = final_summary
                                     
                                     # Convert created_at to IST
-                                    call_details['created_at'] = convert_utc_to_ist(call_data.get('created_at', campaign_results.get('started_at', datetime.now().isoformat())))
+                                    call_details['created_at'] = convert_utc_to_ist(call_data.get('created_at', first_run_started_at))
 
                                     # Count the status
                                     if call_status in status_counts:
