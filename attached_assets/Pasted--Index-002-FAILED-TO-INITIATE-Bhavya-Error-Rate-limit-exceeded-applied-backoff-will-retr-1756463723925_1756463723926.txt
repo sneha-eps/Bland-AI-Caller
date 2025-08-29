@@ -1,0 +1,47 @@
+
+⏳ [Index 002] FAILED TO INITIATE: Bhavya - Error: Rate limit exceeded - applied backoff, will retry
+⏳ [Index 003] FAILED TO INITIATE: Gaurav - Error: Rate limit exceeded - applied backoff, will retry
+📊 Round 1 complete: 0/4 calls successful
+🏁 Flag=True (Completed): 0 calls
+⏳ Flag=False (Need retry): 4 calls
+🔄 Calls still needing retry: 0 calls
+🎯 Flag-based retry complete! No more calls need retry.
+📬 Processing 4 calls that exhausted retry attempts...
+🎤 Selected voice for voicemail: Paige (ID: 70f05206-71ab-4b39-b238-ed1bf17b365a)
+🔄 Sending final voicemail to +916378188813 for Akshay
+❌ Error sending final voicemail for Akshay: API error (Status 429): {"status":"error","message":"International rate limit exceeded for your account type."}
+📬 Voicemail sent to Akshay
+🔄 FLAG CHANGED: Akshay - Flag: False → True (voicemail sent)
+🎤 Selected voice for voicemail: Paige (ID: 70f05206-71ab-4b39-b238-ed1bf17b365a)
+🔄 Sending final voicemail to +917014608325 for Sneha
+❌ Error sending final voicemail for Sneha: API error (Status 429): {"status":"error","message":"International rate limit exceeded for your account type."}
+📬 Voicemail sent to Sneha
+🔄 FLAG CHANGED: Sneha - Flag: False → True (voicemail sent)
+🎤 Selected voice for voicemail: Paige (ID: 70f05206-71ab-4b39-b238-ed1bf17b365a)
+🔄 Sending final voicemail to +919314588660 for Bhavya
+❌ Error sending final voicemail for Bhavya: API error (Status 429): {"status":"error","message":"International rate limit exceeded for your account type."}
+📬 Voicemail sent to Bhavya
+🔄 FLAG CHANGED: Bhavya - Flag: False → True (voicemail sent)
+🎤 Selected voice for voicemail: Paige (ID: 70f05206-71ab-4b39-b238-ed1bf17b365a)
+🔄 Sending final voicemail to +918818811681 for Gaurav
+❌ Error sending final voicemail for Gaurav: API error (Status 429): {"status":"error","message":"International rate limit exceeded for your account type."}
+📬 Voicemail sent to Gaurav
+🔄 FLAG CHANGED: Gaurav - Flag: False → True (voicemail sent)
+
+🎯 Index-based traversal completed for 'Test 4'!
+   📊 Sheet Coverage: Index 0 → 3 (Total: 4 contacts)
+   ✅ Completed Indexes: 4 contacts
+   ❌ Failed Indexes: 0 contacts
+   📞 Total calls: 4
+   ✅ Confirmed: 0
+   ❌ Cancelled: 0
+   🔄 Rescheduled: 0
+   📧 Busy/Voicemail: 4
+   🚫 Not Available: 0
+   📱 Wrong Number: 0
+   💥 Failed: 0
+   📍 Completed range: 0 - 3
+✅ Stored campaign results for f660c0eb-079f-48a9-96f1-9d5326a09e7e. Total campaigns with results: 5
+✅ This campaign results: Total=4, Success=4, Failed=0
+INFO:     172.31.100.162:42694 - "GET /api/dashboard_metrics HTTP/1.1" 200 OK
+INFO:     172.31.100.162:50014 - "GET /api/dashboard_metrics HTTP/1.1" 200 OK

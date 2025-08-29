@@ -77,5 +77,139 @@
         "duration": 0
       }
     ]
+  },
+  "f660c0eb-079f-48a9-96f1-9d5326a09e7e_run_20250829_103312": {
+    "campaign_id": "f660c0eb-079f-48a9-96f1-9d5326a09e7e",
+    "campaign_run_id": "f660c0eb-079f-48a9-96f1-9d5326a09e7e_run_20250829_103312",
+    "campaign_name": "Test 4",
+    "client_name": "Hillside Primary Care",
+    "total_calls": 4,
+    "successful_calls": 4,
+    "failed_calls": 0,
+    "started_at": "2025-08-29T10:33:12.833775",
+    "completed_at": "2025-08-29T10:33:12.833779",
+    "status": "completed",
+    "run_number": 1,
+    "results": [
+      {
+        "success": true,
+        "call_id": null,
+        "status": "busy_voicemail",
+        "call_status": null,
+        "transcript": null,
+        "final_summary": null,
+        "message": "Voicemail sent after max attempts",
+        "error": null,
+        "patient_name": "Akshay",
+        "phone_number": "+916378188813",
+        "duration": 0
+      },
+      {
+        "success": true,
+        "call_id": "05d3187e-fef2-43df-8982-96ba7b09f880",
+        "status": "success",
+        "call_status": "initiated",
+        "transcript": null,
+        "final_summary": null,
+        "message": "Call successfully queued.",
+        "error": null,
+        "patient_name": "Sneha",
+        "phone_number": "+917014608325",
+        "duration": 0
+      },
+      {
+        "success": true,
+        "call_id": null,
+        "status": "busy_voicemail",
+        "call_status": null,
+        "transcript": null,
+        "final_summary": null,
+        "message": "Voicemail sent after max attempts",
+        "error": null,
+        "patient_name": "Bhavya",
+        "phone_number": "+919314588660",
+        "duration": 0
+      },
+      {
+        "success": true,
+        "call_id": null,
+        "status": "busy_voicemail",
+        "call_status": null,
+        "transcript": null,
+        "final_summary": null,
+        "message": "Voicemail sent after max attempts",
+        "error": null,
+        "patient_name": "Gaurav",
+        "phone_number": "+918818811681",
+        "duration": 0
+      }
+    ]
+  },
+  "f660c0eb-079f-48a9-96f1-9d5326a09e7e_run_20250829_103322": {
+    "campaign_id": "f660c0eb-079f-48a9-96f1-9d5326a09e7e",
+    "campaign_run_id": "f660c0eb-079f-48a9-96f1-9d5326a09e7e_run_20250829_103322",
+    "campaign_name": "Test 4",
+    "client_name": "Hillside Primary Care",
+    "total_calls": 4,
+    "successful_calls": 4,
+    "failed_calls": 0,
+    "started_at": "2025-08-29T10:33:22.558632",
+    "completed_at": "2025-08-29T10:33:22.558638",
+    "status": "completed",
+    "run_number": 2,
+    "results": [
+      {
+        "success": true,
+        "call_id": null,
+        "status": "busy_voicemail",
+        "call_status": null,
+        "transcript": null,
+        "final_summary": null,
+        "message": "Voicemail sent after max attempts",
+        "error": null,
+        "patient_name": "Akshay",
+        "phone_number": "+916378188813",
+        "duration": 0
+      },
+      {
+        "success": true,
+        "call_id": null,
+        "status": "busy_voicemail",
+        "call_status": null,
+        "transcript": null,
+        "final_summary": null,
+        "message": "Voicemail sent after max attempts",
+        "error": null,
+        "patient_name": "Sneha",
+        "phone_number": "+917014608325",
+        "duration": 0
+      },
+      {
+        "success": true,
+        "call_id": null,
+        "status": "busy_voicemail",
+        "call_status": null,
+        "transcript": null,
+        "final_summary": null,
+        "message": "Voicemail sent after max attempts",
+        "error": null,
+        "patient_name": "Bhavya",
+        "phone_number": "+919314588660",
+        "duration": 0
+      },
+      {
+        "success": true,
+        "call_id": null,
+        "status": "busy_voicemail",
+        "call_status": null,
+        "transcript": null,
+        "final_summary": null,
+        "message": "Voicemail sent after max attempts",
+        "error": null,
+        "patient_name": "Gaurav",
+        "phone_number": "+918818811681",
+        "duration": 0
+      }
+    ]
   }
 }
