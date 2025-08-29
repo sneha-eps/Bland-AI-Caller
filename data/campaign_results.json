@@ -211,5 +211,72 @@
         "duration": 0
       }
     ]
+  },
+  "f660c0eb-079f-48a9-96f1-9d5326a09e7e_run_20250829_104500": {
+    "campaign_id": "f660c0eb-079f-48a9-96f1-9d5326a09e7e",
+    "campaign_run_id": "f660c0eb-079f-48a9-96f1-9d5326a09e7e_run_20250829_104500",
+    "campaign_name": "Test 4",
+    "client_name": "Hillside Primary Care",
+    "total_calls": 4,
+    "successful_calls": 4,
+    "failed_calls": 0,
+    "started_at": "2025-08-29T10:45:00.985098",
+    "completed_at": "2025-08-29T10:45:00.985107",
+    "status": "completed",
+    "run_number": 3,
+    "results": [
+      {
+        "success": true,
+        "call_id": "ff232560-1843-43dd-98cf-af5f1be5b4b5",
+        "status": "success",
+        "call_status": "initiated",
+        "transcript": null,
+        "final_summary": null,
+        "message": "Call successfully queued.",
+        "error": null,
+        "patient_name": "Akshay",
+        "phone_number": "+916378188813",
+        "duration": 0
+      },
+      {
+        "success": true,
+        "call_id": "a78a8730-621a-4a42-b600-4ed8fb544770",
+        "status": "success",
+        "call_status": "initiated",
+        "transcript": null,
+        "final_summary": null,
+        "message": "Call successfully queued.",
+        "error": null,
+        "patient_name": "Sneha",
+        "phone_number": "+917014608325",
+        "duration": 0
+      },
+      {
+        "success": true,
+        "call_id": "966cb36a-f341-451d-aaab-d463771312e3",
+        "status": "success",
+        "call_status": "initiated",
+        "transcript": null,
+        "final_summary": null,
+        "message": "Call successfully queued.",
+        "error": null,
+        "patient_name": "Bhavya",
+        "phone_number": "+919314588660",
+        "duration": 0
+      },
+      {
+        "success": true,
+        "call_id": "70dea366-aeca-4821-917e-23cbdfdcd001",
+        "status": "success",
+        "call_status": "initiated",
+        "transcript": null,
+        "final_summary": null,
+        "message": "Call successfully queued.",
+        "error": null,
+        "patient_name": "Gaurav",
+        "phone_number": "+918818811681",
+        "duration": 0
+      }
+    ]
   }
 }
