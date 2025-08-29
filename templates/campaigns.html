@@ -1999,11 +1999,11 @@
                         ? call.final_summary.substring(0, 80) + '...' 
                         : call.final_summary;
 
-                    const encodedSummary = encodeURIComponent(call.final_summary);
-                    const encodedPatientNameForSummary = encodeURIComponent(call.patient_name);
-                    
                     finalSummarySection = `
-                        <div class="final-summary-preview" onclick="showFullSummary('${encodedSummary}', '${encodedPatientNameForSummary}')" 
+                        <div class="final-summary-preview" 
+                             data-summary="${encodeURIComponent(call.final_summary)}"
+                             data-patient="${encodeURIComponent(call.patient_name)}"
+                             onclick="showFullSummaryFromData(this)" 
                              style="background: var(--bg-secondary); padding: 0.75rem; border-radius: 8px; border-left: 4px solid var(--success-color); font-size: 0.875rem; line-height: 1.4; cursor: pointer; transition: var(--transition); box-shadow: var(--shadow-sm);">
                             <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
                                 <i class="fas fa-robot" style="color: var(--success-color);"></i>
@@ -2033,12 +2033,12 @@
                         ? call.transcript.substring(0, 150) + '...' 
                         : call.transcript;
 
-                    const encodedTranscript = encodeURIComponent(call.transcript || '');
-                    const encodedPatientName = encodeURIComponent(call.patient_name || '');
-                    
                     transcriptSection = `
                         <div class="transcript-container" style="max-width: 300px;">
-                            <div class="transcript-preview" onclick="showFullTranscript('${encodedTranscript}', '${encodedPatientName}')" 
+                            <div class="transcript-preview" 
+                                 data-transcript="${encodeURIComponent(call.transcript || '')}"
+                                 data-patient="${encodeURIComponent(call.patient_name || '')}"
+                                 onclick="showFullTranscriptFromData(this)" 
                                  style="cursor: pointer; color: var(--primary-color); text-decoration: underline; padding: 0.5rem; background: var(--bg-secondary); border-radius: 6px; border-left: 3px solid var(--primary-color); line-height: 1.4; font-size: 0.875rem; transition: var(--transition);"
                                  onmouseover="this.style.backgroundColor='var(--bg-tertiary)'"
                                  onmouseout="this.style.backgroundColor='var(--bg-secondary)'">
@@ -2122,9 +2122,19 @@
             });
         }
 
-        function showFullTranscript(encodedTranscript, encodedPatientName) {
-            const transcript = decodeURIComponent(encodedTranscript);
-            const patientName = decodeURIComponent(encodedPatientName);
+        function showFullTranscriptFromData(element) {
+            const transcript = decodeURIComponent(element.dataset.transcript);
+            const patientName = decodeURIComponent(element.dataset.patient);
+            showFullTranscript(transcript, patientName);
+        }
+
+        function showFullSummaryFromData(element) {
+            const summary = decodeURIComponent(element.dataset.summary);
+            const patientName = decodeURIComponent(element.dataset.patient);
+            showFullSummary(summary, patientName);
+        }
+
+        function showFullTranscript(transcript, patientName) {
 
             // Create a modal-like dialog for full transcript
             const modal = document.createElement('div');
@@ -2209,9 +2219,7 @@
             document.addEventListener('keydown', handleEscape);
         }
 
-        function showFullSummary(encodedSummary, encodedPatientName) {
-            const summary = decodeURIComponent(encodedSummary);
-            const patientName = decodeURIComponent(encodedPatientName);
+        function showFullSummary(summary, patientName) {
 
             // Create a modal-like dialog for full summary
             const modal = document.createElement('div');
