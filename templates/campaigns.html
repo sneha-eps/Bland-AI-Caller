@@ -1872,7 +1872,7 @@
                 console.log('Analytics response status:', response.status);
 
                 const data = await response.json();
-                console.log('Analytics data:', JSON.stringify(data, null, 2).substring(0, 500) + '...');
+                console.log('Analytics data:', data);
 
                 if (data.success) {
                     // Update score cards
@@ -2000,7 +2000,7 @@
                         : call.final_summary;
 
                     finalSummarySection = `
-                        <div class="final-summary-preview" onclick="showFullSummary('${encodeURIComponent(call.final_summary)}', '${encodeURIComponent(call.patient_name)}')" 
+                        <div class="final-summary-preview" onclick="showFullSummary('${encodeURIComponent(call.final_summary)}', '${call.patient_name}')" 
                              style="background: var(--bg-secondary); padding: 0.75rem; border-radius: 8px; border-left: 4px solid var(--success-color); font-size: 0.875rem; line-height: 1.4; cursor: pointer; transition: var(--transition); box-shadow: var(--shadow-sm);">
                             <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
                                 <i class="fas fa-robot" style="color: var(--success-color);"></i>
@@ -2032,7 +2032,7 @@
 
                     transcriptSection = `
                         <div class="transcript-container" style="max-width: 300px;">
-                            <div class="transcript-preview" onclick="showFullTranscript('${encodeURIComponent(call.transcript)}', '${encodeURIComponent(call.patient_name)}')" 
+                            <div class="transcript-preview" onclick="showFullTranscript('${encodeURIComponent(call.transcript)}', '${call.patient_name}')" 
                                  style="cursor: pointer; color: var(--primary-color); text-decoration: underline; padding: 0.5rem; background: var(--bg-secondary); border-radius: 6px; border-left: 3px solid var(--primary-color); line-height: 1.4; font-size: 0.875rem; transition: var(--transition);"
                                  onmouseover="this.style.backgroundColor='var(--bg-tertiary)'"
                                  onmouseout="this.style.backgroundColor='var(--bg-secondary)'">
@@ -2116,9 +2116,8 @@
             });
         }
 
-        function showFullTranscript(encodedTranscript, encodedPatientName) {
+        function showFullTranscript(encodedTranscript, patientName) {
             const transcript = decodeURIComponent(encodedTranscript);
-            const patientName = decodeURIComponent(encodedPatientName);
 
             // Create a modal-like dialog for full transcript
             const modal = document.createElement('div');
@@ -2203,8 +2202,7 @@
             document.addEventListener('keydown', handleEscape);
         }
 
-        function showFullSummary(encodedSummary, encodedPatientName) {
-            const patientName = decodeURIComponent(encodedPatientName);
+        function showFullSummary(encodedSummary, patientName) {
             const summary = decodeURIComponent(encodedSummary);
 
             // Create a modal-like dialog for full summary
@@ -2508,7 +2506,7 @@
                                 <td><span class="transcript-preview" onclick="viewFullTranscript('${encodeURIComponent(call.transcript || '')}')">${transcriptPreview}</span></td>
                                 <td>
                                     ${call.call_status === 'voicemail' || call.call_status === 'busy' ? 
-                                        `<button onclick="sendIndividualVoicemail('${encodeURIComponent(call.patient_name)}', '${encodeURIComponent(call.phone_number)}')" class="btn-voicemail" style="font-size: 12px; padding: 4px 8px;">
+                                        `<button onclick="sendIndividualVoicemail('${call.patient_name}', '${call.phone_number}')" class="btn-voicemail" style="font-size: 12px; padding: 4px 8px;">
                                             <i class="fas fa-voicemail"></i> Voicemail
                                         </button>` : 
                                         ''
@@ -2543,10 +2541,10 @@
             document.getElementById('voicemailModal').style.display = 'block';
         }
 
-        function sendIndividualVoicemail(encodedPatientName, encodedPhoneNumber) {
+        function sendIndividualVoicemail(patientName, phoneNumber) {
             // Pre-fill the form with patient info
-            document.getElementById('vmPatientName').value = decodeURIComponent(encodedPatientName);
-            document.getElementById('vmPhoneNumber').value = decodeURIComponent(encodedPhoneNumber);
+            document.getElementById('vmPatientName').value = patientName;
+            document.getElementById('vmPhoneNumber').value = phoneNumber;
             document.getElementById('voicemailModal').style.display = 'block';
         }
 
@@ -2606,6 +2604,33 @@
                 submitBtn.disabled = false;
             });
         });
+
+        // Helper functions for status display and time conversion (assuming these are defined elsewhere or should be here)
+        function getStatusDisplay(status) {
+            switch (status) {
+                case 'confirmed': return 'Confirmed';
+                case 'cancelled': return 'Cancelled';
+                case 'rescheduled': return 'Rescheduled';
+                case 'busy': return 'Busy';
+                case 'busy_voicemail': return 'Busy/Voicemail';
+                case 'not_available': return 'Not Available';
+                case 'wrong_number': return 'Wrong Number';
+                case 'failed': return 'Failed';
+                default: return 'Unknown';
+            }
+        }
+
+        function convertToIST(datetimeString) {
+            if (!datetimeString) return 'N/A';
+            try {
+                const date = new Date(datetimeString);
+                return date.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+            } catch (e) {
+                console.error("Error converting date:", e);
+                return datetimeString; // Fallback to original string if conversion fails
+            }
+        }
+
     </script>
 </body>
 </html>
