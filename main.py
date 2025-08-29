@@ -395,7 +395,7 @@ def get_call_prompt(city_name: str = "",
     • If questions arise: answer briefly, then ask "Is there anything else I can help you with?" and wait another 10-15 seconds.
     • If brief acknowledgment: "You're welcome! Have a great day!" then wait 3-4 seconds before ending call.
     • If silence after 10-15 second wait: "Alright, have a great day!" and end the call.
-    • If no response after 3-4 second wait: end call.
+    • If silence after 3-4 second wait: end call.
     • If silence after 10 seconds at any point after the main task is done: end call automatically.
 
     FINAL SUMMARY RULE:
@@ -580,12 +580,12 @@ def convert_utc_to_ist(utc_datetime_str):
     """Convert UTC datetime string to IST timezone"""
     if not utc_datetime_str:
         return "N/A"
-    
+
     try:
         # Parse the UTC datetime
         if utc_datetime_str.endswith('Z'):
             utc_datetime_str = utc_datetime_str[:-1] + '+00:00'
-        
+
         # Handle various datetime formats
         try:
             utc_dt = datetime.fromisoformat(utc_datetime_str.replace('Z', '+00:00'))
@@ -593,18 +593,18 @@ def convert_utc_to_ist(utc_datetime_str):
             # Try parsing without timezone info and assume UTC
             utc_dt = datetime.fromisoformat(utc_datetime_str.split('+')[0].split('Z')[0])
             utc_dt = utc_dt.replace(tzinfo=pytz.UTC)
-        
+
         # If datetime is naive, assume it's UTC
         if utc_dt.tzinfo is None:
             utc_dt = pytz.UTC.localize(utc_dt)
-        
+
         # Convert to IST
         ist_tz = pytz.timezone('Asia/Kolkata')
         ist_dt = utc_dt.astimezone(ist_tz)
-        
+
         # Format as readable string
         return ist_dt.strftime('%Y-%m-%d %I:%M:%S %p IST')
-    
+
     except Exception as e:
         print(f"Error converting datetime {utc_datetime_str} to IST: {e}")
         return utc_datetime_str
@@ -2156,10 +2156,10 @@ def extract_final_summary(transcript: str) -> str:
         return "No summary available"
 
     transcript_lines = transcript.strip().split('\n')
-    
+
     # Look for the AI assistant's final summary statements - specifically the "Just to confirm..." pattern
     assistant_final_statements = []
-    
+
     # Process lines in reverse to find the most recent assistant statements
     for line in reversed(transcript_lines):
         line = line.strip()
@@ -2168,7 +2168,7 @@ def extract_final_summary(transcript: str) -> str:
             statement = line.replace('assistant:', '').strip()
             if statement and len(statement) > 15:  # Meaningful statement
                 assistant_final_statements.append(statement)
-                
+
                 # Check if this is a final summary statement
                 statement_lower = statement.lower()
                 if any(phrase in statement_lower for phrase in [
@@ -2180,13 +2180,13 @@ def extract_final_summary(transcript: str) -> str:
         elif line.startswith('user:') and assistant_final_statements:
             # Stop when we hit user input after finding assistant statements
             break
-    
+
     # If we found assistant statements but no clear final summary, look for specific patterns
     if assistant_final_statements:
         # Check the last few statements for summary patterns
         for statement in assistant_final_statements[:3]:  # Check last 3 statements
             statement_lower = statement.lower()
-            
+
             # Look for final confirmation patterns
             if any(phrase in statement_lower for phrase in [
                 "have a great day", "you're welcome", "see you then", "thank you",
@@ -2196,22 +2196,22 @@ def extract_final_summary(transcript: str) -> str:
                 continue
             elif len(statement) > 30:  # Substantial statement
                 return statement
-        
+
         # Return the most substantial statement
         substantial_statements = [s for s in assistant_final_statements if len(s) > 30]
         if substantial_statements:
             return substantial_statements[0]
-    
+
     # Fallback: Look for final summary patterns anywhere in the transcript
     transcript_lower = transcript.lower()
-    
+
     # Look for "Just to confirm" statements specifically
     for line in transcript_lines:
         if line.startswith('assistant:'):
             statement = line.replace('assistant:', '').strip()
             if statement.lower().startswith('just to confirm'):
                 return statement
-    
+
     # Other confirmation patterns
     if "i will cancel this appointment" in transcript_lower:
         # Find the actual cancellation statement
@@ -2236,19 +2236,20 @@ def extract_final_summary(transcript: str) -> str:
                 statement = line.replace('assistant:', '').strip()
                 if len(statement) > 20 and not any(word in statement.lower() for word in ['hello', 'hi', 'good morning']):
                     return statement
-        
+
         return "Call completed - no clear summary available"
 
 
 def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -> str:
     """
     Determine call status based on final summary content primarily, with transcript as fallback.
+    Returns a tuple: (call_status, standardized_summary)
     """
     if not final_summary or final_summary.strip() == "":
         # Fallback to transcript analysis if no summary
         if transcript and transcript.strip():
-            return analyze_call_transcript(transcript)
-        return 'busy_voicemail'
+            return analyze_call_transcript(transcript), "Analysis based on transcript"
+        return 'busy_voicemail', "No summary or transcript available"
 
     summary_lower = final_summary.lower().strip()
 
@@ -2258,48 +2259,53 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
         "scheduling agent will call", "will call you to find a new time", "someone will be in touch",
         "follow-up call arranged", "patient requested to reschedule", "arrange a new time"
     ]):
-        return 'rescheduled'
+        return 'rescheduled', "Patient requested to reschedule"
 
     # Check for AI cancellation processing patterns
     if any(phrase in summary_lower for phrase in [
-        "ai processed cancellation", "patient cancelled", "cancelled appointment", 
-        "appointment cancelled", "i will cancel this appointment", 
+        "ai processed cancellation", "patient cancelled", "cancelled appointment",
+        "appointment cancelled", "i will cancel this appointment",
         "appointment has been cancelled", "cancelled for you"
     ]):
-        return 'cancelled'
+        return 'cancelled', "Patient cancelled appointment"
 
     # Check for AI confirmation patterns (these indicate successful confirmations)
     # BUT exclude cases that mention rescheduling
     if any(phrase in summary_lower for phrase in [
-        "patient confirmed", "appointment confirmed", "confirmed appointment", 
+        "patient confirmed", "appointment confirmed", "confirmed appointment",
         "ai provided confirmation", "confirmation details", "we are glad to have you"
     ]) and not any(reschedule_word in summary_lower for reschedule_word in [
         "reschedule", "rescheduled", "scheduling agent", "arrange a new time"
     ]):
-        return 'confirmed'
-    
+        return 'confirmed', "Patient confirmed appointment"
+
     # Special case: "just to confirm" can be either confirmation OR reschedule summary
     if "just to confirm" in summary_lower:
         if any(phrase in summary_lower for phrase in [
             "will be rescheduled", "reschedule", "scheduling agent", "arrange a new time"
         ]):
-            return 'rescheduled'
+            return 'rescheduled', "Patient requested to reschedule"
         elif "is confirmed" in summary_lower or "appointment on" in summary_lower:
-            return 'confirmed'
+            return 'confirmed', "Patient confirmed appointment"
 
     # Check for wrong number patterns from AI response
     if any(phrase in summary_lower for phrase in [
         "wrong number", "incorrect contact", "my apologies for the confusion",
         "no one by that name", "nobody by that name", "not the right person"
     ]):
-        return 'wrong_number'
+        return 'wrong_number', "Wrong number or patient not available"
 
     # Check for not available patterns
     if any(phrase in summary_lower for phrase in [
-        "not available", "not here", "not home", "out right now",
-        "can't come to phone", "busy right now", "call back later"
+        "not here right now", "isn't here", "is not here", "not available",
+        "not home", "isn't home", "is not home", "out right now",
+        "can't come to phone", "cannot come to phone", "busy right now",
+        "in a meeting", "at work", "not in", "stepped out", "away from",
+        "will be back", "call back later", "try calling later", "not around",
+        "unavailable", "sleeping", "napping", "can you call back",
+        "not a good time", "isn't a good time", "bad time"
     ]):
-        return 'not_available'
+        return 'not_available', "Patient not available"
 
     # Check for voicemail/busy patterns
     if any(phrase in summary_lower for phrase in [
@@ -2307,44 +2313,65 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
         "no answer", "line busy", "busy signal", "disconnected",
         "no response", "automated message", "no transcript available"
     ]):
-        return 'busy_voicemail'
+        return 'busy_voicemail', "Busy, voicemail, or no answer"
 
     # Enhanced transcript analysis as fallback
     if transcript and transcript.strip():
         # Look specifically for AI assistant's final confirmation statements
         transcript_lower = transcript.lower()
-        
+
         # Check for AI's final confirmation patterns
         if any(phrase in transcript_lower for phrase in [
             "just to confirm, your appointment", "we are glad to have you",
             "have a great day", "see you then", "you're welcome"
         ]):
-            return 'confirmed'
-        
+            return 'confirmed', "Patient confirmed appointment"
+
         # Check for AI's cancellation processing
         if any(phrase in transcript_lower for phrase in [
             "i will cancel this appointment", "appointment has been cancelled",
             "feel free to contact us anytime"
         ]):
-            return 'cancelled'
-        
+            return 'cancelled', "Patient cancelled appointment"
+
         # Check for AI's reschedule processing
         if any(phrase in transcript_lower for phrase in [
             "our scheduling agent will call you", "someone will be in touch soon",
             "to find a new time", "will call you shortly"
         ]):
-            return 'rescheduled'
-        
+            return 'rescheduled', "Patient requested to reschedule"
+
         # Check for AI's wrong number handling
         if any(phrase in transcript_lower for phrase in [
             "my apologies for the confusion", "thank you for your time"
         ]):
-            return 'wrong_number'
-        
-        return analyze_call_transcript(transcript)
+            return 'wrong_number', "Wrong number or patient not available"
+
+        # Use a more general transcript analyzer if specific patterns aren't found
+        return analyze_call_transcript(transcript), "Analysis based on transcript"
 
     # Default to busy_voicemail if we can't determine
-    return 'busy_voicemail'
+    return 'busy_voicemail', "Unable to determine status"
+
+
+def get_standardized_summary_for_status(status: str) -> str:
+    """Provides a standardized summary based on the known status."""
+    if status == 'confirmed':
+        return "Patient confirmed appointment"
+    elif status == 'cancelled':
+        return "Patient cancelled appointment"
+    elif status == 'rescheduled':
+        return "Patient requested to reschedule"
+    elif status == 'wrong_number':
+        return "Wrong number or patient not available"
+    elif status == 'not_available':
+        return "Patient not available"
+    elif status == 'busy_voicemail':
+        return "Busy, voicemail, or no answer"
+    elif status == 'failed':
+        return "Call failed"
+    else:
+        return "Unknown status"
 
 
 def analyze_call_transcript(transcript: str) -> str:
@@ -2716,6 +2743,7 @@ async def get_campaign_analytics(campaign_id: str):
         for stored_key, stored_results in campaign_results_db.items():
             if stored_key == campaign_id or stored_key.startswith(f"{campaign_id}_run_"):
                 campaign_runs[stored_key] = stored_results
+                print(f"   Found run matching campaign ID: {stored_key}")
 
         if not campaign_runs:
             print(f"🔍 No stored results found for campaign {campaign_name}. Available campaigns in results_db: {list(campaign_results_db.keys())}")
@@ -2746,12 +2774,12 @@ async def get_campaign_analytics(campaign_id: str):
         # Aggregate all results from all runs of this campaign
         all_results = []
         total_runs = len(campaign_runs)
-        
+
         # Get the first run's started_at as fallback for timestamps
         first_run_started_at = datetime.now().isoformat()
         if campaign_runs:
             first_run_started_at = next(iter(campaign_runs.values())).get('started_at', datetime.now().isoformat())
-        
+
         for run_key, run_data in campaign_runs.items():
             all_results.extend(run_data.get('results', []))
             print(f"📊 Found run {run_key} with {len(run_data.get('results', []))} calls")
@@ -2841,21 +2869,21 @@ async def get_campaign_analytics(campaign_id: str):
 
                                     if stored_final_summary and stored_final_summary.strip():
                                         # Use stored final summary to determine status - this is the most accurate
-                                        call_status = analyze_call_status_from_summary(stored_final_summary, stored_transcript or transcript)
-                                        final_summary = stored_final_summary
+                                        call_status, standardized_summary = analyze_call_status_from_summary(stored_final_summary, stored_transcript or transcript)
+                                        final_summary = standardized_summary
                                         transcript = stored_transcript or transcript
                                         call_details['analysis_notes'] = "Status determined from stored final summary"
                                     elif stored_status and stored_transcript:
                                         # Use stored data from webhook if no final summary
                                         call_status = stored_status
                                         transcript = stored_transcript
-                                        final_summary = extract_final_summary(transcript)
+                                        final_summary = get_standardized_summary_for_status(call_status)
                                         call_details['analysis_notes'] = "Used stored webhook data"
                                     else:
                                         # Analyze fresh transcript and extract final summary
                                         if transcript and transcript.strip():
-                                            final_summary = extract_final_summary(transcript)
-                                            call_status = analyze_call_status_from_summary(final_summary, transcript)
+                                            call_status, standardized_summary = analyze_call_status_from_summary(extract_final_summary(transcript), transcript)
+                                            final_summary = standardized_summary
                                             call_details['analysis_notes'] = f"Analyzed {len(transcript)} characters from API"
                                         else:
                                             call_status = 'busy_voicemail'
@@ -2865,7 +2893,7 @@ async def get_campaign_analytics(campaign_id: str):
                                     call_details['call_status'] = call_status
                                     call_details['transcript'] = transcript
                                     call_details['final_summary'] = final_summary
-                                    
+
                                     # Convert created_at to IST
                                     call_details['created_at'] = convert_utc_to_ist(call_data.get('created_at', first_run_started_at))
 
@@ -3373,7 +3401,8 @@ async def bland_webhook(request: Request):
                         if transcript and transcript.strip():
                             final_summary = extract_final_summary(transcript)
                             # Use final summary to determine status (more accurate)
-                            analyzed_status = analyze_call_status_from_summary(final_summary, transcript)
+                            analyzed_status, standardized_summary = analyze_call_status_from_summary(final_summary, transcript)
+                            final_summary = standardized_summary # Use standardized summary
                         else:
                             analyzed_status = 'busy_voicemail'
                             final_summary = "No transcript available"
