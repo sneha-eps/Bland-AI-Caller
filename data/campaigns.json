@@ -18,5 +18,25 @@
     "country_code": "+91",
     "file_name": "Phone Calls - Untitled spreadsheet - Sheet1 (1) (5).csv",
     "file_data_b64": "cGhvbmVfbnVtYmVyLHBhdGllbnRfbmFtZSxvZmZpY2VfbG9jYXRpb24sZGF0ZSx0aW1lLHByb3ZpZGVyX25hbWUNCjYzNzgxODg4MTMsQWtzaGF5LEhpbGxzaWRlIFByaW1hcnkgQ2FyZSBMaXZlIE9haywwOS8wNC8yMDI1LDEyOjAwLERyLiBQYXRlbA0KNzAxNDYwODMyNSxTbmVoYSxIaWxsc2lkZSBQcmltYXJ5IENhcmUgU2NoZXJ0eiwwOS8xMC8yMDI1LDEzOjAwLERyLiBBcmlhbmENCjkzMTQ1ODg2NjAsQmhhdnlhLEhpbGxzaWRlIFByaW1hcnkgQ2FyZSBTb3V0aHNpZGUsMDkvMTAvMjAyNSwxMTowMCxEci4gVmFzcXVleg0KODgxODgxMTY4MSxHYXVyYXYsIkFCQ0QsIHNjaGVydHoiLDEwLzEwLzIwMjUsMTI6MDAsRHIuIFZhc3F1ZXoNCg=="
+  },
+  "5c8e1967-cd1a-4fea-8eae-d221100b4fb8": {
+    "id": "5c8e1967-cd1a-4fea-8eae-d221100b4fb8",
+    "name": "Hello Sinopia Test",
+    "client_id": "fd18d957-f59e-481d-b556-53c4e0d48eb6",
+    "max_attempts": 3,
+    "retry_interval": 30,
+    "country_code": "+1",
+    "file_name": "sample_campaign_data.csv",
+    "file_data_b64": "cGhvbmVfbnVtYmVyLHBhdGllbnRfbmFtZSxvZmZpY2VfbG9jYXRpb24sZGF0ZSx0aW1lLHByb3ZpZGVyX25hbWUNCjk3ODMzMzYzNTgsQXNpdCBHb2VsLEhpbGxzaWRlIFByaW1hcnkgQ2FyZSBTY2hlcnR6LDA3LzIzLzIwMjUsMDI6MzAgUE0sUGF0ZWw="
+  },
+  "1bea9e95-3213-4c9d-a3b9-51675ce625a2": {
+    "id": "1bea9e95-3213-4c9d-a3b9-51675ce625a2",
+    "name": "Paige Voice Testing",
+    "client_id": "7b5c8aa5-1f6a-4e3f-a3c1-67705746d6a9",
+    "max_attempts": 3,
+    "retry_interval": 30,
+    "country_code": "+1",
+    "file_name": "sample_campaign_data.csv",
+    "file_data_b64": "cGhvbmVfbnVtYmVyLHBhdGllbnRfbmFtZSxvZmZpY2VfbG9jYXRpb24sZGF0ZSx0aW1lLHByb3ZpZGVyX25hbWUNCjk3ODMzMzYzNTgsQXNpdCBHb2VsLEhpbGxzaWRlIFByaW1hcnkgQ2FyZSBTY2hlcnR6LDA3LzIzLzIwMjUsMDI6MzAgUE0sUGF0ZWw="
   }
 }

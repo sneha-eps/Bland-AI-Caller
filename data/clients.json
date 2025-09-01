@@ -8,5 +8,15 @@
     "language": "english",
     "call_type": "appointment_confirmation",
     "voice": "Paige"
+  },
+  "7b5c8aa5-1f6a-4e3f-a3c1-67705746d6a9": {
+    "id": "7b5c8aa5-1f6a-4e3f-a3c1-67705746d6a9",
+    "name": "Hillside Primary Car",
+    "phone_number": "2222222222",
+    "email": "info@sinopia.ai",
+    "website_url": "https://sinopia.ai/",
+    "language": "english",
+    "call_type": "appointment_confirmation",
+    "voice": "Paige"
   }
 }

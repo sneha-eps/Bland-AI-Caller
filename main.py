@@ -2236,7 +2236,7 @@ def extract_final_summary(transcript: str) -> str:
         return "Call completed - no clear summary available"
 
 
-def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -> str:
+def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -> tuple[str, str]:
     """
     Determine call status based on final summary content primarily, with transcript as fallback.
     Returns a tuple: (call_status, standardized_summary)

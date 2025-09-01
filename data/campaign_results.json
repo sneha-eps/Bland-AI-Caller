@@ -278,5 +278,89 @@
         "duration": 0
       }
     ]
+  },
+  "5c8e1967-cd1a-4fea-8eae-d221100b4fb8_run_20250830_120938": {
+    "campaign_id": "5c8e1967-cd1a-4fea-8eae-d221100b4fb8",
+    "campaign_run_id": "5c8e1967-cd1a-4fea-8eae-d221100b4fb8_run_20250830_120938",
+    "campaign_name": "Hello Sinopia Test",
+    "client_name": "Hillside Primary Care",
+    "total_calls": 1,
+    "successful_calls": 1,
+    "failed_calls": 0,
+    "started_at": "2025-08-30T12:09:38.122221",
+    "completed_at": "2025-08-30T12:09:38.122229",
+    "status": "completed",
+    "run_number": 1,
+    "results": [
+      {
+        "success": true,
+        "call_id": "9a014989-25c1-46b9-be7c-a762fa7e4e03",
+        "status": "success",
+        "call_status": "initiated",
+        "transcript": null,
+        "final_summary": null,
+        "message": "Call successfully queued.",
+        "error": null,
+        "patient_name": "Asit Goel",
+        "phone_number": "+19783336358",
+        "duration": 0
+      }
+    ]
+  },
+  "5c8e1967-cd1a-4fea-8eae-d221100b4fb8_run_20250830_121334": {
+    "campaign_id": "5c8e1967-cd1a-4fea-8eae-d221100b4fb8",
+    "campaign_run_id": "5c8e1967-cd1a-4fea-8eae-d221100b4fb8_run_20250830_121334",
+    "campaign_name": "Hello Sinopia Test",
+    "client_name": "Hillside Primary Care",
+    "total_calls": 1,
+    "successful_calls": 1,
+    "failed_calls": 0,
+    "started_at": "2025-08-30T12:13:34.433832",
+    "completed_at": "2025-08-30T12:13:34.433842",
+    "status": "completed",
+    "run_number": 2,
+    "results": [
+      {
+        "success": true,
+        "call_id": "e226013a-4d09-4039-a3aa-6178991a9e2b",
+        "status": "success",
+        "call_status": "initiated",
+        "transcript": null,
+        "final_summary": null,
+        "message": "Call successfully queued.",
+        "error": null,
+        "patient_name": "Asit Goel",
+        "phone_number": "+19783336358",
+        "duration": 0
+      }
+    ]
+  },
+  "1bea9e95-3213-4c9d-a3b9-51675ce625a2_run_20250830_122611": {
+    "campaign_id": "1bea9e95-3213-4c9d-a3b9-51675ce625a2",
+    "campaign_run_id": "1bea9e95-3213-4c9d-a3b9-51675ce625a2_run_20250830_122611",
+    "campaign_name": "Paige Voice Testing",
+    "client_name": "Hillside Primary Car",
+    "total_calls": 1,
+    "successful_calls": 1,
+    "failed_calls": 0,
+    "started_at": "2025-08-30T12:26:11.048513",
+    "completed_at": "2025-08-30T12:26:11.048521",
+    "status": "completed",
+    "run_number": 1,
+    "results": [
+      {
+        "success": true,
+        "call_id": "c832e93f-b56f-4946-84a6-cd6fe54dd8c5",
+        "status": "success",
+        "call_status": "initiated",
+        "transcript": null,
+        "final_summary": null,
+        "message": "Call successfully queued.",
+        "error": null,
+        "patient_name": "Asit Goel",
+        "phone_number": "+19783336358",
+        "duration": 0
+      }
+    ]
   }
 }
