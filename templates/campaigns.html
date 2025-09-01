@@ -2108,7 +2108,7 @@
                             </small>
                         </div>
                     </td>
-                    <td style="font-family: monospace; font-weight: 600;">${formatDuration(call.duration || 0)}</td>
+                    <td style="font-family: monospace; font-weight: 600;">${formatCallDuration(call.duration || 0)}</td>
                     <td style="font-size: 0.875rem;">${call.created_at || 'N/A'}</td>
                     <td style="max-width: 250px;">
                         ${finalSummarySection}
@@ -2293,6 +2293,21 @@
                 return `${minutes}m ${secs}s`;
             } else {
                 return `${secs}s`;
+            }
+        }
+
+        function formatCallDuration(seconds) {
+            if (!seconds || seconds === 0) {
+                return "0 sec";
+            }
+            
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            
+            if (minutes > 0) {
+                return `${minutes} min ${remainingSeconds.toString().padStart(2, '0')} sec`;
+            } else {
+                return `${remainingSeconds} sec`;
             }
         }
 
@@ -2509,7 +2524,7 @@
                         summary.calls.forEach(call => {
                             const row = document.createElement('tr');
                             const statusClass = `status-${call.call_status || 'failed'}`;
-                            const duration = call.duration ? `${Math.floor(call.duration / 60)}m ${call.duration % 60}s` : '0s';
+                            const duration = formatCallDuration(call.duration || 0);
                             const transcriptPreview = call.transcript ? 
                                 (call.transcript.length > 50 ? call.transcript.substring(0, 50) + '...' : call.transcript) : 
                                 'No transcript';
