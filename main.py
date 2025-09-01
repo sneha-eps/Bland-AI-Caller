@@ -534,33 +534,74 @@ def format_phone_number(phone_number, country_code) -> str:
     return f"{country_code}{cleaned}"
 
 
-def parse_duration(raw_duration):
-    """Parse duration from various formats to seconds"""
-    if isinstance(raw_duration, (int, float)):
-        return int(raw_duration)
-    elif isinstance(raw_duration, str) and raw_duration:
-        try:
-            duration_str = raw_duration.lower().strip()
-            if 'm' in duration_str and 's' in duration_str:
-                # Format: "2m 30s" or "2m30s"
-                import re
-                match = re.search(r'(\d+)m\s*(\d+)?s?', duration_str)
-                if match:
-                    minutes = int(match.group(1))
-                    seconds = int(match.group(2)) if match.group(2) else 0
-                    return minutes * 60 + seconds
-            elif 's' in duration_str:
-                # Format: "150s"
-                return int(duration_str.replace('s', ''))
-            elif 'm' in duration_str:
-                # Format: "2m"
-                return int(duration_str.replace('m', '')) * 60
-            elif duration_str.isdigit():
-                # Just a number, assume seconds
-                return int(duration_str)
-        except Exception:
-            return 0
+def parse_duration(duration_value):
+    """Parse duration from various formats into seconds"""
+    if not duration_value:
+        return 0
+
+    try:
+        # If it's already a number (seconds), return it
+        if isinstance(duration_value, (int, float)):
+            return int(duration_value)
+
+        # If it's a string, try to parse it
+        if isinstance(duration_value, str):
+            duration_value = duration_value.strip()
+
+            # Handle empty string
+            if not duration_value:
+                return 0
+
+            # Try to convert to float first (most common case for call_length)
+            try:
+                return int(float(duration_value))
+            except ValueError:
+                pass
+
+            # Handle time format like "1:30" (minutes:seconds)
+            if ':' in duration_value:
+                parts = duration_value.split(':')
+                if len(parts) == 2:
+                    try:
+                        minutes = int(float(parts[0]))
+                        seconds = int(float(parts[1]))
+                        return minutes * 60 + seconds
+                    except ValueError:
+                        pass
+                elif len(parts) == 3:  # Handle h:m:s format
+                    try:
+                        hours = int(float(parts[0]))
+                        minutes = int(float(parts[1]))
+                        seconds = int(float(parts[2]))
+                        return hours * 3600 + minutes * 60 + seconds
+                    except ValueError:
+                        pass
+
+            # Handle formats like "1m 30s" or "90s"
+            import re
+
+            # Extract numbers followed by time units
+            pattern = r'(\d+(?:\.\d+)?)\s*([hms]?)'
+            matches = re.findall(pattern, duration_value.lower())
+
+            total_seconds = 0
+            for value, unit in matches:
+                value = float(value)
+                if unit == 'h':
+                    total_seconds += value * 3600
+                elif unit == 'm':
+                    total_seconds += value * 60
+                elif unit == 's' or not unit:  # Default to seconds if no unit
+                    total_seconds += value
+
+            return int(total_seconds)
+
+    except Exception as e:
+        print(f"❌ Error parsing duration '{duration_value}': {e}")
+        return 0
+
     return 0
+
 
 def format_duration_display(total_duration_seconds):
     """Format duration in seconds to display format"""
@@ -577,37 +618,53 @@ def format_duration_display(total_duration_seconds):
 
 
 def convert_utc_to_ist(utc_datetime_str):
-    """Convert UTC datetime string to IST timezone"""
-    if not utc_datetime_str:
+    """Convert UTC datetime string to IST with better formatting"""
+    if not utc_datetime_str or utc_datetime_str in ['N/A', 'Unknown', 'Invalid Date']:
         return "N/A"
 
     try:
-        # Parse the UTC datetime
-        if utc_datetime_str.endswith('Z'):
-            utc_datetime_str = utc_datetime_str[:-1] + '+00:00'
+        # Handle different datetime formats
+        if isinstance(utc_datetime_str, str):
+            # Remove microseconds if present (everything after the last dot)
+            if '.' in utc_datetime_str and not utc_datetime_str.endswith('Z'):
+                parts = utc_datetime_str.split('.')
+                if len(parts) > 1:
+                    # Keep only first 6 digits of microseconds
+                    microseconds = parts[1][:6]
+                    utc_datetime_str = parts[0] + '.' + microseconds
 
-        # Handle various datetime formats
-        try:
-            utc_dt = datetime.fromisoformat(utc_datetime_str.replace('Z', '+00:00'))
-        except:
-            # Try parsing without timezone info and assume UTC
-            utc_dt = datetime.fromisoformat(utc_datetime_str.split('+')[0].split('Z')[0])
+            # Handle Z suffix
+            if utc_datetime_str.endswith('Z'):
+                utc_datetime_str = utc_datetime_str[:-1] + '+00:00'
+            elif not ('+' in utc_datetime_str[-6:] or utc_datetime_str.endswith('UTC')):
+                # Add UTC timezone if no timezone info
+                utc_datetime_str += '+00:00'
+
+        # Parse the datetime string
+        if '+' in utc_datetime_str:
+            utc_dt = datetime.fromisoformat(utc_datetime_str)
+        else:
+            # Fallback parsing
+            utc_dt = datetime.fromisoformat(utc_datetime_str.replace('UTC', ''))
             utc_dt = utc_dt.replace(tzinfo=pytz.UTC)
 
-        # If datetime is naive, assume it's UTC
-        if utc_dt.tzinfo is None:
-            utc_dt = pytz.UTC.localize(utc_dt)
-
         # Convert to IST
-        ist_tz = pytz.timezone('Asia/Kolkata')
-        ist_dt = utc_dt.astimezone(ist_tz)
+        ist_timezone = pytz.timezone('Asia/Kolkata')
+        ist_dt = utc_dt.astimezone(ist_timezone)
 
-        # Format as readable string
-        return ist_dt.strftime('%Y-%m-%d %I:%M:%S %p IST')
+        # Format as a nice readable string
+        return ist_dt.strftime("%Y-%m-%d %I:%M:%S %p IST")
 
     except Exception as e:
-        print(f"Error converting datetime {utc_datetime_str} to IST: {e}")
-        return utc_datetime_str
+        print(f"❌ Error converting datetime {utc_datetime_str}: {e}")
+        # Try to extract just the date part if it's malformed
+        try:
+            if isinstance(utc_datetime_str, str) and len(utc_datetime_str) > 10:
+                date_part = utc_datetime_str[:10]  # Just YYYY-MM-DD
+                return f"{date_part} (Time unavailable)"
+        except:
+            pass
+        return "Invalid Date"
 
 
 async def make_single_call_async(call_request: CallRequest, api_key: str,

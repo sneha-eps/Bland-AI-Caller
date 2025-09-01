@@ -2297,17 +2297,28 @@
         }
 
         function formatCallDuration(seconds) {
-            if (!seconds || seconds === 0) {
+            // Handle null, undefined, or invalid values
+            if (!seconds || seconds === 0 || isNaN(seconds)) {
                 return "0 sec";
             }
             
-            const minutes = Math.floor(seconds / 60);
-            const remainingSeconds = seconds % 60;
+            // Ensure we have an integer
+            const totalSeconds = Math.floor(Number(seconds));
             
-            if (minutes > 0) {
-                return `${minutes} min ${remainingSeconds.toString().padStart(2, '0')} sec`;
+            if (totalSeconds <= 0) {
+                return "0 sec";
+            }
+            
+            const hours = Math.floor(totalSeconds / 3600);
+            const minutes = Math.floor((totalSeconds % 3600) / 60);
+            const remainingSeconds = totalSeconds % 60;
+            
+            if (hours > 0) {
+                return `${hours}h ${minutes}m ${remainingSeconds}s`;
+            } else if (minutes > 0) {
+                return `${minutes}m ${remainingSeconds}s`;
             } else {
-                return `${remainingSeconds} sec`;
+                return `${remainingSeconds}s`;
             }
         }
 
@@ -2652,21 +2663,45 @@
         }
 
         function convertToIST(datetimeString) {
-            if (!datetimeString || datetimeString === 'N/A' || datetimeString === 'Unknown') return 'N/A';
+            if (!datetimeString || datetimeString === 'N/A' || datetimeString === 'Unknown' || datetimeString === 'Invalid Date') return 'N/A';
+            
             try {
-                // Handle different datetime formats
-                let date;
-                
                 // If it's already properly formatted, return as is
-                if (datetimeString.includes('IST') && datetimeString.includes('AM') || datetimeString.includes('PM')) {
+                if (datetimeString.includes('IST') && (datetimeString.includes('AM') || datetimeString.includes('PM'))) {
                     return datetimeString;
                 }
                 
-                // Parse ISO format or other formats
-                date = new Date(datetimeString);
+                // Clean up malformed datetime strings
+                let cleanedString = datetimeString;
                 
+                // Handle strings with excessive precision or malformed suffixes
+                if (cleanedString.includes('T') && cleanedString.includes('.')) {
+                    // Remove excessive microseconds (keep only 3 digits)
+                    cleanedString = cleanedString.replace(/(\.\d{3})\d+/, '$1');
+                }
+                
+                // Remove any trailing numbers that don't belong
+                cleanedString = cleanedString.replace(/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?)\d+$/, '$1');
+                
+                // Parse the cleaned string
+                let date = new Date(cleanedString);
+                
+                // If parsing failed, try alternative approaches
                 if (isNaN(date.getTime())) {
-                    return 'Invalid Date';
+                    // Try extracting just the date and time parts
+                    const match = cleanedString.match(/(\d{4}-\d{2}-\d{2})T?(\d{2}:\d{2}:\d{2})/);
+                    if (match) {
+                        const [, datePart, timePart] = match;
+                        date = new Date(`${datePart}T${timePart}`);
+                    }
+                }
+                
+                // Final check
+                if (isNaN(date.getTime())) {
+                    console.error("Could not parse date:", datetimeString);
+                    // Extract just the date if possible
+                    const dateMatch = datetimeString.match(/(\d{4}-\d{2}-\d{2})/);
+                    return dateMatch ? dateMatch[1] + ' (Time unavailable)' : 'Invalid Date';
                 }
                 
                 // Convert to IST and format nicely
@@ -2681,9 +2716,16 @@
                 };
                 
                 return date.toLocaleString('en-US', options) + ' IST';
+                
             } catch (e) {
                 console.error("Error converting date:", e, "Input:", datetimeString);
-                return 'Invalid Date';
+                // Last resort: try to extract date part
+                try {
+                    const dateMatch = datetimeString.match(/(\d{4}-\d{2}-\d{2})/);
+                    return dateMatch ? dateMatch[1] + ' (Time unavailable)' : 'Invalid Date';
+                } catch (finalError) {
+                    return 'Invalid Date';
+                }
             }
         }
 
