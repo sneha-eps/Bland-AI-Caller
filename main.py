@@ -2850,13 +2850,14 @@ async def get_campaign_analytics(campaign_id: str):
 
                                     # Get transcript and other details with better field handling
                                     transcript = call_data.get('transcript', call_data.get('concatenated_transcript', ''))
-                                    call_length = call_data.get('call_length', call_data.get('duration', 0))
+                                    call_length = call_data.get('call_length', call_data.get('corrected_duration', 0))
 
                                     # Parse duration more robustly - try multiple fields
                                     raw_duration = (call_length or
                                                   call_data.get('duration', 0) or
                                                   call_data.get('call_duration', 0) or
-                                                  call_data.get('length', 0))
+
+call_data.get('corrected_duration', 0) or                                                                                                 call_data.get('length', 0))
                                     duration_seconds = parse_duration(raw_duration)
 
                                     call_details['duration'] = duration_seconds
@@ -3056,6 +3057,7 @@ async def get_call_details(call_id: str):
 
             # Handle duration from multiple fields
             raw_duration = (call_data.get("call_length", 0) or
+                            call_data.get("corrected_duration", 0) or
                            call_data.get("duration", 0) or
                            call_data.get("length", 0))
             duration = parse_duration(raw_duration)
