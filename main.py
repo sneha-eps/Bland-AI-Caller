@@ -2908,15 +2908,19 @@ async def get_campaign_analytics(campaign_id: str):
                                     # Get transcript and other details with better field handling
                                     transcript = call_data.get('transcript', call_data.get('concatenated_transcript', ''))
                                     # Parse duration more robustly - prioritize call_length parameter
-                                    raw_duration = (call_data.get('call_length', 0) or
-                                                  call_data.get('duration', 0) or
-                                                  call_data.get('call_duration', 0) or
-                                                  call_data.get('length', 0) or
-                                                  call_data.get('corrected_duration', 0))
-                                    duration_seconds = parse_duration(raw_duration)
+                                    call_length = call_data.get("call_length")
+                                    corrected_duration = call_data.get("corrected_duration")
 
-                                    call_details['duration'] = duration_seconds
-                                    total_duration += duration_seconds
+                                    if call_length is not None and call_length != 0:
+                                        duration = parse_duration(call_length)
+                                    elif corrected_duration is not None and corrected_duration != 0:
+                                        duration = parse_duration(corrected_duration)
+                                    else:
+                                        raw_duration = (call_data.get("duration", 0) or call_data.get("length", 0))
+                                        duration = parse_duration(raw_duration)
+
+                                    call_details['duration'] = duration
+                                    total_duration += duration
 
                                     # Check if call already has stored status from webhook
                                     stored_status = result.get('call_status')
@@ -2960,7 +2964,7 @@ async def get_campaign_analytics(campaign_id: str):
                                         status_counts['busy_voicemail'] += 1
                                         call_details['call_status'] = 'busy_voicemail'
 
-                                    print(f"✅ Call details for {call_details['patient_name']}: Status={call_status}, Duration={duration_seconds}s, Transcript={len(transcript)} chars")
+                                    print(f"✅ Call details for {call_details['patient_name']}: Status={call_status}, Duration={duration}s, Transcript={len(transcript)} chars")
 
                                 elif call_response.status == 404:
                                     print(f"⚠️ Call {result.get('call_id')} not found in Bland AI - may still be processing")
@@ -3111,11 +3115,16 @@ async def get_call_details(call_id: str):
                 final_summary = extract_final_summary(transcript)
 
             # Handle duration from multiple fields
-            raw_duration = (call_data.get("call_length", 0) or
-                            call_data.get("corrected_duration", 0) or
-                           call_data.get("duration", 0) or
-                           call_data.get("length", 0))
-            duration = parse_duration(raw_duration)
+            call_length = call_data.get("call_length")
+            corrected_duration = call_data.get("corrected_duration")
+
+            if call_length is not None and call_length != 0:
+                duration = parse_duration(call_length)
+            elif corrected_duration is not None and corrected_duration != 0:
+                duration = parse_duration(corrected_duration)
+            else:
+                raw_duration = (call_data.get("duration", 0) or call_data.get("length", 0))
+                duration = parse_duration(raw_duration)
 
             return {
                 "call_id": call_id,

@@ -2298,14 +2298,20 @@
 
         function formatCallDuration(seconds) {
             // Handle null, undefined, or invalid values
-            if (!seconds || seconds === 0 || isNaN(seconds)) {
+            if (!seconds && seconds !== 0) {
                 return "0 sec";
             }
             
-            // Ensure we have an integer
-            const totalSeconds = Math.floor(Number(seconds));
+            // Convert to number and ensure we have a valid number
+            const numSeconds = Number(seconds);
+            if (isNaN(numSeconds)) {
+                return "0 sec";
+            }
             
-            if (totalSeconds <= 0) {
+            // Ensure we have a positive integer
+            const totalSeconds = Math.max(0, Math.floor(numSeconds));
+            
+            if (totalSeconds === 0) {
                 return "0 sec";
             }
             
@@ -2318,7 +2324,7 @@
             } else if (minutes > 0) {
                 return `${minutes}m ${remainingSeconds}s`;
             } else {
-                return `${remainingSeconds}s`;
+                return `${remainingSeconds} sec`;
             }
         }
 
