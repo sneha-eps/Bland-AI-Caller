@@ -288,7 +288,7 @@ def get_call_prompt(city_name: str = "",
 
     CLINIC DETAILS (USE AS-IS WHEN NEEDED)
     • Website: w w w dot hill side primary care dot com
-    • Phone: 2 1 0 7 4 2 6 5 5 5
+    • Phone: 2107426555
     • Email: live oak office @ hill side primary care dot com
     • Hours: 8 a.m. to 5 p.m., Monday to Friday
     • Address: {full_address}
@@ -354,7 +354,7 @@ def get_call_prompt(city_name: str = "",
     RESPONSE FLOW BY INTENT
 
     • IF CONFIRM:
-    Say: "Excellent! We are glad to have you. Just a reminder to please arrive 15 minutes early for check-in. If you have any insurance changes, please email them to live oak office @ hill side primary care dot com. For any other issues, you can call the office at 2 1 0 7 4 2 6 5 5 5. Do you have any questions?"
+    Say: "Excellent! We are glad to have you. Just a reminder to please arrive 15 minutes early for check-in. If you have any insurance changes, please email them to live oak office @ hill side primary care dot com. For any other issues, you can call the office at 2107426555. Do you have any questions?"
     Wait for response.
     – If they request a detail (phone, email, address, provider, date, time), provide only that item clearly (spelled out as required), then wait for acknowledgment.
     – If they simply acknowledge, say: "You're welcome. Have a great day!" End the call.
