@@ -539,10 +539,14 @@ def parse_duration(duration_value):
     if not duration_value:
         return 0
 
+    print(f"🔍 Parsing duration: {duration_value} (type: {type(duration_value)})")
+
     try:
         # If it's already a number (seconds), return it
         if isinstance(duration_value, (int, float)):
-            return int(duration_value)
+            result = int(duration_value)
+            print(f"   Numeric value: {duration_value} -> {result} seconds")
+            return result
 
         # If it's a string, try to parse it
         if isinstance(duration_value, str):
@@ -554,7 +558,9 @@ def parse_duration(duration_value):
 
             # Try to convert to float first (most common case for call_length)
             try:
-                return int(float(duration_value))
+                result = int(float(duration_value))
+                print(f"   String-to-float: {duration_value} -> {result} seconds")
+                return result
             except ValueError:
                 pass
 
@@ -2911,13 +2917,20 @@ async def get_campaign_analytics(campaign_id: str):
                                     call_length = call_data.get("call_length")
                                     corrected_duration = call_data.get("corrected_duration")
 
+                                    print(f"🔍 Duration parsing for {call_details['patient_name']}:")
+                                    print(f"   call_length: {call_length} (type: {type(call_length)})")
+                                    print(f"   corrected_duration: {corrected_duration} (type: {type(corrected_duration)})")
+
                                     if call_length is not None and call_length != 0:
                                         duration = parse_duration(call_length)
+                                        print(f"   Using call_length: {call_length} -> {duration} seconds")
                                     elif corrected_duration is not None and corrected_duration != 0:
                                         duration = parse_duration(corrected_duration)
+                                        print(f"   Using corrected_duration: {corrected_duration} -> {duration} seconds")
                                     else:
                                         raw_duration = (call_data.get("duration", 0) or call_data.get("length", 0))
                                         duration = parse_duration(raw_duration)
+                                        print(f"   Using fallback duration: {raw_duration} -> {duration} seconds")
 
                                     call_details['duration'] = duration
                                     total_duration += duration
@@ -3118,13 +3131,20 @@ async def get_call_details(call_id: str):
             call_length = call_data.get("call_length")
             corrected_duration = call_data.get("corrected_duration")
 
+            print(f"🔍 Call details duration parsing for {call_id}:")
+            print(f"   call_length: {call_length} (type: {type(call_length)})")
+            print(f"   corrected_duration: {corrected_duration} (type: {type(corrected_duration)})")
+
             if call_length is not None and call_length != 0:
                 duration = parse_duration(call_length)
+                print(f"   Using call_length: {call_length} -> {duration} seconds")
             elif corrected_duration is not None and corrected_duration != 0:
                 duration = parse_duration(corrected_duration)
+                print(f"   Using corrected_duration: {corrected_duration} -> {duration} seconds")
             else:
                 raw_duration = (call_data.get("duration", 0) or call_data.get("length", 0))
                 duration = parse_duration(raw_duration)
+                print(f"   Using fallback duration: {raw_duration} -> {duration} seconds")
 
             return {
                 "call_id": call_id,
