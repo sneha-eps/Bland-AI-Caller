@@ -1097,13 +1097,14 @@ async def dashboard(request: Request):
 
             # Calculate actual duration from individual call results
             for result in campaign_results['results']:
-                if result.get('success') and result.get('duration'):
+                if result.get('success'):
                     # Use actual duration if available
                     duration = result.get('duration', 0)
-                    total_duration_seconds += duration
-                elif result.get('success'):
-                    # For calls without duration data, don't estimate
-                    total_duration_seconds += 0
+                    if duration and duration > 0:
+                        total_duration_seconds += duration
+                        print(f"📊 Adding duration: {duration}s from {result.get('patient_name', 'Unknown')} in {campaign_id}")
+                    
+        print(f"📊 Campaign {campaign_id}: {len(campaign_results.get('results', []))} calls processed")
 
     # Format total duration
     formatted_duration = format_duration_display(total_duration_seconds)
@@ -3407,13 +3408,14 @@ async def get_dashboard_metrics():
 
                 # Calculate actual duration from individual call results
                 for result in campaign_results['results']:
-                    if result.get('success') and result.get('duration'):
+                    if result.get('success'):
                         # Use actual duration if available
                         duration = result.get('duration', 0)
-                        total_duration_seconds += duration
-                    elif result.get('success'):
-                        # For calls without duration data, don't estimate
-                        total_duration_seconds += 0
+                        if duration and duration > 0:
+                            total_duration_seconds += duration
+                            print(f"📊 API: Adding duration: {duration}s from {result.get('patient_name', 'Unknown')} in {result_key}")
+                        
+            print(f"📊 API: Campaign {result_key}: {len(campaign_results.get('results', []))} calls processed")
 
         # Format total duration
         formatted_duration = format_duration_display(total_duration_seconds)
