@@ -1249,13 +1249,91 @@
             return `${minutes}m ${remainingSeconds}s`;
         }
 
-        // Format date time
+        // Format date time with comprehensive validation
         function formatDateTime(dateTimeStr) {
             try {
-                const date = new Date(dateTimeStr);
-                return date.toLocaleString();
+                // Handle null, undefined, or invalid inputs
+                if (!dateTimeStr || dateTimeStr === 'null' || dateTimeStr === 'undefined' || dateTimeStr === 'Invalid Date') {
+                    return 'Invalid Date';
+                }
+                
+                // Clean the string
+                const cleanedStr = String(dateTimeStr).trim();
+                
+                // Check for empty or very short strings
+                if (cleanedStr.length < 8) {
+                    return 'Invalid Date';
+                }
+                
+                // Check for common invalid patterns
+                if (/^(nan|null|none|invalid|unknown)$/i.test(cleanedStr)) {
+                    return 'Invalid Date';
+                }
+                
+                // Try to create a Date object
+                const date = new Date(cleanedStr);
+                
+                // Check if the date is valid
+                if (isNaN(date.getTime())) {
+                    // Try alternative parsing for malformed dates
+                    
+                    // Extract date parts using regex
+                    const dateMatch = cleanedStr.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
+                    const timeMatch = cleanedStr.match(/(\d{1,2}):(\d{1,2}):(\d{1,2})/);
+                    
+                    if (dateMatch) {
+                        const year = parseInt(dateMatch[1]);
+                        const month = parseInt(dateMatch[2]) - 1; // JS months are 0-indexed
+                        const day = parseInt(dateMatch[3]);
+                        
+                        let hour = 0, minute = 0, second = 0;
+                        if (timeMatch) {
+                            hour = parseInt(timeMatch[1]);
+                            minute = parseInt(timeMatch[2]);
+                            second = parseInt(timeMatch[3]);
+                        }
+                        
+                        // Validate ranges
+                        if (year >= 1970 && year <= 2100 && 
+                            month >= 0 && month <= 11 &&
+                            day >= 1 && day <= 31 &&
+                            hour >= 0 && hour <= 23 &&
+                            minute >= 0 && minute <= 59 &&
+                            second >= 0 && second <= 59) {
+                            
+                            const reconstructedDate = new Date(year, month, day, hour, minute, second);
+                            if (!isNaN(reconstructedDate.getTime())) {
+                                return reconstructedDate.toLocaleString() + ' (Reconstructed)';
+                            }
+                        }
+                    }
+                    
+                    // If all parsing fails, return a safe representation
+                    return `Invalid Date (${cleanedStr.substring(0, 20)}${cleanedStr.length > 20 ? '...' : ''})`;
+                }
+                
+                // Check for unreasonable dates
+                const year = date.getFullYear();
+                if (year < 1970 || year > 2100) {
+                    return `Invalid Date (Year: ${year})`;
+                }
+                
+                // Format the valid date
+                const options = {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit',
+                    hour12: true
+                };
+                
+                return date.toLocaleString('en-US', options);
+                
             } catch (error) {
-                return dateTimeStr;
+                console.error('Date formatting error:', error, 'Input:', dateTimeStr);
+                return `Date Error (${String(dateTimeStr).substring(0, 15)}...)`;
             }
         }
 

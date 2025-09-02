@@ -625,22 +625,37 @@ def format_duration_display(total_duration_seconds):
 
 
 def convert_utc_to_ist(utc_datetime_str):
-    """Convert UTC datetime string to IST with better formatting"""
-    if not utc_datetime_str or utc_datetime_str in ['N/A', 'Unknown', 'Invalid Date']:
+    """Convert UTC datetime string to IST with comprehensive error handling"""
+    if not utc_datetime_str or utc_datetime_str in ['N/A', 'Unknown', 'Invalid Date', 'null', 'None']:
         return "N/A"
 
     try:
         # Handle different datetime formats
         if isinstance(utc_datetime_str, str):
-            original_str = utc_datetime_str
+            original_str = utc_datetime_str.strip()
+            
+            # Skip empty or very short strings
+            if len(original_str) < 8:
+                return "Invalid Date"
+            
+            # Handle common invalid formats early
+            if original_str.lower() in ['invalid date', 'nan', 'null', 'none', '']:
+                return "Invalid Date"
+            
+            utc_datetime_str = original_str
             
             # Fix incomplete timezone formats like "+00:" to "+00:00"
-            if utc_datetime_str.endswith('+00:'):
-                utc_datetime_str = utc_datetime_str[:-4] + '+00:00'
+            if utc_datetime_str.endswith(('+00:', '-00:', '+01:', '-01:', '+02:', '-02:')):
+                utc_datetime_str = utc_datetime_str[:-1] + '00'
                 print(f"🔧 Fixed timezone format: {original_str} -> {utc_datetime_str}")
-            elif utc_datetime_str.endswith('-00:'):
-                utc_datetime_str = utc_datetime_str[:-4] + '-00:00'
-                print(f"🔧 Fixed timezone format: {original_str} -> {utc_datetime_str}")
+            
+            # Fix other malformed timezone patterns
+            import re
+            # Pattern for fixing "+nn:" or "-nn:" at the end
+            tz_pattern = re.compile(r'([+-]\d{2}):$')
+            if tz_pattern.search(utc_datetime_str):
+                utc_datetime_str = tz_pattern.sub(r'\1:00', utc_datetime_str)
+                print(f"🔧 Fixed timezone pattern: {original_str} -> {utc_datetime_str}")
             
             # Handle microseconds - fix malformed microsecond parts
             if '.' in utc_datetime_str and not utc_datetime_str.endswith('Z'):
@@ -661,15 +676,19 @@ def convert_utc_to_ist(utc_datetime_str):
                         microseconds = microsecond_and_tz[:tz_index]
                         timezone_part = microsecond_and_tz[tz_index:]
                         
-                        # Ensure microseconds are max 6 digits
-                        microseconds = microseconds[:6].ljust(6, '0')
+                        # Clean up microseconds - remove any non-digit characters
+                        microseconds = re.sub(r'[^\d]', '', microseconds)[:6]
+                        microseconds = microseconds.ljust(6, '0')
                         
                         # Reconstruct the datetime string
                         utc_datetime_str = parts[0] + '.' + microseconds + timezone_part
                     else:
-                        # No timezone found, just limit microseconds
-                        microseconds = microsecond_and_tz[:6].ljust(6, '0')
+                        # No timezone found, just clean and limit microseconds
+                        microseconds = re.sub(r'[^\d]', '', microsecond_and_tz)[:6]
+                        microseconds = microseconds.ljust(6, '0')
                         utc_datetime_str = parts[0] + '.' + microseconds
+                        
+                    print(f"🔧 Fixed microseconds: {original_str} -> {utc_datetime_str}")
 
             # Handle Z suffix
             if utc_datetime_str.endswith('Z'):
@@ -678,51 +697,105 @@ def convert_utc_to_ist(utc_datetime_str):
                 # Add UTC timezone if no timezone info
                 utc_datetime_str += '+00:00'
 
-        # Parse the datetime string
-        if any(tz in utc_datetime_str for tz in ['+', '-']) and not utc_datetime_str.endswith('UTC'):
-            utc_dt = datetime.fromisoformat(utc_datetime_str)
+        # Parse the datetime string with multiple strategies
+        utc_dt = None
+        
+        # Strategy 1: Direct ISO format parsing
+        try:
+            if any(tz in utc_datetime_str for tz in ['+', '-']) and not utc_datetime_str.endswith('UTC'):
+                utc_dt = datetime.fromisoformat(utc_datetime_str)
+            else:
+                # Fallback parsing for UTC suffix
+                clean_str = utc_datetime_str.replace('UTC', '').strip()
+                utc_dt = datetime.fromisoformat(clean_str)
+                utc_dt = utc_dt.replace(tzinfo=pytz.UTC)
+        except ValueError as e:
+            print(f"🔧 ISO parsing failed for {utc_datetime_str}: {e}")
+            
+        # Strategy 2: Manual parsing if ISO failed
+        if utc_dt is None:
+            try:
+                # Try to parse manually with strptime
+                date_patterns = [
+                    '%Y-%m-%dT%H:%M:%S.%f%z',
+                    '%Y-%m-%dT%H:%M:%S%z',
+                    '%Y-%m-%dT%H:%M:%S.%fZ',
+                    '%Y-%m-%dT%H:%M:%SZ',
+                    '%Y-%m-%d %H:%M:%S.%f%z',
+                    '%Y-%m-%d %H:%M:%S%z',
+                    '%Y-%m-%d %H:%M:%S.%f',
+                    '%Y-%m-%d %H:%M:%S',
+                    '%Y-%m-%dT%H:%M:%S.%f',
+                    '%Y-%m-%dT%H:%M:%S'
+                ]
+                
+                for pattern in date_patterns:
+                    try:
+                        if 'Z' in pattern and utc_datetime_str.endswith('Z'):
+                            utc_dt = datetime.strptime(utc_datetime_str, pattern)
+                            utc_dt = utc_dt.replace(tzinfo=pytz.UTC)
+                            break
+                        elif '%z' in pattern:
+                            utc_dt = datetime.strptime(utc_datetime_str, pattern)
+                            break
+                        elif '%z' not in pattern and 'Z' not in pattern:
+                            utc_dt = datetime.strptime(utc_datetime_str, pattern)
+                            utc_dt = utc_dt.replace(tzinfo=pytz.UTC)
+                            break
+                    except ValueError:
+                        continue
+                        
+                if utc_dt:
+                    print(f"🔧 Manual parsing succeeded for {utc_datetime_str}")
+                        
+            except Exception as e:
+                print(f"🔧 Manual parsing also failed for {utc_datetime_str}: {e}")
+
+        # If we successfully parsed the datetime, convert to IST
+        if utc_dt:
+            ist_timezone = pytz.timezone('Asia/Kolkata')
+            ist_dt = utc_dt.astimezone(ist_timezone)
+            return ist_dt.strftime("%Y-%m-%d %I:%M:%S %p IST")
         else:
-            # Fallback parsing for UTC suffix
-            clean_str = utc_datetime_str.replace('UTC', '').strip()
-            utc_dt = datetime.fromisoformat(clean_str)
-            utc_dt = utc_dt.replace(tzinfo=pytz.UTC)
-
-        # Convert to IST
-        ist_timezone = pytz.timezone('Asia/Kolkata')
-        ist_dt = utc_dt.astimezone(ist_timezone)
-
-        # Format as a nice readable string
-        return ist_dt.strftime("%Y-%m-%d %I:%M:%S %p IST")
+            raise ValueError("All parsing strategies failed")
 
     except Exception as e:
         print(f"❌ Error converting datetime {utc_datetime_str}: {e}")
-        # Try multiple fallback strategies
+        # Enhanced fallback strategies
         try:
             if isinstance(utc_datetime_str, str):
                 # Strategy 1: Extract just the date and time without timezone
                 import re
-                date_time_match = re.match(r'(\d{4}-\d{2}-\d{2})[T\s](\d{2}:\d{2}:\d{2})', utc_datetime_str)
-                if date_time_match:
-                    date_part = date_time_match.group(1)
-                    time_part = date_time_match.group(2)
-                    return f"{date_part} {time_part} (UTC)"
                 
-                # Strategy 2: Extract just the date
-                date_match = re.match(r'(\d{4}-\d{2}-\d{2})', utc_datetime_str)
-                if date_match:
-                    return f"{date_match.group(1)} (Time unavailable)"
+                # Try to extract ISO-like date and time
+                datetime_patterns = [
+                    r'(\d{4}-\d{2}-\d{2})[T\s](\d{2}:\d{2}:\d{2})',
+                    r'(\d{4}-\d{2}-\d{2})[T\s](\d{2}:\d{2})',
+                    r'(\d{4}-\d{2}-\d{2})'
+                ]
                 
-                # Strategy 3: If it looks like a timestamp, try basic parsing
-                if len(utc_datetime_str) > 10 and '-' in utc_datetime_str:
-                    # Try removing problematic parts and parsing
-                    clean_str = re.sub(r'\+\d{2}:?$', '', utc_datetime_str)  # Remove incomplete timezone
-                    clean_str = re.sub(r'\.\d+$', '', clean_str)  # Remove microseconds
-                    try:
-                        simple_dt = datetime.fromisoformat(clean_str)
-                        return simple_dt.strftime("%Y-%m-%d %H:%M:%S (UTC)")
-                    except:
-                        pass
-        except:
+                for pattern in datetime_patterns:
+                    match = re.search(pattern, utc_datetime_str)
+                    if match:
+                        if len(match.groups()) == 2:
+                            date_part = match.group(1)
+                            time_part = match.group(2)
+                            return f"{date_part} {time_part} (UTC)"
+                        else:
+                            date_part = match.group(1)
+                            return f"{date_part} (Time unavailable)"
+                
+                # If no pattern matches, try to extract any valid date
+                date_only_match = re.search(r'\d{4}-\d{1,2}-\d{1,2}', utc_datetime_str)
+                if date_only_match:
+                    return f"{date_only_match.group(0)} (Parsed from: {utc_datetime_str[:20]}...)"
+                
+                # Last resort: return a safe representation
+                safe_repr = re.sub(r'[^\w\s\-\:\.T]', '', utc_datetime_str)[:30]
+                return f"Date parsing failed ({safe_repr})"
+                
+        except Exception as fallback_error:
+            print(f"🔧 Even fallback parsing failed: {fallback_error}")
             pass
         
         return "Invalid Date"
