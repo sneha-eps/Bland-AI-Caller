@@ -1171,6 +1171,8 @@
                 <i class="fas {% if has_api_key %}fa-check-circle{% else %}fa-exclamation-triangle{% endif %}"></i>
                 {% if has_api_key %}API Connected{% else %}API Not Configured{% endif %}
             </div>
+            <!-- Placeholder for logout button if it exists on other pages -->
+            <!-- <button id="logoutBtn" class="btn-secondary" style="padding: 0.5rem 1rem;">Logout</button> -->
         </div>
     </div>
 
@@ -2747,6 +2749,25 @@
                 console.error(`Exception fetching call details for ${callId}:`, error);
                 return null;
             }
+        }
+
+        // Add event listener for logout button
+        const logoutBtn = document.getElementById('logoutBtn');
+        if (logoutBtn) {
+            logoutBtn.addEventListener('click', async () => {
+                try {
+                    const response = await fetch('/api/logout', { method: 'POST' });
+                    const data = await response.json();
+                    if (data.success) {
+                        window.location.href = '/login'; // Redirect to login page
+                    } else {
+                        alert('Logout failed. Please try again.');
+                    }
+                } catch (error) {
+                    console.error('Error during logout:', error);
+                    alert('An error occurred during logout.');
+                }
+            });
         }
 
     </script>

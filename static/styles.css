@@ -286,9 +286,69 @@ body {
 }
 
 .theme-toggle:hover {
+    background: var(--bg-secondary);
+}
+
+/* Header actions and user menu */
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.user-menu {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-left: 1rem;
+    padding-left: 1rem;
+    border-left: 1px solid var(--border-color);
+}
+
+.user-info {
+    color: var(--text-primary);
+    font-size: 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.user-info i {
+    font-size: 1.2rem;
+    color: var(--primary-color);
+}
+
+.header-action {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 0.5rem 1rem;
+    border-radius: var(--border-radius-sm);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.header-action:hover {
     background: var(--bg-tertiary);
-    transform: rotate(180deg) scale(1.1);
-    box-shadow: var(--shadow-md);
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+}
+
+.logout-btn {
+    background: var(--danger-color) !important;
+    color: white !important;
+    border-color: var(--danger-color) !important;
+}
+
+.logout-btn:hover {
+    background: #c82333 !important;
+    border-color: #c82333 !important;
 }
 
 .status-badge {
@@ -1473,9 +1533,6 @@ input[type="file"] {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    padding: 0.5rem;
-    border-radius: var(--border-radius-sm);
-    background: var(--bg-secondary);
 }
 
 .user-info i {
@@ -1495,24 +1552,25 @@ input[type="file"] {
     display: flex;
     align-items: center;
     gap: 0.5rem;
-    box-shadow: var(--shadow-sm);
+    text-decoration: none;
+    font-weight: 500;
 }
 
 .header-action:hover {
     background: var(--bg-tertiary);
     transform: translateY(-1px);
-    box-shadow: var(--shadow-md);
+    box-shadow: var(--shadow-sm);
 }
 
 .logout-btn {
-    background: var(--gradient-danger) !important;
+    background: var(--danger-color) !important;
     color: white !important;
-    border: none !important;
+    border-color: var(--danger-color) !important;
 }
 
 .logout-btn:hover {
-    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%) !important;
-    box-shadow: 0 6px 15px rgba(239, 68, 68, 0.4) !important;
+    background: #c82333 !important;
+    border-color: #c82333 !important;
 }
 
 /* Enhanced List Styles */
