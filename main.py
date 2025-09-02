@@ -321,7 +321,7 @@ def get_call_prompt(city_name: str = "",
 
     CONVERSATION FLOW (STRICT ORDER)
     1) OPENING
-    **IMPORTANT:** Deliver this opening line slowly and very clearly, with a distinct pause between the two parts.
+    **IMPORTANT:** Deliver this opening line slowly and very clearly, with a distinct pause between the two parts. Wait for the patient's response before proceeding.
     Respond to their initial greeting with: "Hi, I'm calling from [clinic name]. Am I speaking with {patient_name}?"
 
     REMEMBER: Any greeting after this opening should be treated as a polite acknowledgment, not a conversation restart.
@@ -3062,6 +3062,9 @@ async def get_campaign_analytics(campaign_id: str):
                 print(f"   Stored Call ID: {stored_call_id}")
                 print(f"   Call ID Type: {type(stored_call_id)}")
                 print(f"   Success Flag: {result.get('success', False)}")
+
+                # Initialize stored_call_data (this is the stored result itself)
+                stored_call_data = result
 
                 # If call was successful and has call_id, try to get detailed info
                 if result.get('success') and result.get('call_id'):
