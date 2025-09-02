@@ -5,16 +5,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Bland AI Call Center</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="/static/styles.css" rel="stylesheet">
+    <script src="/static/common.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        /* Page-specific styles for login.html */
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -22,111 +19,8 @@
         }
 
         .auth-container {
-            background: white;
-            padding: 2rem;
-            border-radius: 10px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-            width: 100%;
+            background: var(--bg-primary);
             max-width: 400px;
-        }
-
-        .auth-header {
-            text-align: center;
-            margin-bottom: 2rem;
-        }
-
-        .auth-header h1 {
-            color: #333;
-            margin-bottom: 0.5rem;
-        }
-
-        .auth-header p {
-            color: #666;
-            font-size: 0.9rem;
-        }
-
-        .form-group {
-            margin-bottom: 1rem;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            color: #333;
-            font-weight: 500;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 1rem;
-        }
-
-        .form-group input:focus {
-            outline: none;
-            border-color: #667eea;
-        }
-
-        .auth-btn {
-            width: 100%;
-            padding: 0.75rem;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            border-radius: 5px;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: transform 0.2s;
-            margin-bottom: 1rem;
-        }
-
-        .auth-btn:hover {
-            transform: translateY(-1px);
-        }
-
-        .auth-btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .auth-switch {
-            text-align: center;
-            margin-top: 1rem;
-        }
-
-        .auth-switch a {
-            color: #667eea;
-            text-decoration: none;
-            font-weight: 500;
-        }
-
-        .auth-switch a:hover {
-            text-decoration: underline;
-        }
-
-        .user-types {
-            margin-top: 2rem;
-            padding: 1rem;
-            background: #f8f9fa;
-            border-radius: 5px;
-        }
-
-        .user-types h3 {
-            color: #333;
-            margin-bottom: 1rem;
-            font-size: 1rem;
-        }
-
-        .user-type {
-            margin-bottom: 0.5rem;
-            font-size: 0.9rem;
-        }
-
-        .user-type strong {
-            color: #667eea;
         }
 
         .error, .success {
@@ -137,15 +31,15 @@
         }
 
         .error {
-            color: #dc3545;
-            background: #f8d7da;
-            border: 1px solid #f5c6cb;
+            color: var(--danger-color);
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
         }
 
         .success {
-            color: #155724;
-            background: #d4edda;
-            border: 1px solid #c3e6cb;
+            color: var(--success-color);
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.2);
         }
 
         .loading {
@@ -155,19 +49,14 @@
         }
 
         .spinner {
-            border: 2px solid #f3f3f3;
-            border-top: 2px solid #667eea;
+            border: 2px solid var(--border-color);
+            border-top: 2px solid var(--primary-color);
             border-radius: 50%;
             width: 20px;
             height: 20px;
             animation: spin 1s linear infinite;
             display: inline-block;
             margin-right: 0.5rem;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
         }
     </style>
 </head>

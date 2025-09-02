@@ -5,16 +5,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sign Up - Bland AI Call Center</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="/static/styles.css" rel="stylesheet">
+    <script src="/static/common.js"></script>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        /* Page-specific styles for signup.html */
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
             min-height: 100vh;
             display: flex;
             align-items: center;
@@ -22,11 +19,7 @@
         }
 
         .signup-container {
-            background: white;
-            padding: 2rem;
-            border-radius: 10px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
-            width: 100%;
+            background: var(--bg-primary);
             max-width: 450px;
         }
 
@@ -36,54 +29,34 @@
         }
 
         .signup-header h1 {
-            color: #333;
+            color: var(--text-primary);
             margin-bottom: 0.5rem;
+            font-size: 1.75rem;
+            font-weight: 700;
         }
 
         .signup-header p {
-            color: #666;
+            color: var(--text-secondary);
             font-size: 0.9rem;
-        }
-
-        .form-group {
-            margin-bottom: 1rem;
-        }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 0.5rem;
-            color: #333;
-            font-weight: 500;
-        }
-
-        .form-group input, .form-group select {
-            width: 100%;
-            padding: 0.75rem;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-size: 1rem;
-        }
-
-        .form-group input:focus, .form-group select:focus {
-            outline: none;
-            border-color: #667eea;
         }
 
         .signup-btn {
             width: 100%;
             padding: 0.75rem;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, var(--primary-color) 0%, #7c3aed 100%);
             color: white;
             border: none;
-            border-radius: 5px;
+            border-radius: 8px;
             font-size: 1rem;
+            font-weight: 600;
             cursor: pointer;
-            transition: transform 0.2s;
+            transition: var(--transition);
             margin-bottom: 1rem;
         }
 
         .signup-btn:hover {
             transform: translateY(-1px);
+            box-shadow: 0 8px 20px rgba(79, 70, 229, 0.3);
         }
 
         .signup-btn:disabled {
@@ -98,7 +71,7 @@
         }
 
         .login-link a {
-            color: #667eea;
+            color: var(--primary-color);
             text-decoration: none;
             font-weight: 500;
         }
@@ -115,15 +88,15 @@
         }
 
         .error {
-            color: #dc3545;
-            background: #f8d7da;
-            border: 1px solid #f5c6cb;
+            color: var(--danger-color);
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
         }
 
         .success {
-            color: #155724;
-            background: #d4edda;
-            border: 1px solid #c3e6cb;
+            color: var(--success-color);
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.2);
         }
 
         .loading {
@@ -133,25 +106,14 @@
         }
 
         .spinner {
-            border: 2px solid #f3f3f3;
-            border-top: 2px solid #667eea;
+            border: 2px solid var(--border-color);
+            border-top: 2px solid var(--primary-color);
             border-radius: 50%;
             width: 20px;
             height: 20px;
             animation: spin 1s linear infinite;
             display: inline-block;
             margin-right: 0.5rem;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-
-        .role-info {
-            font-size: 0.8rem;
-            color: #666;
-            margin-top: 0.25rem;
         }
     </style>
 </head>
