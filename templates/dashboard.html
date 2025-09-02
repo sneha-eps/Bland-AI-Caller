@@ -1165,14 +1165,26 @@
         // Function to toggle client list visibility
         function toggleClientsList() {
             const clientsListSection = document.getElementById('clientsListSection');
+            const campaignsListSection = document.getElementById('campaignsListSection');
             const isVisible = clientsListSection.style.display === 'block';
+            
+            // Close campaigns list if it's open
+            campaignsListSection.style.display = 'none';
+            
+            // Toggle clients list
             clientsListSection.style.display = isVisible ? 'none' : 'block';
         }
 
         // Function to toggle campaign list visibility
         function toggleCampaignsList() {
+            const clientsListSection = document.getElementById('clientsListSection');
             const campaignsListSection = document.getElementById('campaignsListSection');
             const isVisible = campaignsListSection.style.display === 'block';
+            
+            // Close clients list if it's open
+            clientsListSection.style.display = 'none';
+            
+            // Toggle campaigns list
             campaignsListSection.style.display = isVisible ? 'none' : 'block';
         }
 
