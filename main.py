@@ -3086,7 +3086,10 @@ async def get_call_details(call_id: str):
         raise HTTPException(status_code=400,
                             detail="BLAND_API_KEY not found in Secrets.")
 
+    # --- THIS IS THE FIX ---
+    # Initialize the variable to None before the try block
     stored_call_data = None
+    # --------------------
 
     try:
         print(f"🔍 Fetching call details for {call_id}")
@@ -3115,9 +3118,9 @@ async def get_call_details(call_id: str):
             print(f"📊 API call data keys: {list(call_data.keys())}")
 
             # Get transcript from multiple possible fields
-            transcript = (call_data.get("transcript", "") or
-                         call_data.get("concatenated_transcript", "") or
-                         (stored_call_data.get("transcript", "") if stored_call_data else ""))
+            transcript = (call_data.get("transcript", "") or 
+                          call_data.get("concatenated_transcript", "") or
+                          (stored_call_data.get("transcript", "") if stored_call_data else ""))
 
             # Use stored data if available, otherwise analyze fresh
             if stored_call_data and stored_call_data.get("call_status"):
@@ -3132,19 +3135,19 @@ async def get_call_details(call_id: str):
             corrected_duration = call_data.get("corrected_duration")
 
             print(f"🔍 Call details duration parsing for {call_id}:")
-            print(f"   call_length: {call_length} (type: {type(call_length)})")
-            print(f"   corrected_duration: {corrected_duration} (type: {type(corrected_duration)})")
+            print(f"  call_length: {call_length} (type: {type(call_length)})")
+            print(f"  corrected_duration: {corrected_duration} (type: {type(corrected_duration)})")
 
             if call_length is not None and call_length != 0:
                 duration = parse_duration(call_length)
-                print(f"   Using call_length: {call_length} -> {duration} seconds")
+                print(f"  Using call_length: {call_length} -> {duration} seconds")
             elif corrected_duration is not None and corrected_duration != 0:
                 duration = parse_duration(corrected_duration)
-                print(f"   Using corrected_duration: {corrected_duration} -> {duration} seconds")
+                print(f"  Using corrected_duration: {corrected_duration} -> {duration} seconds")
             else:
                 raw_duration = (call_data.get("duration", 0) or call_data.get("length", 0))
                 duration = parse_duration(raw_duration)
-                print(f"   Using fallback duration: {raw_duration} -> {duration} seconds")
+                print(f"  Using fallback duration: {raw_duration} -> {duration} seconds")
 
             return {
                 "call_id": call_id,
