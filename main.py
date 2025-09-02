@@ -1090,23 +1090,19 @@ async def dashboard(request: Request):
     total_calls = 0
     total_duration_seconds = 0
 
+    # --- THIS IS THE CORRECTED LOGIC ---
     # Aggregate data from all campaign results (including multiple runs)
     for result_key, campaign_results in campaign_results_db.items():
         if 'results' in campaign_results:
             total_calls += len(campaign_results['results'])
 
-            # Calculate actual duration from individual call results
-            campaign_duration = 0
+            # Sum the actual 'duration' field from each call result
             for result in campaign_results['results']:
-                if result.get('success'):
-                    # Use actual duration if available
-                    duration = result.get('duration', 0)
-                    if duration and duration > 0:
-                        total_duration_seconds += duration
-                        campaign_duration += duration
-                        print(f"📊 Adding duration: {duration}s from {result.get('patient_name', 'Unknown')} in {result_key}")
-
-            print(f"📊 Campaign {result_key}: {len(campaign_results.get('results', []))} calls processed, {campaign_duration}s total duration")
+                # The 'duration' is already parsed into seconds by the webhook
+                duration_in_seconds = result.get('duration', 0)
+                if isinstance(duration_in_seconds, int):
+                    total_duration_seconds += duration_in_seconds
+    # --- END OF CORRECTION ---
 
     # Format total duration
     formatted_duration = format_duration_display(total_duration_seconds)
