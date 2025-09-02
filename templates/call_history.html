@@ -982,46 +982,88 @@
                     }
                 }
 
-                // Now process campaign results with enhanced analytics data
+                // Process each unique campaign and use analytics data directly to avoid duplicates
+                const processedCalls = new Map(); // Use Map to track unique calls by call_id
+                
+                // Process analytics data instead of debug data to get accurate, non-duplicated calls
+                Object.entries(campaignAnalytics).forEach(([campaignId, analytics]) => {
+                    if (!analytics || !analytics.calls) return;
+                    
+                    const campaign = allCampaigns[campaignId] || { name: 'Unknown Campaign', client_id: null };
+                    const client = campaign.client_id ? allClients[campaign.client_id] : { name: 'Unknown Client' };
+                    
+                    // Process each call from analytics (this contains the most accurate data)
+                    analytics.calls.forEach(callData => {
+                        // Create unique key for each call - use call_id if available, otherwise patient+phone combination
+                        const uniqueKey = callData.call_id || `${callData.patient_name}_${callData.phone_number}`;
+                        
+                        // Only process if we haven't seen this exact call before
+                        if (!processedCalls.has(uniqueKey)) {
+                            const callRecord = {
+                                clientName: client ? client.name : 'Unknown Client',
+                                campaignName: campaign.name || 'Unknown Campaign',
+                                patientName: callData.patient_name,
+                                phoneNumber: callData.phone_number || 'Unknown',
+                                status: callData.call_status || 'busy_voicemail',
+                                duration: callData.duration || 0,
+                                dateTime: callData.created_at || 'Unknown',
+                                finalSummary: callData.final_summary || 'No summary available',
+                                transcript: (callData.transcript && callData.transcript.trim()) ? 'View Transcript' : 'No transcript',
+                                callId: callData.call_id,
+                                success: callData.success,
+                                campaignId: campaignId,
+                                hasEnhancedData: true,
+                                dataSource: 'analytics'
+                            };
+                            
+                            processedCalls.set(uniqueKey, callRecord);
+                            allCallHistory.push(callRecord);
+                        } else {
+                            console.log(`Skipping duplicate call: ${callData.patient_name} (${uniqueKey})`);
+                        }
+                    });
+                });
+                
+                // Handle any campaigns that don't have analytics data by falling back to debug data
                 Object.entries(debugData.debug_info.campaign_details).forEach(([campaignRunId, campaignResults]) => {
                     const campaignId = campaignResults.is_csv_upload ? 
                         campaignRunId : 
                         campaignRunId.split('_run_')[0];
                     
+                    // Skip if we already processed this campaign through analytics
+                    if (campaignAnalytics[campaignId]) {
+                        return;
+                    }
+                    
                     const campaign = allCampaigns[campaignId] || { name: campaignResults.campaign_name, client_id: null };
                     const client = campaign.client_id ? allClients[campaign.client_id] : { name: campaignResults.client_name };
-                    
-                    // Get analytics data for this campaign
-                    const analytics = campaignAnalytics[campaignId];
 
                     campaignResults.call_details.forEach(callDetail => {
-                        // Find matching call in analytics to get enhanced data
-                        let enhancedCallData = null;
-                        if (analytics && analytics.calls) {
-                            enhancedCallData = analytics.calls.find(call => 
-                                call.call_id === callDetail.call_id || 
-                                call.patient_name === callDetail.patient_name
-                            );
+                        const uniqueKey = callDetail.call_id || `${callDetail.patient_name}_${callDetail.phone_number}`;
+                        
+                        // Only add if not already processed
+                        if (!processedCalls.has(uniqueKey)) {
+                            const callRecord = {
+                                clientName: client ? client.name : 'Unknown Client',
+                                campaignName: campaign.name || 'Unknown Campaign',
+                                patientName: callDetail.patient_name,
+                                phoneNumber: callDetail.phone_number || 'Unknown',
+                                status: callDetail.call_status || 'busy_voicemail',
+                                duration: 0,
+                                dateTime: campaignResults.started_at || 'Unknown',
+                                finalSummary: callDetail.final_summary || 'No summary available',
+                                transcript: callDetail.has_transcript ? 'View Transcript' : 'No transcript',
+                                callId: callDetail.call_id,
+                                success: callDetail.success,
+                                campaignId: campaignId,
+                                campaignRunId: campaignRunId,
+                                hasEnhancedData: false,
+                                dataSource: 'fallback'
+                            };
+                            
+                            processedCalls.set(uniqueKey, callRecord);
+                            allCallHistory.push(callRecord);
                         }
-
-                        const callRecord = {
-                            clientName: client ? client.name : 'Unknown Client',
-                            campaignName: campaign.name || 'Unknown Campaign',
-                            patientName: callDetail.patient_name,
-                            phoneNumber: enhancedCallData ? enhancedCallData.phone_number : (callDetail.phone_number || 'Unknown'),
-                            status: enhancedCallData ? enhancedCallData.call_status : (callDetail.call_status || 'busy_voicemail'),
-                            duration: enhancedCallData ? enhancedCallData.duration : 0,
-                            dateTime: enhancedCallData ? enhancedCallData.created_at : (campaignResults.started_at || 'Unknown'),
-                            finalSummary: enhancedCallData ? enhancedCallData.final_summary : (callDetail.final_summary || 'No summary available'),
-                            transcript: (enhancedCallData && enhancedCallData.transcript) ? 'View Transcript' : 
-                                       (callDetail.has_transcript ? 'View Transcript' : 'No transcript'),
-                            callId: callDetail.call_id,
-                            success: callDetail.success,
-                            campaignId: campaignId,
-                            campaignRunId: campaignRunId,
-                            hasEnhancedData: !!enhancedCallData
-                        };
-                        allCallHistory.push(callRecord);
                     });
                 });
 

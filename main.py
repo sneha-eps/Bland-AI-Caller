@@ -2962,8 +2962,8 @@ async def get_campaign_analytics(campaign_id: str):
                 }
             }
 
-        # Aggregate all results from all runs of this campaign
-        all_results = []
+        # Aggregate results from all runs but deduplicate by call_id or patient+phone combination
+        unique_calls_map = {}
         total_runs = len(campaign_runs)
 
         # Get the first run's started_at as fallback for timestamps
@@ -2971,9 +2971,34 @@ async def get_campaign_analytics(campaign_id: str):
         if campaign_runs:
             first_run_started_at = next(iter(campaign_runs.values())).get('started_at', datetime.now().isoformat())
 
-        for run_key, run_data in campaign_runs.items():
-            all_results.extend(run_data.get('results', []))
-            print(f"📊 Found run {run_key} with {len(run_data.get('results', []))} calls")
+        # Process runs in chronological order (newer runs override older ones for same patient)
+        sorted_runs = sorted(campaign_runs.items(), key=lambda x: x[1].get('started_at', ''))
+        
+        for run_key, run_data in sorted_runs:
+            run_results = run_data.get('results', [])
+            print(f"📊 Processing run {run_key} with {len(run_results)} calls")
+            
+            for result in run_results:
+                # Create unique identifier for each call
+                call_id = result.get('call_id')
+                patient_name = result.get('patient_name', 'Unknown')
+                phone_number = result.get('phone_number', 'Unknown')
+                
+                # Use call_id as primary key, fallback to patient+phone combination
+                unique_key = call_id if call_id else f"{patient_name}_{phone_number}"
+                
+                # If this is a newer call for the same patient/call_id, update it
+                if unique_key not in unique_calls_map or (
+                    call_id and unique_calls_map[unique_key].get('call_id') != call_id
+                ):
+                    unique_calls_map[unique_key] = result
+                    print(f"📊 Added/Updated call: {patient_name} with key {unique_key}")
+                else:
+                    print(f"📊 Skipping duplicate call: {patient_name} with key {unique_key}")
+
+        # Convert back to list for processing
+        all_results = list(unique_calls_map.values())
+        print(f"📊 After deduplication: {len(all_results)} unique calls from {total_runs} runs")
 
         # Get detailed call information for each call with batch processing
         calls_with_details = []
@@ -3065,40 +3090,61 @@ async def get_campaign_analytics(campaign_id: str):
                                     call_details['duration'] = duration
                                     total_duration += duration
 
-                                    # Check if call already has stored status from webhook
-                                    stored_status = result.get('call_status')
-                                    stored_transcript = result.get('transcript', '')
-                                    stored_final_summary = result.get('final_summary', '')
+                                    # Priority order for status extraction: 
+                                    # 1. Fresh transcript analysis (most accurate)
+                                    # 2. Stored webhook data with summary
+                                    # 3. Stored status only
+                                    # 4. Default fallback
 
-                                    if stored_final_summary and stored_final_summary.strip():
-                                        # Use stored final summary to determine status - this is the most accurate
-                                        call_status, standardized_summary = analyze_call_status_from_summary(stored_final_summary, stored_transcript or transcript)
+                                    call_status = 'busy_voicemail'  # Default
+                                    final_summary = "No summary available"
+                                    analysis_source = "default"
+
+                                    # Priority 1: Fresh transcript from API (most accurate)
+                                    if transcript and transcript.strip():
+                                        extracted_summary = extract_final_summary(transcript)
+                                        call_status, standardized_summary = analyze_call_status_from_summary(extracted_summary, transcript)
                                         final_summary = standardized_summary
-                                        transcript = stored_transcript or transcript
-                                        call_details['analysis_notes'] = "Status determined from stored final summary"
-                                    elif stored_status and stored_transcript:
-                                        # Use stored data from webhook if no final summary
-                                        call_status = stored_status
-                                        transcript = stored_transcript
+                                        analysis_source = f"fresh_transcript_{len(transcript)}_chars"
+                                        print(f"📊 Using fresh transcript for {call_details['patient_name']}: {call_status}")
+                                    
+                                    # Priority 2: Stored final summary from webhook
+                                    elif result.get('final_summary') and result.get('final_summary').strip():
+                                        stored_final_summary = result.get('final_summary')
+                                        call_status, standardized_summary = analyze_call_status_from_summary(stored_final_summary, result.get('transcript', ''))
+                                        final_summary = standardized_summary
+                                        analysis_source = "stored_summary"
+                                        print(f"📊 Using stored summary for {call_details['patient_name']}: {call_status}")
+                                    
+                                    # Priority 3: Stored status from webhook
+                                    elif result.get('call_status'):
+                                        call_status = result.get('call_status')
                                         final_summary = get_standardized_summary_for_status(call_status)
-                                        call_details['analysis_notes'] = "Used stored webhook data"
+                                        transcript = result.get('transcript', '')
+                                        analysis_source = "stored_status"
+                                        print(f"📊 Using stored status for {call_details['patient_name']}: {call_status}")
+                                    
+                                    # Priority 4: No good data available
                                     else:
-                                        # Analyze fresh transcript and extract final summary
-                                        if transcript and transcript.strip():
-                                            call_status, standardized_summary = analyze_call_status_from_summary(extract_final_summary(transcript), transcript)
-                                            final_summary = standardized_summary
-                                            call_details['analysis_notes'] = f"Analyzed {len(transcript)} characters from API"
-                                        else:
-                                            call_status = 'busy_voicemail'
-                                            final_summary = "No transcript available"
-                                            call_details['analysis_notes'] = "No transcript in API response"
+                                        call_status = 'busy_voicemail'
+                                        final_summary = "No transcript or status data available"
+                                        analysis_source = "no_data_fallback"
+                                        print(f"📊 No data available for {call_details['patient_name']}, using fallback")
+
+                                    call_details['analysis_notes'] = analysis_source
 
                                     call_details['call_status'] = call_status
                                     call_details['transcript'] = transcript
                                     call_details['final_summary'] = final_summary
 
-                                    # Convert created_at to IST
-                                    call_details['created_at'] = convert_utc_to_ist(call_data.get('created_at', first_run_started_at))
+                                    # Convert created_at to IST - use actual call timestamp, not campaign start time
+                                    actual_call_time = call_data.get('created_at') or call_data.get('started_at')
+                                    if actual_call_time:
+                                        call_details['created_at'] = convert_utc_to_ist(actual_call_time)
+                                    else:
+                                        # Fallback to stored data or campaign start time
+                                        fallback_time = stored_call_data.get('created_at') if stored_call_data else first_run_started_at
+                                        call_details['created_at'] = convert_utc_to_ist(fallback_time)
 
                                     # Count the status
                                     if call_status in status_counts:
