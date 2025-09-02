@@ -1,0 +1,1177 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Call History - Bland AI Call Center</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #4f46e5;
+            --primary-hover: #4338ca;
+            --success-color: #10b981;
+            --danger-color: #ef4444;
+            --warning-color: #f59e0b;
+            --sidebar-width: 280px;
+            --header-height: 70px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Light theme variables */
+        [data-theme="light"] {
+            --bg-primary: #ffffff;
+            --bg-secondary: #f8fafc;
+            --bg-tertiary: #f1f5f9;
+            --text-primary: #1e293b;
+            --text-secondary: #64748b;
+            --text-tertiary: #94a3b8;
+            --border-color: #e2e8f0;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Dark theme variables */
+        [data-theme="dark"] {
+            --bg-primary: #0f172a;
+            --bg-secondary: #1e293b;
+            --bg-tertiary: #334155;
+            --text-primary: #f8fafc;
+            --text-secondary: #cbd5e1;
+            --text-tertiary: #94a3b8;
+            --border-color: #334155;
+            --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4);
+            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4);
+            --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.4);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            transition: var(--transition);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: var(--sidebar-width);
+            height: 100vh;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border-color);
+            z-index: 1000;
+            transform: translateX(-100%);
+            transition: var(--transition);
+            overflow-y: auto;
+        }
+
+        .sidebar.open {
+            transform: translateX(0);
+        }
+
+        .sidebar-header {
+            padding: 1.5rem;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .sidebar-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            text-decoration: none;
+        }
+
+        .sidebar-logo i {
+            font-size: 1.5rem;
+        }
+
+        .sidebar-nav {
+            padding: 1rem 0;
+        }
+
+        .nav-section {
+            margin-bottom: 2rem;
+        }
+
+        .nav-section-title {
+            padding: 0.5rem 1.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-tertiary);
+            margin-bottom: 0.5rem;
+        }
+
+        .nav-link {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 0.75rem 1.5rem;
+            color: var(--text-secondary);
+            text-decoration: none;
+            transition: var(--transition);
+            border-left: 3px solid transparent;
+        }
+
+        .nav-link:hover {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+        }
+
+        .nav-link.active {
+            background: var(--bg-tertiary);
+            color: var(--primary-color);
+            border-left-color: var(--primary-color);
+        }
+
+        .nav-link i {
+            width: 20px;
+            text-align: center;
+        }
+
+        /* Header */
+        .header {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: var(--header-height);
+            background: var(--bg-primary);
+            border-bottom: 1px solid var(--border-color);
+            z-index: 999;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1.5rem;
+            transition: var(--transition);
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .sidebar-toggle {
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1.25rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 8px;
+            transition: var(--transition);
+        }
+
+        .sidebar-toggle:hover {
+            background: var(--bg-secondary);
+        }
+
+        .header-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .theme-toggle {
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 1.25rem;
+            cursor: pointer;
+            padding: 0.5rem;
+            border-radius: 8px;
+            transition: var(--transition);
+        }
+
+        .theme-toggle:hover {
+            background: var(--bg-secondary);
+        }
+
+        .status-badge {
+            padding: 0.5rem 1rem;
+            border-radius: 25px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-connected {
+            background: var(--success-color);
+            color: white;
+        }
+
+        .status-error {
+            background: var(--danger-color);
+            color: white;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-top: var(--header-height);
+            padding: 2rem;
+            transition: var(--transition);
+        }
+
+        .main-content.sidebar-open {
+            margin-left: var(--sidebar-width);
+        }
+
+        .page-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2rem;
+        }
+
+        .page-title {
+            font-size: 2rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* Filters Section */
+        .filters-section {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border-color);
+        }
+
+        .filters-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            align-items: end;
+        }
+
+        .filter-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .filter-group label {
+            font-weight: 600;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+        }
+
+        .filter-group select,
+        .filter-group input {
+            padding: 0.75rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            transition: var(--transition);
+        }
+
+        .filter-group select:focus,
+        .filter-group input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #7c3aed 100%);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            text-decoration: none;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(79, 70, 229, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-secondary);
+        }
+
+        /* Call History Table */
+        .call-history-section {
+            background: var(--bg-secondary);
+            border-radius: 16px;
+            padding: 2rem;
+            box-shadow: var(--shadow-lg);
+            border: 1px solid var(--border-color);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1.5rem;
+        }
+
+        .section-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .results-count {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            background: var(--bg-tertiary);
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+
+        .call-history-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--bg-primary);
+        }
+
+        .call-history-table th {
+            background: var(--bg-tertiary);
+            color: var(--text-primary);
+            font-weight: 600;
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .call-history-table td {
+            padding: 1rem;
+            border-bottom: 1px solid var(--border-color);
+            vertical-align: top;
+        }
+
+        .call-history-table tr:hover {
+            background: var(--bg-secondary);
+        }
+
+        .status-badge-small {
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .status-confirmed {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success-color);
+        }
+
+        .status-cancelled {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger-color);
+        }
+
+        .status-rescheduled {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning-color);
+        }
+
+        .status-busy_voicemail {
+            background: rgba(107, 114, 128, 0.1);
+            color: var(--text-secondary);
+        }
+
+        .status-not_available {
+            background: rgba(156, 163, 175, 0.1);
+            color: var(--text-secondary);
+        }
+
+        .status-wrong_number {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger-color);
+        }
+
+        .status-failed {
+            background: rgba(239, 68, 68, 0.1);
+            color: var(--danger-color);
+        }
+
+        .transcript-preview {
+            max-width: 200px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            cursor: pointer;
+            color: var(--primary-color);
+        }
+
+        .transcript-preview:hover {
+            text-decoration: underline;
+        }
+
+        .loading-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-secondary);
+        }
+
+        .loading-state i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 3rem;
+            color: var(--text-secondary);
+        }
+
+        .empty-state i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        /* Overlay */
+        .sidebar-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 999;
+            opacity: 0;
+            visibility: hidden;
+            transition: var(--transition);
+        }
+
+        .sidebar-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        /* Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+        }
+
+        .modal-content {
+            background: var(--bg-primary);
+            margin: 2% auto;
+            padding: 0;
+            border-radius: 16px;
+            width: 90%;
+            max-width: 800px;
+            max-height: 90vh;
+            overflow: hidden;
+            box-shadow: var(--shadow-xl);
+            border: 1px solid var(--border-color);
+        }
+
+        .modal-header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, #7c3aed 100%);
+            color: white;
+            padding: 1.5rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .modal-header h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+            opacity: 0.8;
+            transition: var(--transition);
+        }
+
+        .modal-close:hover {
+            opacity: 1;
+        }
+
+        .modal-body {
+            padding: 2rem;
+            max-height: 70vh;
+            overflow-y: auto;
+        }
+
+        .transcript-content {
+            white-space: pre-wrap;
+            line-height: 1.6;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            background: var(--bg-secondary);
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border-color);
+        }
+
+        @media (max-width: 768px) {
+            .main-content {
+                padding: 1rem;
+            }
+
+            .filters-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .call-history-table {
+                font-size: 0.875rem;
+            }
+
+            .call-history-table th,
+            .call-history-table td {
+                padding: 0.75rem;
+            }
+
+            .transcript-preview {
+                max-width: 150px;
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .sidebar {
+                transform: translateX(0);
+            }
+
+            .main-content {
+                margin-left: var(--sidebar-width);
+            }
+
+            .sidebar-overlay {
+                display: none;
+            }
+
+            .sidebar-toggle {
+                display: none;
+            }
+        }
+    </style>
+</head>
+<body data-theme="light">
+    <!-- Sidebar -->
+    <div class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <a href="/" class="sidebar-logo">
+                <i class="fas fa-phone-alt"></i>
+                <span>Bland AI</span>
+            </a>
+        </div>
+        <nav class="sidebar-nav">
+            <div class="nav-section">
+                <div class="nav-section-title">Main</div>
+                <a href="/" class="nav-link">
+                    <i class="fas fa-chart-line"></i>
+                    <span>Dashboard</span>
+                </a>
+                <a href="/clients" class="nav-link">
+                    <i class="fas fa-users"></i>
+                    <span>Clients</span>
+                </a>
+                <a href="/campaigns" class="nav-link">
+                    <i class="fas fa-bullhorn"></i>
+                    <span>Campaigns</span>
+                </a>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title">Analytics</div>
+                <a href="/call_history" class="nav-link active">
+                    <i class="fas fa-history"></i>
+                    <span>Call History</span>
+                </a>
+                <a href="#" class="nav-link" onclick="alert('Feature coming soon!')">
+                    <i class="fas fa-chart-bar"></i>
+                    <span>Reports</span>
+                </a>
+            </div>
+            <div class="nav-section">
+                <div class="nav-section-title">Settings</div>
+                <a href="#" class="nav-link" onclick="alert('Feature coming soon!')">
+                    <i class="fas fa-cog"></i>
+                    <span>Configuration</span>
+                </a>
+                <a href="#" class="nav-link" onclick="alert('Feature coming soon!')">
+                    <i class="fas fa-user"></i>
+                    <span>Profile</span>
+                </a>
+            </div>
+        </nav>
+    </div>
+
+    <!-- Sidebar Overlay -->
+    <div class="sidebar-overlay" id="sidebarOverlay"></div>
+
+    <!-- Header -->
+    <div class="header">
+        <div class="header-left">
+            <button class="sidebar-toggle" id="sidebarToggle">
+                <i class="fas fa-bars"></i>
+            </button>
+            <h1 class="header-title">Call History</h1>
+        </div>
+        <div class="header-right">
+            <button id="themeToggle" class="theme-toggle">
+                <i class="fas fa-moon"></i>
+            </button>
+            {% if current_user %}
+            <div class="user-menu">
+                <span class="user-info">
+                    <i class="fas fa-user-circle"></i>
+                    {{ current_user.username }} ({{ current_user.role.title() }})
+                </span>
+                <button id="logoutBtn" class="header-action logout-btn">
+                    <i class="fas fa-sign-out-alt"></i>
+                    Logout
+                </button>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content" id="mainContent">
+        <div class="page-header">
+            <div>
+                <h1 class="page-title">
+                    <i class="fas fa-history"></i>
+                    Call History
+                </h1>
+            </div>
+            <button class="btn-secondary" onclick="refreshCallHistory()">
+                <i class="fas fa-sync-alt"></i>
+                Refresh
+            </button>
+        </div>
+
+        <!-- Filters Section -->
+        <div class="filters-section">
+            <div class="filters-grid">
+                <div class="filter-group">
+                    <label for="clientFilter">Client</label>
+                    <select id="clientFilter" onchange="applyFilters()">
+                        <option value="">All Clients</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="campaignFilter">Campaign</label>
+                    <select id="campaignFilter" onchange="applyFilters()">
+                        <option value="">All Campaigns</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="statusFilter">Status</label>
+                    <select id="statusFilter" onchange="applyFilters()">
+                        <option value="">All Statuses</option>
+                        <option value="confirmed">Confirmed</option>
+                        <option value="cancelled">Cancelled</option>
+                        <option value="rescheduled">Rescheduled</option>
+                        <option value="busy_voicemail">Busy/Voicemail</option>
+                        <option value="not_available">Not Available</option>
+                        <option value="wrong_number">Wrong Number</option>
+                        <option value="failed">Failed</option>
+                    </select>
+                </div>
+                <div class="filter-group">
+                    <label for="searchFilter">Search Patient</label>
+                    <input type="text" id="searchFilter" placeholder="Search by patient name or phone..." oninput="applyFilters()">
+                </div>
+                <div class="filter-group">
+                    <button class="btn-secondary" onclick="clearFilters()">
+                        <i class="fas fa-times"></i>
+                        Clear Filters
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Call History Table -->
+        <div class="call-history-section">
+            <div class="section-header">
+                <h2 class="section-title">
+                    <i class="fas fa-phone-alt"></i>
+                    All Calls
+                </h2>
+                <div class="results-count" id="resultsCount">
+                    Loading...
+                </div>
+            </div>
+
+            <div id="loadingState" class="loading-state">
+                <i class="fas fa-spinner"></i>
+                <h3>Loading Call History...</h3>
+                <p>Please wait while we fetch your call data</p>
+            </div>
+
+            <div id="emptyState" class="empty-state" style="display: none;">
+                <i class="fas fa-phone-slash"></i>
+                <h3>No Call History Found</h3>
+                <p>No calls have been made yet or no call data matches your filters.</p>
+            </div>
+
+            <div id="tableContainer" class="table-container" style="display: none;">
+                <table class="call-history-table">
+                    <thead>
+                        <tr>
+                            <th>Client Name</th>
+                            <th>Campaign Name</th>
+                            <th>Patient Name</th>
+                            <th>Phone Number</th>
+                            <th>Status</th>
+                            <th>Duration</th>
+                            <th>Date/Time</th>
+                            <th>Final Summary</th>
+                            <th>Transcript</th>
+                        </tr>
+                    </thead>
+                    <tbody id="callHistoryTableBody">
+                        <!-- Call history rows will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Transcript Modal -->
+    <div id="transcriptModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-file-alt"></i> Call Transcript</h3>
+                <button class="modal-close" onclick="closeTranscriptModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div id="transcriptContent" class="transcript-content">
+                    <!-- Transcript content will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Theme management
+        const themeToggle = document.getElementById('themeToggle');
+        const body = document.body;
+        const themeIcon = themeToggle.querySelector('i');
+
+        // Load saved theme or default to light
+        const savedTheme = localStorage.getItem('theme') || 'light';
+        body.setAttribute('data-theme', savedTheme);
+        updateThemeIcon(savedTheme);
+
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = body.getAttribute('data-theme');
+            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
+
+            body.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            updateThemeIcon(newTheme);
+        });
+
+        function updateThemeIcon(theme) {
+            themeIcon.className = theme === 'light' ? 'fas fa-moon' : 'fas fa-sun';
+        }
+
+        // Sidebar management
+        const sidebar = document.getElementById('sidebar');
+        const sidebarToggle = document.getElementById('sidebarToggle');
+        const sidebarOverlay = document.getElementById('sidebarOverlay');
+        const mainContent = document.getElementById('mainContent');
+
+        sidebarToggle.addEventListener('click', toggleSidebar);
+        sidebarOverlay.addEventListener('click', closeSidebar);
+
+        function toggleSidebar() {
+            sidebar.classList.toggle('open');
+            sidebarOverlay.classList.toggle('active');
+            mainContent.classList.toggle('sidebar-open');
+        }
+
+        function closeSidebar() {
+            sidebar.classList.remove('open');
+            sidebarOverlay.classList.remove('active');
+            mainContent.classList.remove('sidebar-open');
+        }
+
+        // Handle window resize
+        window.addEventListener('resize', () => {
+            if (window.innerWidth >= 1024) {
+                closeSidebar();
+            }
+        });
+
+        // Global variables
+        let allCallHistory = [];
+        let filteredCallHistory = [];
+        let allClients = {};
+        let allCampaigns = {};
+
+        // Load call history on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadCallHistory();
+        });
+
+        // Load call history data
+        async function loadCallHistory() {
+            try {
+                showLoadingState();
+
+                // Fetch clients, campaigns, and campaign results in parallel
+                const [clientsResponse, campaignsResponse, debugResponse] = await Promise.all([
+                    fetch('/api/clients'),
+                    fetch('/api/campaigns'),
+                    fetch('/debug/campaign_results')
+                ]);
+
+                const clientsData = await clientsResponse.json();
+                const campaignsData = await campaignsResponse.json();
+                const debugData = await debugResponse.json();
+
+                if (!clientsData.success || !campaignsData.success || !debugData.success) {
+                    throw new Error('Failed to load data');
+                }
+
+                // Process clients and campaigns for easy lookup
+                allClients = {};
+                clientsData.clients.forEach(client => {
+                    allClients[client.id] = client;
+                });
+
+                allCampaigns = {};
+                campaignsData.campaigns.forEach(campaign => {
+                    allCampaigns[campaign.id] = campaign;
+                });
+
+                // Process campaign results into call history
+                allCallHistory = [];
+                
+                Object.entries(debugData.debug_info.campaign_details).forEach(([campaignRunId, campaignResults]) => {
+                    const campaignId = campaignResults.is_csv_upload ? 
+                        campaignRunId : 
+                        campaignRunId.split('_run_')[0];
+                    
+                    const campaign = allCampaigns[campaignId] || { name: campaignResults.campaign_name, client_id: null };
+                    const client = campaign.client_id ? allClients[campaign.client_id] : { name: campaignResults.client_name };
+
+                    campaignResults.call_details.forEach(callDetail => {
+                        const callRecord = {
+                            clientName: client ? client.name : 'Unknown Client',
+                            campaignName: campaign.name || 'Unknown Campaign',
+                            patientName: callDetail.patient_name,
+                            phoneNumber: callDetail.phone_number || 'Unknown',
+                            status: callDetail.call_status || 'Unknown',
+                            duration: 0, // Will be fetched if needed
+                            dateTime: campaignResults.started_at || 'Unknown',
+                            finalSummary: callDetail.final_summary || 'No summary available',
+                            transcript: callDetail.has_transcript ? 'View Transcript' : 'No transcript',
+                            callId: callDetail.call_id,
+                            success: callDetail.success,
+                            campaignId: campaignId,
+                            campaignRunId: campaignRunId
+                        };
+                        allCallHistory.push(callRecord);
+                    });
+                });
+
+                // Populate filter dropdowns
+                populateFilters();
+
+                // Apply initial filters and display
+                applyFilters();
+
+                hideLoadingState();
+
+            } catch (error) {
+                console.error('Error loading call history:', error);
+                showEmptyState();
+                hideLoadingState();
+            }
+        }
+
+        // Populate filter dropdowns
+        function populateFilters() {
+            const clientFilter = document.getElementById('clientFilter');
+            const campaignFilter = document.getElementById('campaignFilter');
+
+            // Clear existing options
+            clientFilter.innerHTML = '<option value="">All Clients</option>';
+            campaignFilter.innerHTML = '<option value="">All Campaigns</option>';
+
+            // Get unique clients and campaigns
+            const uniqueClients = [...new Set(allCallHistory.map(call => call.clientName))];
+            const uniqueCampaigns = [...new Set(allCallHistory.map(call => call.campaignName))];
+
+            // Populate client filter
+            uniqueClients.forEach(clientName => {
+                const option = document.createElement('option');
+                option.value = clientName;
+                option.textContent = clientName;
+                clientFilter.appendChild(option);
+            });
+
+            // Populate campaign filter
+            uniqueCampaigns.forEach(campaignName => {
+                const option = document.createElement('option');
+                option.value = campaignName;
+                option.textContent = campaignName;
+                campaignFilter.appendChild(option);
+            });
+        }
+
+        // Apply filters
+        function applyFilters() {
+            const clientFilter = document.getElementById('clientFilter').value;
+            const campaignFilter = document.getElementById('campaignFilter').value;
+            const statusFilter = document.getElementById('statusFilter').value;
+            const searchFilter = document.getElementById('searchFilter').value.toLowerCase();
+
+            filteredCallHistory = allCallHistory.filter(call => {
+                const matchesClient = !clientFilter || call.clientName === clientFilter;
+                const matchesCampaign = !campaignFilter || call.campaignName === campaignFilter;
+                const matchesStatus = !statusFilter || call.status === statusFilter;
+                const matchesSearch = !searchFilter || 
+                    call.patientName.toLowerCase().includes(searchFilter) ||
+                    call.phoneNumber.toLowerCase().includes(searchFilter);
+
+                return matchesClient && matchesCampaign && matchesStatus && matchesSearch;
+            });
+
+            displayCallHistory();
+        }
+
+        // Clear filters
+        function clearFilters() {
+            document.getElementById('clientFilter').value = '';
+            document.getElementById('campaignFilter').value = '';
+            document.getElementById('statusFilter').value = '';
+            document.getElementById('searchFilter').value = '';
+            applyFilters();
+        }
+
+        // Display call history in table
+        function displayCallHistory() {
+            const tableBody = document.getElementById('callHistoryTableBody');
+            const resultsCount = document.getElementById('resultsCount');
+
+            if (filteredCallHistory.length === 0) {
+                showEmptyState();
+                hideTable();
+                resultsCount.textContent = '0 calls found';
+                return;
+            }
+
+            showTable();
+            hideEmptyState();
+
+            resultsCount.textContent = `${filteredCallHistory.length} call${filteredCallHistory.length !== 1 ? 's' : ''} found`;
+
+            let html = '';
+            filteredCallHistory.forEach(call => {
+                const statusClass = `status-${call.status.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+                const formattedDateTime = formatDateTime(call.dateTime);
+                const durationDisplay = call.duration > 0 ? formatDuration(call.duration) : '-';
+                
+                html += `
+                    <tr>
+                        <td><strong>${call.clientName}</strong></td>
+                        <td>${call.campaignName}</td>
+                        <td>${call.patientName}</td>
+                        <td>${call.phoneNumber}</td>
+                        <td><span class="status-badge-small ${statusClass}">${formatStatus(call.status)}</span></td>
+                        <td>${durationDisplay}</td>
+                        <td>${formattedDateTime}</td>
+                        <td class="transcript-preview" title="${call.finalSummary}">${call.finalSummary}</td>
+                        <td>
+                            ${call.callId ? 
+                                `<span class="transcript-preview" onclick="viewTranscript('${call.callId}', '${call.patientName}')">View Transcript</span>` : 
+                                '<span style="color: var(--text-tertiary);">No transcript</span>'
+                            }
+                        </td>
+                    </tr>
+                `;
+            });
+
+            tableBody.innerHTML = html;
+        }
+
+        // Format status for display
+        function formatStatus(status) {
+            const statusMap = {
+                'confirmed': 'Confirmed',
+                'cancelled': 'Cancelled',
+                'rescheduled': 'Rescheduled',
+                'busy_voicemail': 'Busy/Voicemail',
+                'not_available': 'Not Available',
+                'wrong_number': 'Wrong Number',
+                'failed': 'Failed'
+            };
+            return statusMap[status] || status;
+        }
+
+        // Format duration
+        function formatDuration(seconds) {
+            if (seconds < 60) {
+                return `${seconds}s`;
+            }
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            return `${minutes}m ${remainingSeconds}s`;
+        }
+
+        // Format date time
+        function formatDateTime(dateTimeStr) {
+            try {
+                const date = new Date(dateTimeStr);
+                return date.toLocaleString();
+            } catch (error) {
+                return dateTimeStr;
+            }
+        }
+
+        // View transcript
+        async function viewTranscript(callId, patientName) {
+            try {
+                const response = await fetch(`/call_details/${callId}`);
+                const data = await response.json();
+
+                if (data.transcript) {
+                    document.getElementById('transcriptContent').textContent = data.transcript;
+                    document.querySelector('#transcriptModal .modal-header h3').innerHTML = 
+                        `<i class="fas fa-file-alt"></i> Call Transcript - ${patientName}`;
+                    document.getElementById('transcriptModal').style.display = 'block';
+                } else {
+                    alert('No transcript available for this call.');
+                }
+            } catch (error) {
+                console.error('Error fetching transcript:', error);
+                alert('Error loading transcript. Please try again.');
+            }
+        }
+
+        // Close transcript modal
+        function closeTranscriptModal() {
+            document.getElementById('transcriptModal').style.display = 'none';
+        }
+
+        // Show/hide states
+        function showLoadingState() {
+            document.getElementById('loadingState').style.display = 'block';
+            hideTable();
+            hideEmptyState();
+        }
+
+        function hideLoadingState() {
+            document.getElementById('loadingState').style.display = 'none';
+        }
+
+        function showEmptyState() {
+            document.getElementById('emptyState').style.display = 'block';
+        }
+
+        function hideEmptyState() {
+            document.getElementById('emptyState').style.display = 'none';
+        }
+
+        function showTable() {
+            document.getElementById('tableContainer').style.display = 'block';
+        }
+
+        function hideTable() {
+            document.getElementById('tableContainer').style.display = 'none';
+        }
+
+        // Refresh call history
+        function refreshCallHistory() {
+            loadCallHistory();
+        }
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('transcriptModal');
+            if (event.target === modal) {
+                closeTranscriptModal();
+            }
+        };
+
+        console.log('Call History page loaded successfully');
+    </script>
+</body>
+</html>

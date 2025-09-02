@@ -3603,6 +3603,15 @@ async def bland_webhook(request: Request):
         return {"success": False, "error": str(e)}
 
 
+@app.get("/call_history", response_class=HTMLResponse)
+async def call_history_page(request: Request):
+    """Call history page"""
+    user = require_auth(request)
+    return templates.TemplateResponse("call_history.html", {
+        "request": request,
+        "current_user": user
+    })
+
 @app.get("/docs")
 async def get_docs():
     """Access FastAPI automatic documentation"""
