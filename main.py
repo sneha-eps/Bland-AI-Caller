@@ -3063,8 +3063,7 @@ async def get_campaign_analytics(campaign_id: str):
                 print(f"   Call ID Type: {type(stored_call_id)}")
                 print(f"   Success Flag: {result.get('success', False)}")
 
-                # Initialize stored_call_data (this is the stored result itself)
-                stored_call_data = result
+                stored_call_data = result.get('stored_call_data', {})
 
                 # If call was successful and has call_id, try to get detailed info
                 if result.get('success') and result.get('call_id'):
