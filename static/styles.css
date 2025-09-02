@@ -1,4 +1,3 @@
-
 :root {
     --primary-color: #6366f1;
     --primary-hover: #4f46e5;
@@ -6,6 +5,7 @@
     --primary-dark: #3730a3;
     --secondary-color: #8b5cf6;
     --secondary-hover: #7c3aed;
+    --secondary-dark: #7c3aed;
     --accent-color: #06b6d4;
     --accent-hover: #0891b2;
     --success-color: #10b981;
@@ -47,7 +47,8 @@
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
     --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
     --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-    --gradient-primary: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    --gradient-primary: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    --gradient-secondary: linear-gradient(135deg, var(--secondary-color) 0%, var(--secondary-dark) 100%);
     --gradient-success: linear-gradient(135deg, var(--success-color) 0%, #059669 100%);
     --gradient-warning: linear-gradient(135deg, var(--warning-color) 0%, #d97706 100%);
     --gradient-danger: linear-gradient(135deg, var(--danger-color) 0%, #dc2626 100%);
@@ -73,7 +74,8 @@
     --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
     --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 10px 10px -5px rgba(0, 0, 0, 0.3);
     --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
-    --gradient-primary: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+    --gradient-primary: linear-gradient(135deg, var(--primary-color) 0%, var(--primary-dark) 100%);
+    --gradient-secondary: linear-gradient(135deg, var(--secondary-color) 0%, var(--secondary-dark) 100%);
     --gradient-success: linear-gradient(135deg, var(--success-color) 0%, #059669 100%);
     --gradient-warning: linear-gradient(135deg, var(--warning-color) 0%, #d97706 100%);
     --gradient-danger: linear-gradient(135deg, var(--danger-color) 0%, #dc2626 100%);
