@@ -1138,17 +1138,29 @@
             }
         });
 
-        console.log('Dashboard loaded successfully');
+        // Global variables for filtering
+        let allCampaigns = {{ campaigns | tojson }};
+        let allClients = {{ clients | tojson }};
 
-        // Refresh metrics every 30 seconds to show updated data
-        setInterval(refreshDashboardMetrics, 30000);
+        // Initialize dashboard when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Dashboard loaded successfully');
 
-        // Also refresh metrics when page gains focus (user comes back to tab)
-        window.addEventListener('focus', refreshDashboardMetrics);
+            // Initialize theme
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            body.setAttribute('data-theme', savedTheme);
+            updateThemeIcon(savedTheme);
 
-        // Global variables to store data
-        let allClients = [];
-        let allCampaigns = [];
+            // Load metrics
+            loadDashboardMetrics();
+
+            // Set up periodic refresh every 30 seconds
+            setInterval(loadDashboardMetrics, 30000);
+
+            // Initialize filtering data
+            console.log('Campaigns data:', allCampaigns);
+            console.log('Clients data:', allClients);
+        });
 
         // Function to toggle client list visibility
         function toggleClientsList() {
