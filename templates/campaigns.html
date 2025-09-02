@@ -1164,15 +1164,22 @@
             <h1 class="header-title">Campaigns</h1>
         </div>
         <div class="header-right">
-            <button class="theme-toggle" id="themeToggle" title="Toggle theme">
+            <button id="themeToggle" class="theme-toggle">
                 <i class="fas fa-moon"></i>
             </button>
-            <div class="status-badge {% if has_api_key %}status-connected{% else %}status-error{% endif %}">
-                <i class="fas {% if has_api_key %}fa-check-circle{% else %}fa-exclamation-triangle{% endif %}"></i>
-                {% if has_api_key %}API Connected{% else %}API Not Configured{% endif %}
+
+            {% if current_user %}
+            <div class="user-menu">
+                <span class="user-info">
+                    <i class="fas fa-user-circle"></i>
+                    {{ current_user.username }} ({{ current_user.role.title() }})
+                </span>
+                <button id="logoutBtn" class="header-action logout-btn">
+                    <i class="fas fa-sign-out-alt"></i>
+                    Logout
+                </button>
             </div>
-            <!-- Placeholder for logout button if it exists on other pages -->
-            <!-- <button id="logoutBtn" class="btn-secondary" style="padding: 0.5rem 1rem;">Logout</button> -->
+            {% endif %}
         </div>
     </div>
 
