@@ -632,27 +632,59 @@ def convert_utc_to_ist(utc_datetime_str):
     try:
         # Handle different datetime formats
         if isinstance(utc_datetime_str, str):
-            # Remove microseconds if present (everything after the last dot)
+            original_str = utc_datetime_str
+            
+            # Fix incomplete timezone formats like "+00:" to "+00:00"
+            if utc_datetime_str.endswith('+00:'):
+                utc_datetime_str = utc_datetime_str[:-4] + '+00:00'
+                print(f"🔧 Fixed timezone format: {original_str} -> {utc_datetime_str}")
+            elif utc_datetime_str.endswith('-00:'):
+                utc_datetime_str = utc_datetime_str[:-4] + '-00:00'
+                print(f"🔧 Fixed timezone format: {original_str} -> {utc_datetime_str}")
+            
+            # Handle microseconds - fix malformed microsecond parts
             if '.' in utc_datetime_str and not utc_datetime_str.endswith('Z'):
                 parts = utc_datetime_str.split('.')
                 if len(parts) > 1:
-                    # Keep only first 6 digits of microseconds
-                    microseconds = parts[1][:6]
-                    utc_datetime_str = parts[0] + '.' + microseconds
+                    # Extract microseconds and timezone parts
+                    microsecond_and_tz = parts[1]
+                    
+                    # Look for timezone indicator
+                    tz_index = -1
+                    for i, char in enumerate(microsecond_and_tz):
+                        if char in ['+', '-']:
+                            tz_index = i
+                            break
+                    
+                    if tz_index >= 0:
+                        # Split microseconds and timezone
+                        microseconds = microsecond_and_tz[:tz_index]
+                        timezone_part = microsecond_and_tz[tz_index:]
+                        
+                        # Ensure microseconds are max 6 digits
+                        microseconds = microseconds[:6].ljust(6, '0')
+                        
+                        # Reconstruct the datetime string
+                        utc_datetime_str = parts[0] + '.' + microseconds + timezone_part
+                    else:
+                        # No timezone found, just limit microseconds
+                        microseconds = microsecond_and_tz[:6].ljust(6, '0')
+                        utc_datetime_str = parts[0] + '.' + microseconds
 
             # Handle Z suffix
             if utc_datetime_str.endswith('Z'):
                 utc_datetime_str = utc_datetime_str[:-1] + '+00:00'
-            elif not ('+' in utc_datetime_str[-6:] or utc_datetime_str.endswith('UTC')):
+            elif not any(tz in utc_datetime_str[-6:] for tz in ['+', '-']) and not utc_datetime_str.endswith('UTC'):
                 # Add UTC timezone if no timezone info
                 utc_datetime_str += '+00:00'
 
         # Parse the datetime string
-        if '+' in utc_datetime_str:
+        if any(tz in utc_datetime_str for tz in ['+', '-']) and not utc_datetime_str.endswith('UTC'):
             utc_dt = datetime.fromisoformat(utc_datetime_str)
         else:
-            # Fallback parsing
-            utc_dt = datetime.fromisoformat(utc_datetime_str.replace('UTC', ''))
+            # Fallback parsing for UTC suffix
+            clean_str = utc_datetime_str.replace('UTC', '').strip()
+            utc_dt = datetime.fromisoformat(clean_str)
             utc_dt = utc_dt.replace(tzinfo=pytz.UTC)
 
         # Convert to IST
@@ -664,13 +696,35 @@ def convert_utc_to_ist(utc_datetime_str):
 
     except Exception as e:
         print(f"❌ Error converting datetime {utc_datetime_str}: {e}")
-        # Try to extract just the date part if it's malformed
+        # Try multiple fallback strategies
         try:
-            if isinstance(utc_datetime_str, str) and len(utc_datetime_str) > 10:
-                date_part = utc_datetime_str[:10]  # Just YYYY-MM-DD
-                return f"{date_part} (Time unavailable)"
+            if isinstance(utc_datetime_str, str):
+                # Strategy 1: Extract just the date and time without timezone
+                import re
+                date_time_match = re.match(r'(\d{4}-\d{2}-\d{2})[T\s](\d{2}:\d{2}:\d{2})', utc_datetime_str)
+                if date_time_match:
+                    date_part = date_time_match.group(1)
+                    time_part = date_time_match.group(2)
+                    return f"{date_part} {time_part} (UTC)"
+                
+                # Strategy 2: Extract just the date
+                date_match = re.match(r'(\d{4}-\d{2}-\d{2})', utc_datetime_str)
+                if date_match:
+                    return f"{date_match.group(1)} (Time unavailable)"
+                
+                # Strategy 3: If it looks like a timestamp, try basic parsing
+                if len(utc_datetime_str) > 10 and '-' in utc_datetime_str:
+                    # Try removing problematic parts and parsing
+                    clean_str = re.sub(r'\+\d{2}:?$', '', utc_datetime_str)  # Remove incomplete timezone
+                    clean_str = re.sub(r'\.\d+$', '', clean_str)  # Remove microseconds
+                    try:
+                        simple_dt = datetime.fromisoformat(clean_str)
+                        return simple_dt.strftime("%Y-%m-%d %H:%M:%S (UTC)")
+                    except:
+                        pass
         except:
             pass
+        
         return "Invalid Date"
 
 
