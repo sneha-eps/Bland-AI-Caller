@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -53,7 +52,7 @@
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
             background: var(--bg-primary);
@@ -219,12 +218,12 @@
             align-items: center;
             gap: 8px;
         }
-        
+
         .status-connected {
             background: var(--success-color);
             color: white;
         }
-        
+
         .status-error {
             background: var(--danger-color);
             color: white;
@@ -248,29 +247,29 @@
             overflow: hidden;
             border: 1px solid var(--border-color);
         }
-        
+
         .card-header {
             background: linear-gradient(135deg, var(--primary-color) 0%, #7c3aed 100%);
             color: white;
             padding: 2rem;
             text-align: center;
         }
-        
+
         .card-header h1 {
             font-size: 2.5rem;
             font-weight: 700;
             margin-bottom: 0.5rem;
         }
-        
+
         .card-header p {
             font-size: 1.125rem;
             opacity: 0.9;
         }
-        
+
         .card-body {
             padding: 2rem;
         }
-        
+
         .alert {
             padding: 1rem 1.5rem;
             margin-bottom: 1.5rem;
@@ -281,17 +280,17 @@
             gap: 12px;
             border: 1px solid var(--border-color);
         }
-        
+
         .alert i {
             font-size: 1.25rem;
         }
-        
+
         .alert-error {
             background: var(--bg-tertiary);
             color: var(--danger-color);
             border-left: 4px solid var(--danger-color);
         }
-        
+
         .csv-format {
             background: var(--bg-tertiary);
             padding: 2rem;
@@ -301,7 +300,7 @@
             box-shadow: var(--shadow-md);
             border: 1px solid var(--border-color);
         }
-        
+
         .csv-format h3 {
             color: var(--primary-color);
             font-size: 1.375rem;
@@ -311,7 +310,7 @@
             align-items: center;
             gap: 10px;
         }
-        
+
         .csv-format code {
             background: var(--bg-primary);
             color: var(--text-primary);
@@ -324,7 +323,7 @@
             overflow-x: auto;
             border: 1px solid var(--border-color);
         }
-        
+
         .form-section {
             background: var(--bg-tertiary);
             padding: 2rem;
@@ -332,11 +331,11 @@
             margin-bottom: 2rem;
             border: 1px solid var(--border-color);
         }
-        
+
         .form-group {
             margin-bottom: 1.5rem;
         }
-        
+
         label {
             display: block;
             margin-bottom: 0.5rem;
@@ -344,13 +343,13 @@
             color: var(--text-primary);
             font-size: 1rem;
         }
-        
+
         .file-input-wrapper {
             position: relative;
             display: inline-block;
             width: 100%;
         }
-        
+
         input[type="file"] {
             position: absolute;
             opacity: 0;
@@ -358,7 +357,7 @@
             height: 100%;
             cursor: pointer;
         }
-        
+
         .file-input-display {
             background: var(--bg-primary);
             border: 2px dashed var(--border-color);
@@ -368,32 +367,32 @@
             transition: var(--transition);
             cursor: pointer;
         }
-        
+
         .file-input-display:hover {
             border-color: var(--primary-color);
             background: var(--bg-secondary);
         }
-        
+
         .file-input-display.dragover {
             border-color: var(--primary-color);
             background: var(--bg-secondary);
         }
-        
+
         .file-input-display i {
             font-size: 3rem;
             color: var(--text-tertiary);
             margin-bottom: 1rem;
         }
-        
+
         .file-input-display.has-file {
             border-color: var(--success-color);
             background: var(--bg-secondary);
         }
-        
+
         .file-input-display.has-file i {
             color: var(--success-color);
         }
-        
+
         .btn {
             background: linear-gradient(135deg, var(--primary-color) 0%, #7c3aed 100%);
             color: white;
@@ -410,19 +409,19 @@
             justify-content: center;
             gap: 12px;
         }
-        
+
         .btn:hover:not(:disabled) {
             transform: translateY(-2px);
             box-shadow: 0 10px 25px rgba(79, 70, 229, 0.3);
         }
-        
+
         .btn:disabled {
             background: var(--text-tertiary);
             cursor: not-allowed;
             transform: none;
             box-shadow: none;
         }
-        
+
         select {
             width: 100%;
             padding: 0.75rem 1rem;
@@ -433,19 +432,19 @@
             color: var(--text-primary);
             transition: var(--transition);
         }
-        
+
         select:focus {
             outline: none;
             border-color: var(--primary-color);
             box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
         }
-        
+
         select:disabled {
             background: var(--bg-tertiary);
             color: var(--text-tertiary);
             cursor: not-allowed;
         }
-        
+
         .loading {
             display: none;
             text-align: center;
@@ -455,14 +454,14 @@
             margin: 2rem 0;
             border: 1px solid var(--border-color);
         }
-        
+
         .loading-content {
             display: flex;
             flex-direction: column;
             align-items: center;
             gap: 1rem;
         }
-        
+
         .spinner {
             width: 40px;
             height: 40px;
@@ -471,17 +470,17 @@
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
-        
+
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        
+
         .results {
             display: none;
             margin-top: 2rem;
         }
-        
+
         .results-summary {
             background: var(--bg-secondary);
             padding: 1.5rem;
@@ -490,7 +489,7 @@
             border-left: 4px solid var(--primary-color);
             border: 1px solid var(--border-color);
         }
-        
+
         .results-summary h3 {
             color: var(--primary-color);
             font-size: 1.25rem;
@@ -499,14 +498,14 @@
             align-items: center;
             gap: 8px;
         }
-        
+
         .stats-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
             gap: 1rem;
             margin-top: 1rem;
         }
-        
+
         .stat-item {
             background: var(--bg-primary);
             padding: 1rem;
@@ -515,19 +514,19 @@
             box-shadow: var(--shadow-md);
             border: 1px solid var(--border-color);
         }
-        
+
         .stat-number {
             font-size: 1.75rem;
             font-weight: bold;
             margin-bottom: 0.25rem;
             color: var(--text-primary);
         }
-        
+
         .stat-label {
             color: var(--text-secondary);
             font-size: 0.875rem;
         }
-        
+
         .results-table {
             width: 100%;
             border-collapse: collapse;
@@ -537,14 +536,14 @@
             box-shadow: var(--shadow-lg);
             border: 1px solid var(--border-color);
         }
-        
+
         .results-table th,
         .results-table td {
             padding: 1rem;
             text-align: left;
             border-bottom: 1px solid var(--border-color);
         }
-        
+
         .results-table th {
             background: var(--bg-secondary);
             font-weight: 600;
@@ -553,11 +552,11 @@
             text-transform: uppercase;
             letter-spacing: 0.05em;
         }
-        
+
         .results-table tbody tr:hover {
             background: var(--bg-secondary);
         }
-        
+
         .status-badge-table {
             padding: 0.375rem 0.75rem;
             border-radius: 20px;
@@ -567,17 +566,17 @@
             align-items: center;
             gap: 4px;
         }
-        
+
         .status-success {
             background: rgba(16, 185, 129, 0.1);
             color: var(--success-color);
         }
-        
+
         .status-error {
             background: rgba(239, 68, 68, 0.1);
             color: var(--danger-color);
         }
-        
+
         .btn-small {
             background: var(--primary-color);
             color: white;
@@ -588,7 +587,7 @@
             cursor: pointer;
             transition: var(--transition);
         }
-        
+
         .btn-small:hover {
             background: var(--primary-hover);
         }
@@ -604,7 +603,7 @@
             background-color: rgba(0,0,0,0.6);
             backdrop-filter: blur(4px);
         }
-        
+
         .modal-content {
             background: var(--bg-primary);
             margin: 2% auto;
@@ -617,7 +616,7 @@
             box-shadow: var(--shadow-xl);
             border: 1px solid var(--border-color);
         }
-        
+
         .modal-header {
             background: linear-gradient(135deg, var(--primary-color) 0%, #7c3aed 100%);
             color: white;
@@ -626,12 +625,12 @@
             justify-content: space-between;
             align-items: center;
         }
-        
+
         .modal-header h3 {
             font-size: 1.25rem;
             font-weight: 600;
         }
-        
+
         .modal-close {
             background: none;
             border: none;
@@ -641,17 +640,17 @@
             opacity: 0.8;
             transition: var(--transition);
         }
-        
+
         .modal-close:hover {
             opacity: 1;
         }
-        
+
         .modal-body {
             padding: 2rem;
             max-height: 70vh;
             overflow-y: auto;
         }
-        
+
         .call-details-card {
             background: var(--bg-secondary);
             padding: 1.5rem;
@@ -659,18 +658,18 @@
             margin-bottom: 1.5rem;
             border: 1px solid var(--border-color);
         }
-        
+
         .detail-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 1rem;
         }
-        
+
         .detail-item {
             display: flex;
             flex-direction: column;
         }
-        
+
         .detail-label {
             font-size: 0.75rem;
             color: var(--text-tertiary);
@@ -678,12 +677,12 @@
             letter-spacing: 0.05em;
             margin-bottom: 0.25rem;
         }
-        
+
         .detail-value {
             font-weight: 600;
             color: var(--text-primary);
         }
-        
+
         .transcript-card {
             background: var(--bg-secondary);
             color: var(--text-primary);
@@ -715,24 +714,24 @@
             opacity: 1;
             visibility: visible;
         }
-        
+
         @media (max-width: 768px) {
             .main-content {
                 padding: 1rem;
             }
-            
+
             .card-header h1 {
                 font-size: 2rem;
             }
-            
+
             .card-body {
                 padding: 1.5rem;
             }
-            
+
             .results-table {
                 font-size: 0.875rem;
             }
-            
+
             .results-table th,
             .results-table td {
                 padding: 0.75rem 0.5rem;
@@ -785,24 +784,9 @@
             </div>
             <div class="nav-section">
                 <div class="nav-section-title">Analytics</div>
-                <a href="#" class="nav-link" onclick="alert('Feature coming soon!')">
-                    <i class="fas fa-chart-bar"></i>
-                    <span>Reports</span>
-                </a>
-                <a href="#" class="nav-link" onclick="alert('Feature coming soon!')">
+                <a href="/call_history" class="nav-link">
                     <i class="fas fa-history"></i>
                     <span>Call History</span>
-                </a>
-            </div>
-            <div class="nav-section">
-                <div class="nav-section-title">Settings</div>
-                <a href="#" class="nav-link" onclick="alert('Feature coming soon!')">
-                    <i class="fas fa-cog"></i>
-                    <span>Configuration</span>
-                </a>
-                <a href="#" class="nav-link" onclick="alert('Feature coming soon!')">
-                    <i class="fas fa-user"></i>
-                    <span>Profile</span>
                 </a>
             </div>
         </nav>
@@ -837,7 +821,7 @@
                 <h1>Professional Call Management</h1>
                 <p>Automated appointment confirmation system powered by AI</p>
             </div>
-            
+
             <div class="card-body">
                 {% if not has_api_key %}
                 <div class="alert alert-error">
@@ -848,7 +832,7 @@
                     </div>
                 </div>
                 {% endif %}
-                
+
                 <div class="csv-format">
                     <h3>
                         <i class="fas fa-file-csv"></i>
@@ -858,15 +842,15 @@
                         <strong>Supported formats:</strong> CSV (.csv) and Excel (.xlsx)<br>
                         <strong>Required columns:</strong> <code>phone_number</code>, <code>patient_name</code>, <code>office_location</code>, <code>date</code> (YYYY-MM-DD), <code>time</code> (HH:MM), <code>provider_name</code>
                     </p>
-                    
+
                     <code>phone_number,patient_name,office_location,date,time,provider_name
 1234567890,John Smith,123 Main St Downtown Clinic,2024-01-15,14:30,Dr. Johnson
 0987654321,Jane Doe,456 Oak Ave Westside Medical,2024-01-16,10:00,Dr. Wilson</code>
                 </div>
-                
+
                 <div class="form-section">
                     <form id="csvForm" enctype="multipart/form-data">
-                        
+
                         <div class="form-group">
                             <label for="countryCode">
                                 <i class="fas fa-globe"></i>
@@ -912,7 +896,7 @@
                                 <option value="+62">🇮🇩 Indonesia (+62)</option>
                             </select>
                         </div>
-                        
+
                         <div class="form-group">
                             <label for="csvFile">
                                 <i class="fas fa-cloud-upload-alt"></i>
@@ -929,14 +913,14 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <button type="submit" class="btn" {% if not has_api_key %}disabled{% endif %}>
                             <i class="fas fa-phone"></i>
                             Process File & Initiate Calls
                         </button>
                     </form>
                 </div>
-                
+
                 <div class="loading" id="loading">
                     <div class="loading-content">
                         <div class="spinner"></div>
@@ -944,7 +928,7 @@
                         <p>Analyzing file and initiating automated calls...</p>
                     </div>
                 </div>
-                
+
                 <div class="results" id="results">
                     <div class="results-summary" id="resultsSummary"></div>
                     <table class="results-table" id="resultsTable">
@@ -995,7 +979,7 @@
         themeToggle.addEventListener('click', () => {
             const currentTheme = body.getAttribute('data-theme');
             const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-            
+
             body.setAttribute('data-theme', newTheme);
             localStorage.setItem('theme', newTheme);
             updateThemeIcon(newTheme);
@@ -1075,44 +1059,44 @@
 
         document.getElementById('csvForm').addEventListener('submit', async function(e) {
             e.preventDefault();
-            
+
             const form = e.target;
             const formData = new FormData(form);
             const countryCode = document.getElementById('countryCode').value;
-            
+
             if (!countryCode) {
                 alert('Please select a country code');
                 return;
             }
-            
+
             // Add country code to form data
             formData.append('country_code', countryCode);
-            
+
             const loadingDiv = document.getElementById('loading');
             const resultsDiv = document.getElementById('results');
             const submitBtn = form.querySelector('button[type="submit"]');
-            
+
             if (!fileInput.files.length) {
                 alert('Please select a CSV or Excel file');
                 return;
             }
-            
+
             loadingDiv.style.display = 'block';
             resultsDiv.style.display = 'none';
             submitBtn.disabled = true;
-            
+
             try {
                 const response = await fetch('/process_csv', {
                     method: 'POST',
                     body: formData
                 });
-                
+
                 const result = await response.json();
                 loadingDiv.style.display = 'none';
-                
+
                 if (result.success) {
                     resultsDiv.style.display = 'block';
-                    
+
                     const summaryDiv = document.getElementById('resultsSummary');
                     summaryDiv.innerHTML = `
                         <h3><i class="fas fa-chart-bar"></i> Call Results Summary</h3>
@@ -1135,23 +1119,23 @@
                             </div>
                         </div>
                     `;
-                    
+
                     const tbody = document.getElementById('resultsBody');
                     tbody.innerHTML = '';
-                    
+
                     result.results.forEach(call => {
                         const row = tbody.insertRow();
                         const callStatusText = call.success ? 
                             (call.call_status ? call.call_status.charAt(0).toUpperCase() + call.call_status.slice(1) : 'In Progress') : 
                             'Failed';
-                        
+
                         const statusIcon = call.success ? 
                             (call.call_status === 'confirmed' ? '✅' : 
                              call.call_status === 'rescheduled' ? '📅' : 
                              call.call_status === 'cancelled' ? '❌' : 
                              call.call_status === 'voicemail' ? '📧' : 
                              call.call_status === 'busy' ? '📞' : '⏳') : '❌';
-                        
+
                         row.innerHTML = `
                             <td><strong>${call.patient_name}</strong></td>
                             <td>${call.phone_number}</td>
@@ -1185,7 +1169,7 @@
                     `;
                     document.getElementById('resultsTable').style.display = 'none';
                 }
-                
+
             } catch (error) {
                 loadingDiv.style.display = 'none';
                 resultsDiv.style.display = 'block';
@@ -1201,7 +1185,7 @@
                 `;
                 document.getElementById('resultsTable').style.display = 'none';
             }
-            
+
             submitBtn.disabled = false;
         });
 
@@ -1211,23 +1195,23 @@
             const modalTitle = document.getElementById('modalTitle');
             const callDetails = document.getElementById('callDetails');
             const transcriptContent = document.getElementById('transcriptContent');
-            
+
             modalTitle.innerHTML = `<i class="fas fa-phone"></i> Call Details - ${patientName}`;
             callDetails.innerHTML = '<div style="text-align: center; padding: 2rem;"><div class="spinner"></div><p>Loading call details...</p></div>';
             transcriptContent.innerHTML = '';
             modal.style.display = 'block';
-            
+
             try {
                 const response = await fetch(`/call_details/${callId}`);
                 const data = await response.json();
-                
+
                 if (response.ok) {
                     const statusIcon = data.call_status === 'confirmed' ? '✅' : 
                                      data.call_status === 'rescheduled' ? '📅' : 
                                      data.call_status === 'cancelled' ? '❌' : 
                                      data.call_status === 'voicemail' ? '📧' : 
                                      data.call_status === 'busy' ? '📞' : '⏳';
-                    
+
                     callDetails.innerHTML = `
                         <div class="call-details-card">
                             <h4 style="margin-bottom: 1rem; color: var(--primary-color);"><i class="fas fa-info-circle"></i> Call Information</h4>
@@ -1255,7 +1239,7 @@
                             </div>
                         </div>
                     `;
-                    
+
                     transcriptContent.innerHTML = `
                         <div>
                             <h4 style="margin-bottom: 1rem; color: var(--primary-color);"><i class="fas fa-comments"></i> Call Transcript</h4>
