@@ -1995,15 +1995,15 @@
                 // Create final summary display based on transcript analysis
                 let finalSummarySection = '';
                 if (call.final_summary && call.final_summary.trim() && call.final_summary !== "No transcript available") {
-                    const summaryPreview = call.final_summary.length > 80 
-                        ? call.final_summary.substring(0, 80) + '...' 
+                    const summaryPreview = call.final_summary.length > 80
+                        ? call.final_summary.substring(0, 80) + '...'
                         : call.final_summary;
 
                     finalSummarySection = `
-                        <div class="final-summary-preview" 
+                        <div class="final-summary-preview"
                              data-summary="${encodeURIComponent(call.final_summary)}"
                              data-patient="${encodeURIComponent(call.patient_name)}"
-                             onclick="showFullSummaryFromData(this)" 
+                             onclick="showFullSummaryFromData(this)"
                              style="background: var(--bg-secondary); padding: 0.75rem; border-radius: 8px; border-left: 4px solid var(--success-color); font-size: 0.875rem; line-height: 1.4; cursor: pointer; transition: var(--transition); box-shadow: var(--shadow-sm);">
                             <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
                                 <i class="fas fa-robot" style="color: var(--success-color);"></i>
@@ -2029,16 +2029,16 @@
                 let transcriptSection = '';
 
                 if (call.transcript && call.transcript.trim()) {
-                    transcriptPreview = call.transcript.length > 150 
-                        ? call.transcript.substring(0, 150) + '...' 
+                    transcriptPreview = call.transcript.length > 150
+                        ? call.transcript.substring(0, 150) + '...'
                         : call.transcript;
 
                     transcriptSection = `
                         <div class="transcript-container" style="max-width: 300px;">
-                            <div class="transcript-preview" 
+                            <div class="transcript-preview"
                                  data-transcript="${encodeURIComponent(call.transcript || '')}"
                                  data-patient="${encodeURIComponent(call.patient_name || '')}"
-                                 onclick="showFullTranscriptFromData(this)" 
+                                 onclick="showFullTranscriptFromData(this)"
                                  style="cursor: pointer; color: var(--primary-color); text-decoration: underline; padding: 0.5rem; background: var(--bg-secondary); border-radius: 6px; border-left: 3px solid var(--primary-color); line-height: 1.4; font-size: 0.875rem; transition: var(--transition);"
                                  onmouseover="this.style.backgroundColor='var(--bg-tertiary)'"
                                  onmouseout="this.style.backgroundColor='var(--bg-secondary)'">
@@ -2162,7 +2162,7 @@
                         </h3>
                         <p style="margin: 0.25rem 0 0 0; opacity: 0.9; font-size: 0.875rem;">Patient: ${patientName}</p>
                     </div>
-                    <button onclick="this.closest('.transcript-modal').remove()" 
+                    <button onclick="this.closest('.transcript-modal').remove()"
                             style="background: rgba(255,255,255,0.2); border: none; color: white; font-size: 1.25rem; cursor: pointer; padding: 0.5rem; border-radius: 50%; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; transition: background 0.3s ease;"
                             onmouseover="this.style.background='rgba(255,255,255,0.3)'"
                             onmouseout="this.style.background='rgba(255,255,255,0.2)'">
@@ -2239,7 +2239,7 @@
             content.innerHTML = `
                 <div style="display: flex; justify-content: between; align-items: center; margin-bottom: 1rem; border-bottom: 1px solid var(--border-color); padding-bottom: 1rem;">
                     <h3 style="margin: 0; color: var(--text-primary);"><i class="fas fa-clipboard-check" style="color: var(--success-color); margin-right: 0.5rem;"></i>Agent's Final Summary - ${patientName}</h3>
-                    <button onclick="this.closest('.summary-modal').remove()" 
+                    <button onclick="this.closest('.summary-modal').remove()"
                             style="background: none; border: none; font-size: 1.5rem; cursor: pointer; color: var(--text-secondary); margin-left: auto;">
                         <i class="fas fa-times"></i>
                     </button>
@@ -2301,24 +2301,24 @@
             if (!seconds && seconds !== 0) {
                 return "0 sec";
             }
-            
+
             // Convert to number and ensure we have a valid number
             const numSeconds = Number(seconds);
             if (isNaN(numSeconds)) {
                 return "0 sec";
             }
-            
+
             // Ensure we have a positive integer
             const totalSeconds = Math.max(0, Math.floor(numSeconds));
-            
+
             if (totalSeconds === 0) {
                 return "0 sec";
             }
-            
+
             const hours = Math.floor(totalSeconds / 3600);
             const minutes = Math.floor((totalSeconds % 3600) / 60);
             const remainingSeconds = totalSeconds % 60;
-            
+
             if (hours > 0) {
                 return `${hours}h ${minutes}m ${remainingSeconds}s`;
             } else if (minutes > 0) {
@@ -2496,7 +2496,7 @@
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        document.getElementById('analyticsModalTitle').textContent = 
+                        document.getElementById('analyticsModalTitle').textContent =
                             `Analytics: ${data.campaign_name}`;
 
                         // Populate summary
@@ -2542,8 +2542,8 @@
                             const row = document.createElement('tr');
                             const statusClass = `status-${call.call_status || 'failed'}`;
                             const duration = formatCallDuration(call.duration || 0);
-                            const transcriptPreview = call.transcript ? 
-                                (call.transcript.length > 50 ? call.transcript.substring(0, 50) + '...' : call.transcript) : 
+                            const transcriptPreview = call.transcript ?
+                                (call.transcript.length > 50 ? call.transcript.substring(0, 50) + '...' : call.transcript) :
                                 'No transcript';
 
                             row.innerHTML = `
@@ -2553,10 +2553,10 @@
                                 <td class="duration-cell">${duration}</td>
                                 <td><span class="transcript-preview" onclick="viewFullTranscript('${encodeURIComponent(call.transcript || '')}')">${transcriptPreview}</span></td>
                                 <td>
-                                    ${call.call_status === 'voicemail' || call.call_status === 'busy' ? 
+                                    ${call.call_status === 'voicemail' || call.call_status === 'busy' ?
                                         `<button onclick="sendIndividualVoicemail('${call.patient_name}', '${call.phone_number}')" class="btn-voicemail" style="font-size: 12px; padding: 4px 8px;">
                                             <i class="fas fa-voicemail"></i> Voicemail
-                                        </button>` : 
+                                        </button>` :
                                         ''
                                     }
                                 </td>
@@ -2670,28 +2670,28 @@
 
         function convertToIST(datetimeString) {
             if (!datetimeString || datetimeString === 'N/A' || datetimeString === 'Unknown' || datetimeString === 'Invalid Date') return 'N/A';
-            
+
             try {
                 // If it's already properly formatted, return as is
                 if (datetimeString.includes('IST') && (datetimeString.includes('AM') || datetimeString.includes('PM'))) {
                     return datetimeString;
                 }
-                
+
                 // Clean up malformed datetime strings
                 let cleanedString = datetimeString;
-                
+
                 // Handle strings with excessive precision or malformed suffixes
                 if (cleanedString.includes('T') && cleanedString.includes('.')) {
                     // Remove excessive microseconds (keep only 3 digits)
                     cleanedString = cleanedString.replace(/(\.\d{3})\d+/, '$1');
                 }
-                
+
                 // Remove any trailing numbers that don't belong
                 cleanedString = cleanedString.replace(/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?)\d+$/, '$1');
-                
+
                 // Parse the cleaned string
                 let date = new Date(cleanedString);
-                
+
                 // If parsing failed, try alternative approaches
                 if (isNaN(date.getTime())) {
                     // Try extracting just the date and time parts
@@ -2701,7 +2701,7 @@
                         date = new Date(`${datePart}T${timePart}`);
                     }
                 }
-                
+
                 // Final check
                 if (isNaN(date.getTime())) {
                     console.error("Could not parse date:", datetimeString);
@@ -2709,7 +2709,7 @@
                     const dateMatch = datetimeString.match(/(\d{4}-\d{2}-\d{2})/);
                     return dateMatch ? dateMatch[1] + ' (Time unavailable)' : 'Invalid Date';
                 }
-                
+
                 // Convert to IST and format nicely
                 const options = {
                     timeZone: 'Asia/Kolkata',
@@ -2720,9 +2720,9 @@
                     minute: '2-digit',
                     hour12: true
                 };
-                
+
                 return date.toLocaleString('en-US', options) + ' IST';
-                
+
             } catch (e) {
                 console.error("Error converting date:", e, "Input:", datetimeString);
                 // Last resort: try to extract date part
@@ -2732,6 +2732,22 @@
                 } catch (finalError) {
                     return 'Invalid Date';
                 }
+            }
+        }
+
+        // Function to fetch detailed call data using the improved endpoint
+        async function getCallDetailsFromAPI(callId) {
+            try {
+                const response = await fetch(`/get_call_details/${callId}`);
+                if (!response.ok) {
+                    console.error(`Error fetching call details for ${callId}: ${response.status} ${response.statusText}`);
+                    return null;
+                }
+                const data = await response.json();
+                return data;
+            } catch (error) {
+                console.error(`Exception fetching call details for ${callId}:`, error);
+                return null;
             }
         }
 
