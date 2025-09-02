@@ -1209,7 +1209,18 @@ async def dashboard(request: Request):
 
     # Load clients and campaigns data for dashboard
     clients = load_clients()
-    campaigns = load_campaigns()
+    campaigns_raw = load_campaigns()
+    
+    # Remove file data from campaigns to make them JSON serializable
+    campaigns = []
+    for campaign in campaigns_raw:
+        campaign_copy = campaign.copy()
+        # Remove any file-related data that might be bytes
+        if 'file_data' in campaign_copy:
+            del campaign_copy['file_data']
+        if 'csv_data' in campaign_copy:
+            del campaign_copy['csv_data']
+        campaigns.append(campaign_copy)
 
     # Calculate metrics from actual campaign results
     total_clients = len(clients)
