@@ -2922,9 +2922,11 @@ async def get_campaign_analytics(campaign_id: str):
                                     print(f"   corrected_duration: {corrected_duration} (type: {type(corrected_duration)})")
 
                                     if call_length is not None and call_length != 0:
-                                        duration = parse_duration(call_length)
-                                        print(f"   Using call_length: {call_length} -> {duration} seconds")
+                                        # call_length is in MINUTES, convert to seconds
+                                        duration = int(float(call_length) * 60)
+                                        print(f"   Using call_length: {call_length} minutes -> {duration} seconds")
                                     elif corrected_duration is not None and corrected_duration != 0:
+                                        # corrected_duration is in SECONDS
                                         duration = parse_duration(corrected_duration)
                                         print(f"   Using corrected_duration: {corrected_duration} -> {duration} seconds")
                                     else:
@@ -3139,9 +3141,12 @@ async def get_call_details(call_id: str):
             print(f"  corrected_duration: {corrected_duration} (type: {type(corrected_duration)})")
 
             if call_length is not None and call_length != 0:
-                duration = parse_duration(call_length)
-                print(f"  Using call_length: {call_length} -> {duration} seconds")
+                # call_length is in MINUTES, convert to seconds
+                duration_in_seconds = int(float(call_length) * 60)
+                print(f"  Using call_length: {call_length} minutes -> {duration_in_seconds} seconds")
+                duration = duration_in_seconds
             elif corrected_duration is not None and corrected_duration != 0:
+                # corrected_duration is in SECONDS
                 duration = parse_duration(corrected_duration)
                 print(f"  Using corrected_duration: {corrected_duration} -> {duration} seconds")
             else:
