@@ -1090,21 +1090,23 @@ async def dashboard(request: Request):
     total_calls = 0
     total_duration_seconds = 0
 
-    # Aggregate data from all campaign results (including CSV uploads)
-    for campaign_id, campaign_results in campaign_results_db.items():
+    # Aggregate data from all campaign results (including multiple runs)
+    for result_key, campaign_results in campaign_results_db.items():
         if 'results' in campaign_results:
             total_calls += len(campaign_results['results'])
 
             # Calculate actual duration from individual call results
+            campaign_duration = 0
             for result in campaign_results['results']:
                 if result.get('success'):
                     # Use actual duration if available
                     duration = result.get('duration', 0)
                     if duration and duration > 0:
                         total_duration_seconds += duration
-                        print(f"📊 Adding duration: {duration}s from {result.get('patient_name', 'Unknown')} in {campaign_id}")
-                    
-        print(f"📊 Campaign {campaign_id}: {len(campaign_results.get('results', []))} calls processed")
+                        campaign_duration += duration
+                        print(f"📊 Adding duration: {duration}s from {result.get('patient_name', 'Unknown')} in {result_key}")
+
+            print(f"📊 Campaign {result_key}: {len(campaign_results.get('results', []))} calls processed, {campaign_duration}s total duration")
 
     # Format total duration
     formatted_duration = format_duration_display(total_duration_seconds)
@@ -2178,18 +2180,14 @@ async def process_csv(file: UploadFile = File(...),
         print(f"   Total results: {len(results)}")
         print(f"   ✅ All rows accounted for: {len(rows) == len(results)}")
 
-        # Calculate summary
-        successful_calls = sum(1 for r in results if r.success)
-        failed_calls = len(results) - successful_calls
-
         # Store results in a format similar to campaigns so dashboard can display them
         csv_results = {
             "campaign_id": csv_session_id,
             "campaign_name": f"CSV Upload - {datetime.now().strftime('%Y-%m-%d %H:%M')}",
             "client_name": "Direct Upload",
             "total_calls": len(results),
-            "successful_calls": successful_calls,
-            "failed_calls": failed_calls,
+            "successful_calls": sum(1 for r in results if r.success),
+            "failed_calls": len(results) - sum(1 for r in results if r.success),
             "started_at": datetime.now().isoformat(),
             "results": [result.dict() for result in results]
         }
@@ -2202,8 +2200,8 @@ async def process_csv(file: UploadFile = File(...),
         return {
             "success": True,
             "total_calls": len(results),
-            "successful_calls": successful_calls,
-            "failed_calls": failed_calls,
+            "successful_calls": sum(1 for r in results if r.success),
+            "failed_calls": len(results) - sum(1 for r in results if r.success),
             "results": [result.dict() for result in results],
             "session_id": csv_session_id
         }
@@ -2354,7 +2352,7 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
         elif "is confirmed" in summary_lower or "appointment on" in summary_lower:
             return 'confirmed', "Patient confirmed appointment"
 
-    # Check for wrong number patterns from AI response
+    # Check for AI wrong number patterns from AI response
     if any(phrase in summary_lower for phrase in [
         "wrong number", "incorrect contact", "my apologies for the confusion",
         "no one by that name", "nobody by that name", "don't know", "never heard of",
@@ -3127,7 +3125,7 @@ async def get_call_details(call_id: str):
             print(f"📊 API call data keys: {list(call_data.keys())}")
 
             # Get transcript from multiple possible fields
-            transcript = (call_data.get("transcript", "") or 
+            transcript = (call_data.get("transcript", "") or
                           call_data.get("concatenated_transcript", "") or
                           (stored_call_data.get("transcript", "") if stored_call_data else ""))
 
@@ -3414,7 +3412,7 @@ async def get_dashboard_metrics():
                         if duration and duration > 0:
                             total_duration_seconds += duration
                             print(f"📊 API: Adding duration: {duration}s from {result.get('patient_name', 'Unknown')} in {result_key}")
-                        
+
             print(f"📊 API: Campaign {result_key}: {len(campaign_results.get('results', []))} calls processed")
 
         # Format total duration
