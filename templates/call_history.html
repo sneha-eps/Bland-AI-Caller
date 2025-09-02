@@ -779,6 +779,14 @@
                     <input type="text" id="searchFilter" placeholder="Search by patient name or phone..." oninput="applyFilters()">
                 </div>
                 <div class="filter-group">
+                    <label for="dateFromFilter">From Date</label>
+                    <input type="date" id="dateFromFilter" onchange="applyFilters()">
+                </div>
+                <div class="filter-group">
+                    <label for="dateToFilter">To Date</label>
+                    <input type="date" id="dateToFilter" onchange="applyFilters()">
+                </div>
+                <div class="filter-group">
                     <button class="btn-secondary" onclick="clearFilters()">
                         <i class="fas fa-times"></i>
                         Clear Filters
@@ -1070,6 +1078,8 @@
             const campaignFilter = document.getElementById('campaignFilter').value;
             const statusFilter = document.getElementById('statusFilter').value;
             const searchFilter = document.getElementById('searchFilter').value.toLowerCase();
+            const dateFromFilter = document.getElementById('dateFromFilter').value;
+            const dateToFilter = document.getElementById('dateToFilter').value;
 
             filteredCallHistory = allCallHistory.filter(call => {
                 const matchesClient = !clientFilter || call.clientName === clientFilter;
@@ -1079,7 +1089,46 @@
                     call.patientName.toLowerCase().includes(searchFilter) ||
                     call.phoneNumber.toLowerCase().includes(searchFilter);
 
-                return matchesClient && matchesCampaign && matchesStatus && matchesSearch;
+                // Date range filtering
+                let matchesDateRange = true;
+                if (dateFromFilter || dateToFilter) {
+                    try {
+                        // Extract date from call.dateTime (which could be in various formats)
+                        let callDate = null;
+                        
+                        if (call.dateTime && call.dateTime !== 'Unknown') {
+                            // Try to parse the date from the datetime string
+                            const dateObj = new Date(call.dateTime);
+                            if (!isNaN(dateObj.getTime())) {
+                                // Convert to YYYY-MM-DD format for comparison
+                                callDate = dateObj.toISOString().split('T')[0];
+                            } else {
+                                // Try to extract date part manually if it's in a different format
+                                const dateMatch = call.dateTime.match(/(\d{4}-\d{2}-\d{2})/);
+                                if (dateMatch) {
+                                    callDate = dateMatch[1];
+                                }
+                            }
+                        }
+
+                        if (callDate) {
+                            if (dateFromFilter && callDate < dateFromFilter) {
+                                matchesDateRange = false;
+                            }
+                            if (dateToFilter && callDate > dateToFilter) {
+                                matchesDateRange = false;
+                            }
+                        } else if (dateFromFilter || dateToFilter) {
+                            // If we can't parse the date but filters are set, exclude the call
+                            matchesDateRange = false;
+                        }
+                    } catch (error) {
+                        console.error('Error parsing date for filtering:', call.dateTime, error);
+                        matchesDateRange = false;
+                    }
+                }
+
+                return matchesClient && matchesCampaign && matchesStatus && matchesSearch && matchesDateRange;
             });
 
             displayCallHistory();
@@ -1091,6 +1140,8 @@
             document.getElementById('campaignFilter').value = '';
             document.getElementById('statusFilter').value = '';
             document.getElementById('searchFilter').value = '';
+            document.getElementById('dateFromFilter').value = '';
+            document.getElementById('dateToFilter').value = '';
             applyFilters();
         }
 
