@@ -453,6 +453,31 @@
             color: var(--danger-color);
         }
 
+        .status-initiated {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning-color);
+        }
+
+        .status-processing {
+            background: rgba(245, 158, 11, 0.1);
+            color: var(--warning-color);
+        }
+
+        .status-completed {
+            background: rgba(16, 185, 129, 0.1);
+            color: var(--success-color);
+        }
+
+        .status-unknown {
+            background: rgba(107, 114, 128, 0.1);
+            color: var(--text-secondary);
+        }
+
+        .status-busy {
+            background: rgba(107, 114, 128, 0.1);
+            color: var(--text-secondary);
+        }
+
         .transcript-preview {
             max-width: 200px;
             overflow: hidden;
@@ -920,9 +945,36 @@
                     allCampaigns[campaign.id] = campaign;
                 });
 
-                // Process campaign results into call history
+                // Process campaign results into call history with enhanced data fetching
                 allCallHistory = [];
                 
+                // Get all unique campaign IDs that have analytics data
+                const uniqueCampaignIds = new Set();
+                Object.entries(debugData.debug_info.campaign_details).forEach(([campaignRunId, campaignResults]) => {
+                    const campaignId = campaignResults.is_csv_upload ? 
+                        campaignRunId : 
+                        campaignRunId.split('_run_')[0];
+                    uniqueCampaignIds.add(campaignId);
+                });
+
+                // Fetch analytics for each campaign to get accurate durations, statuses, and summaries
+                const campaignAnalytics = {};
+                for (const campaignId of uniqueCampaignIds) {
+                    try {
+                        console.log(`Fetching analytics for campaign: ${campaignId}`);
+                        const analyticsResponse = await fetch(`/campaign_analytics/${campaignId}`);
+                        const analyticsData = await analyticsResponse.json();
+                        
+                        if (analyticsData.success) {
+                            campaignAnalytics[campaignId] = analyticsData.analytics;
+                            console.log(`Analytics loaded for ${campaignId}: ${analyticsData.analytics.calls.length} calls`);
+                        }
+                    } catch (error) {
+                        console.error(`Error fetching analytics for campaign ${campaignId}:`, error);
+                    }
+                }
+
+                // Now process campaign results with enhanced analytics data
                 Object.entries(debugData.debug_info.campaign_details).forEach(([campaignRunId, campaignResults]) => {
                     const campaignId = campaignResults.is_csv_upload ? 
                         campaignRunId : 
@@ -930,26 +982,42 @@
                     
                     const campaign = allCampaigns[campaignId] || { name: campaignResults.campaign_name, client_id: null };
                     const client = campaign.client_id ? allClients[campaign.client_id] : { name: campaignResults.client_name };
+                    
+                    // Get analytics data for this campaign
+                    const analytics = campaignAnalytics[campaignId];
 
                     campaignResults.call_details.forEach(callDetail => {
+                        // Find matching call in analytics to get enhanced data
+                        let enhancedCallData = null;
+                        if (analytics && analytics.calls) {
+                            enhancedCallData = analytics.calls.find(call => 
+                                call.call_id === callDetail.call_id || 
+                                call.patient_name === callDetail.patient_name
+                            );
+                        }
+
                         const callRecord = {
                             clientName: client ? client.name : 'Unknown Client',
                             campaignName: campaign.name || 'Unknown Campaign',
                             patientName: callDetail.patient_name,
-                            phoneNumber: callDetail.phone_number || 'Unknown',
-                            status: callDetail.call_status || 'Unknown',
-                            duration: 0, // Will be fetched if needed
-                            dateTime: campaignResults.started_at || 'Unknown',
-                            finalSummary: callDetail.final_summary || 'No summary available',
-                            transcript: callDetail.has_transcript ? 'View Transcript' : 'No transcript',
+                            phoneNumber: enhancedCallData ? enhancedCallData.phone_number : (callDetail.phone_number || 'Unknown'),
+                            status: enhancedCallData ? enhancedCallData.call_status : (callDetail.call_status || 'Unknown'),
+                            duration: enhancedCallData ? enhancedCallData.duration : 0,
+                            dateTime: enhancedCallData ? enhancedCallData.created_at : (campaignResults.started_at || 'Unknown'),
+                            finalSummary: enhancedCallData ? enhancedCallData.final_summary : (callDetail.final_summary || 'No summary available'),
+                            transcript: (enhancedCallData && enhancedCallData.transcript) ? 'View Transcript' : 
+                                       (callDetail.has_transcript ? 'View Transcript' : 'No transcript'),
                             callId: callDetail.call_id,
                             success: callDetail.success,
                             campaignId: campaignId,
-                            campaignRunId: campaignRunId
+                            campaignRunId: campaignRunId,
+                            hasEnhancedData: !!enhancedCallData
                         };
                         allCallHistory.push(callRecord);
                     });
                 });
+
+                console.log(`Processed ${allCallHistory.length} calls with enhanced analytics data`);
 
                 // Populate filter dropdowns
                 populateFilters();
@@ -1045,26 +1113,55 @@
 
             let html = '';
             filteredCallHistory.forEach(call => {
-                const statusClass = `status-${call.status.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+                // Determine status display and class
+                const status = call.status && call.status !== 'Unknown' ? call.status : 'busy_voicemail';
+                const statusClass = `status-${status.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+                
+                // Format date/time
                 const formattedDateTime = formatDateTime(call.dateTime);
+                
+                // Format duration
                 const durationDisplay = call.duration > 0 ? formatDuration(call.duration) : '-';
+                
+                // Format phone number (remove +91 or other country codes for display if needed)
+                let displayPhone = call.phoneNumber;
+                if (displayPhone && displayPhone !== 'Unknown') {
+                    // Keep full number but make it readable
+                    if (displayPhone.startsWith('+91')) {
+                        displayPhone = `+91 ${displayPhone.slice(3)}`;
+                    } else if (displayPhone.startsWith('+1')) {
+                        displayPhone = `+1 ${displayPhone.slice(2)}`;
+                    }
+                }
+                
+                // Format final summary with truncation
+                let summaryDisplay = call.finalSummary || 'No summary available';
+                const maxSummaryLength = 80;
+                if (summaryDisplay.length > maxSummaryLength) {
+                    summaryDisplay = summaryDisplay.substring(0, maxSummaryLength) + '...';
+                }
+                
+                // Enhanced transcript link
+                let transcriptCell;
+                if (call.callId && call.transcript && call.transcript !== 'No transcript') {
+                    transcriptCell = `<span class="transcript-preview" onclick="viewTranscript('${call.callId}', '${call.patientName}')">
+                        <i class="fas fa-file-alt"></i> View Transcript
+                    </span>`;
+                } else {
+                    transcriptCell = '<span style="color: var(--text-tertiary);"><i class="fas fa-ban"></i> No transcript</span>';
+                }
                 
                 html += `
                     <tr>
                         <td><strong>${call.clientName}</strong></td>
                         <td>${call.campaignName}</td>
                         <td>${call.patientName}</td>
-                        <td>${call.phoneNumber}</td>
-                        <td><span class="status-badge-small ${statusClass}">${formatStatus(call.status)}</span></td>
-                        <td>${durationDisplay}</td>
+                        <td style="font-family: monospace;">${displayPhone}</td>
+                        <td><span class="status-badge-small ${statusClass}">${formatStatus(status)}</span></td>
+                        <td><strong>${durationDisplay}</strong></td>
                         <td>${formattedDateTime}</td>
-                        <td class="transcript-preview" title="${call.finalSummary}">${call.finalSummary}</td>
-                        <td>
-                            ${call.callId ? 
-                                `<span class="transcript-preview" onclick="viewTranscript('${call.callId}', '${call.patientName}')">View Transcript</span>` : 
-                                '<span style="color: var(--text-tertiary);">No transcript</span>'
-                            }
-                        </td>
+                        <td class="transcript-preview" title="${call.finalSummary || 'No summary'}">${summaryDisplay}</td>
+                        <td>${transcriptCell}</td>
                     </tr>
                 `;
             });
@@ -1076,14 +1173,19 @@
         function formatStatus(status) {
             const statusMap = {
                 'confirmed': 'Confirmed',
-                'cancelled': 'Cancelled',
+                'cancelled': 'Cancelled', 
                 'rescheduled': 'Rescheduled',
                 'busy_voicemail': 'Busy/Voicemail',
                 'not_available': 'Not Available',
                 'wrong_number': 'Wrong Number',
-                'failed': 'Failed'
+                'failed': 'Failed',
+                'initiated': 'In Progress',
+                'processing': 'Processing',
+                'completed': 'Completed',
+                'unknown': 'Unknown',
+                'busy': 'Busy/Voicemail'
             };
-            return statusMap[status] || status;
+            return statusMap[status] || (status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown');
         }
 
         // Format duration
