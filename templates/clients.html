@@ -661,7 +661,7 @@
                 <div class="client-header">
                     <div class="client-name">{{ client.name }}</div>
                     <div class="client-actions">
-                        <button class="btn-delete" onclick="openDeleteClientModal('{{ client.id }}', '{{ client.name }}')" title="Delete Client">
+                        <button class="btn-delete" onclick="event.stopPropagation(); openDeleteClientModal('{{ client.id }}', '{{ client.name }}')" title="Delete Client">
                             <i class="fas fa-trash"></i>
                         </button>
                     </div>
