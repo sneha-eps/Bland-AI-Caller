@@ -1095,10 +1095,15 @@ async def dashboard(request: Request):
         if 'results' in campaign_results:
             total_calls += len(campaign_results['results'])
 
-            # Calculate duration from individual call results if available
+            # Calculate actual duration from individual call results
             for result in campaign_results['results']:
-                if result.get('success'):
-                    total_duration_seconds += 60  # Estimate 1 minute per successful call
+                if result.get('success') and result.get('duration'):
+                    # Use actual duration if available
+                    duration = result.get('duration', 0)
+                    total_duration_seconds += duration
+                elif result.get('success'):
+                    # For calls without duration data, don't estimate
+                    total_duration_seconds += 0
 
     # Format total duration
     formatted_duration = format_duration_display(total_duration_seconds)
@@ -3400,10 +3405,15 @@ async def get_dashboard_metrics():
             if 'results' in campaign_results:
                 total_calls += len(campaign_results['results'])
 
-                # Calculate duration from individual call results if available
+                # Calculate actual duration from individual call results
                 for result in campaign_results['results']:
-                    if result.get('success'):
-                        total_duration_seconds += 60  # Estimate 1 minute per successful call
+                    if result.get('success') and result.get('duration'):
+                        # Use actual duration if available
+                        duration = result.get('duration', 0)
+                        total_duration_seconds += duration
+                    elif result.get('success'):
+                        # For calls without duration data, don't estimate
+                        total_duration_seconds += 0
 
         # Format total duration
         formatted_duration = format_duration_display(total_duration_seconds)
