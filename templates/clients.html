@@ -476,6 +476,35 @@
             box-shadow: 0 8px 20px rgba(79, 70, 229, 0.3);
         }
 
+        .client-actions {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-delete {
+            background: var(--danger-color);
+            color: white;
+            border: none;
+            border-radius: 6px;
+            padding: 0.5rem;
+            cursor: pointer;
+            transition: var(--transition);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 36px;
+            height: 36px;
+        }
+
+        .btn-delete:hover {
+            background: #dc2626;
+            transform: translateY(-1px);
+        }
+
+        .btn-delete i {
+            font-size: 0.875rem;
+        }
+
         .empty-state {
             text-align: center;
             padding: 4rem 2rem;
@@ -631,6 +660,11 @@
             <div class="client-card" onclick="viewClientCampaigns('{{ client.id }}', '{{ client.name }}')">
                 <div class="client-header">
                     <div class="client-name">{{ client.name }}</div>
+                    <div class="client-actions">
+                        <button class="btn-delete" onclick="openDeleteClientModal('{{ client.id }}', '{{ client.name }}')" title="Delete Client">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="client-info">
                     <div class="info-item">
@@ -668,6 +702,35 @@
             </button>
         </div>
         {% endif %}
+    </div>
+
+    <!-- Delete Client Modal -->
+    <div id="deleteClientModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header" style="background: linear-gradient(135deg, var(--danger-color) 0%, #dc2626 100%);">
+                <h3><i class="fas fa-exclamation-triangle"></i> Delete Client</h3>
+                <button class="modal-close" onclick="closeDeleteClientModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div style="text-align: center; padding: 1rem 0;">
+                    <i class="fas fa-exclamation-triangle" style="font-size: 3rem; color: var(--danger-color); margin-bottom: 1rem;"></i>
+                    <h4 style="margin-bottom: 1rem; color: var(--text-primary);">Are you sure you want to delete this client?</h4>
+                    <p style="color: var(--text-secondary); margin-bottom: 2rem;">
+                        This will permanently delete <strong id="deleteClientName"></strong> and all associated campaigns. This action cannot be undone.
+                    </p>
+                    <div style="display: flex; gap: 1rem; justify-content: center;">
+                        <button type="button" class="btn-secondary" onclick="closeDeleteClientModal()" style="background: var(--text-tertiary); color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 8px; cursor: pointer;">
+                            Cancel
+                        </button>
+                        <button type="button" class="btn-danger" onclick="confirmDeleteClient()" style="background: var(--danger-color); color: white; padding: 0.75rem 1.5rem; border: none; border-radius: 8px; cursor: pointer;">
+                            <i class="fas fa-trash"></i> Delete Client
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <!-- Add Client Modal -->
@@ -918,11 +981,54 @@
             window.location.href = `/campaigns?client_id=${clientId}&client_name=${encodeURIComponent(clientName)}`;
         }
 
+        // Delete client functionality
+        let clientToDelete = null;
+
+        function openDeleteClientModal(clientId, clientName) {
+            clientToDelete = clientId;
+            document.getElementById('deleteClientName').textContent = clientName;
+            document.getElementById('deleteClientModal').style.display = 'block';
+        }
+
+        function closeDeleteClientModal() {
+            document.getElementById('deleteClientModal').style.display = 'none';
+            clientToDelete = null;
+        }
+
+        async function confirmDeleteClient() {
+            if (!clientToDelete) return;
+
+            try {
+                const response = await fetch(`/delete_client/${clientToDelete}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('Client deleted successfully!');
+                    window.location.reload();
+                } else {
+                    alert('Error deleting client: ' + (result.detail || result.message || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error deleting client: ' + error.message);
+            }
+
+            closeDeleteClientModal();
+        }
+
         // Close modal when clicking outside
         window.onclick = function(event) {
-            const modal = document.getElementById('addClientModal');
-            if (event.target === modal) {
+            const addModal = document.getElementById('addClientModal');
+            const deleteModal = document.getElementById('deleteClientModal');
+            if (event.target === addModal) {
                 closeAddClientModal();
+            } else if (event.target === deleteModal) {
+                closeDeleteClientModal();
             }
         }
     </script>

@@ -1334,6 +1334,46 @@ async def add_client(request: Request, client: Client):
     save_clients_db(clients_db)
     return {"success": True, "client_id": client_id, "message": "Client added successfully"}
 
+@app.delete("/delete_client/{client_id}")
+async def delete_client(request: Request, client_id: str):
+    """Delete a client and all associated campaigns (admin only)"""
+    user = require_admin(request)
+    
+    if client_id not in clients_db:
+        raise HTTPException(status_code=404, detail="Client not found")
+    
+    client_name = clients_db[client_id].get("name", "Unknown")
+    
+    # Delete the client
+    del clients_db[client_id]
+    save_clients_db(clients_db)
+    
+    # Delete all campaigns associated with this client
+    campaigns_to_delete = []
+    for campaign_id, campaign in campaigns_db.items():
+        if campaign.get("client_id") == client_id:
+            campaigns_to_delete.append(campaign_id)
+    
+    for campaign_id in campaigns_to_delete:
+        del campaigns_db[campaign_id]
+        # Also delete campaign results
+        results_to_delete = []
+        for result_key in campaign_results_db.keys():
+            if result_key == campaign_id or result_key.startswith(f"{campaign_id}_run_"):
+                results_to_delete.append(result_key)
+        
+        for result_key in results_to_delete:
+            del campaign_results_db[result_key]
+    
+    # Save changes
+    save_campaigns_db(campaigns_db)
+    save_campaign_results_db(campaign_results_db)
+    
+    return {
+        "success": True, 
+        "message": f"Client '{client_name}' and {len(campaigns_to_delete)} associated campaigns deleted successfully"
+    }
+
 @app.get("/api/users")
 async def get_users(request: Request):
     """Get all users (admin only)"""
