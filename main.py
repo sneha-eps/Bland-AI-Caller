@@ -321,6 +321,7 @@ def get_call_prompt(city_name: str = "",
 
     CONVERSATION FLOW (STRICT ORDER)
     1) OPENING
+    **IMPORTANT:** Deliver this opening line slowly and very clearly, with a distinct pause between the two parts.
     Respond to their initial greeting with: "Hi, I'm calling from [clinic name]. Am I speaking with {patient_name}?"
 
     REMEMBER: Any greeting after this opening should be treated as a polite acknowledgment, not a conversation restart.
