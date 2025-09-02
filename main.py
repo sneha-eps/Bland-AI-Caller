@@ -3429,7 +3429,42 @@ async def get_dashboard_metrics():
                         stored_duration = result.get('duration', 0)
                         if stored_duration and stored_duration > 0:
                             campaign_duration += stored_duration
-                            print(f"📊 Dashboard: Adding {stored_duration}s from {result.get('patient_name', 'Unknown')} in campaign {campaign_id}")
+                            print(f"📊 Dashboard: Adding stored {stored_duration}s from {result.get('patient_name', 'Unknown')} in campaign {campaign_id}")
+                        else:
+                            # Fetch fresh duration from API if stored duration is missing/zero
+                            try:
+                                print(f"📊 Dashboard: Fetching fresh duration for {result.get('patient_name', 'Unknown')} call {result.get('call_id')}")
+                                import requests
+                                api_key = get_api_key()
+                                if api_key:
+                                    response = requests.get(
+                                        f"https://api.bland.ai/v1/calls/{result['call_id']}",
+                                        headers={"Authorization": f"Bearer {api_key}"},
+                                        timeout=10
+                                    )
+                                    if response.status_code == 200:
+                                        call_data = response.json()
+                                        # Parse duration using same logic as campaign analytics
+                                        call_length = call_data.get("call_length")
+                                        corrected_duration = call_data.get("corrected_duration")
+                                        
+                                        if call_length is not None and call_length != 0:
+                                            # call_length is in MINUTES, convert to seconds
+                                            duration = int(float(call_length) * 60)
+                                        elif corrected_duration is not None and corrected_duration != 0:
+                                            # corrected_duration is in SECONDS
+                                            duration = parse_duration(corrected_duration)
+                                        else:
+                                            raw_duration = (call_data.get("duration", 0) or call_data.get("length", 0))
+                                            duration = parse_duration(raw_duration)
+                                        
+                                        if duration > 0:
+                                            campaign_duration += duration
+                                            print(f"📊 Dashboard: Adding fresh {duration}s from {result.get('patient_name', 'Unknown')} in campaign {campaign_id}")
+                                    else:
+                                        print(f"📊 Dashboard: API error {response.status_code} for call {result.get('call_id')}")
+                            except Exception as e:
+                                print(f"📊 Dashboard: Error fetching fresh duration for {result.get('call_id')}: {str(e)}")
 
                 total_duration_seconds += campaign_duration
                 print(f"📊 Dashboard: Campaign {campaign_id} total duration: {campaign_duration}s")
