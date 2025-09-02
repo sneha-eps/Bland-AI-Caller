@@ -3388,7 +3388,7 @@ async def debug_call_data(call_id: str):
 
 @app.get("/api/dashboard_metrics")
 async def get_dashboard_metrics():
-    """Get updated dashboard metrics"""
+    """Get updated dashboard metrics by aggregating campaign analytics"""
     try:
         # Calculate metrics from actual campaign results
         clients = load_clients()
@@ -3399,24 +3399,49 @@ async def get_dashboard_metrics():
         total_calls = 0
         total_duration_seconds = 0
 
-        # Aggregate data from all campaign results (including multiple runs)
-        for result_key, campaign_results in campaign_results_db.items():
-            if 'results' in campaign_results:
-                total_calls += len(campaign_results['results'])
+        # Get all unique campaign IDs
+        unique_campaign_ids = set()
+        for campaign in campaigns:
+            unique_campaign_ids.add(campaign['id'])
 
-                # Calculate actual duration from individual call results
-                for result in campaign_results['results']:
-                    if result.get('success'):
-                        # Use actual duration if available
-                        duration = result.get('duration', 0)
-                        if duration and duration > 0:
-                            total_duration_seconds += duration
-                            print(f"📊 API: Adding duration: {duration}s from {result.get('patient_name', 'Unknown')} in {result_key}")
+        print(f"📊 Dashboard metrics: Processing {len(unique_campaign_ids)} unique campaigns")
 
-            print(f"📊 API: Campaign {result_key}: {len(campaign_results.get('results', []))} calls processed")
+        # For each campaign, calculate its total duration using the same logic as campaign analytics
+        for campaign_id in unique_campaign_ids:
+            campaign_runs = {}
+            
+            # Find all runs for this campaign ID (same logic as campaign analytics)
+            for stored_key, stored_results in campaign_results_db.items():
+                if stored_key == campaign_id or stored_key.startswith(f"{campaign_id}_run_"):
+                    campaign_runs[stored_key] = stored_results
+
+            if campaign_runs:
+                # Aggregate all results from all runs of this campaign
+                all_results = []
+                for run_key, run_data in campaign_runs.items():
+                    all_results.extend(run_data.get('results', []))
+                    print(f"📊 Dashboard: Found run {run_key} with {len(run_data.get('results', []))} calls")
+
+                # Count calls for this campaign
+                total_calls += len(all_results)
+
+                # Calculate duration for this campaign using same logic as campaign analytics
+                campaign_duration = 0
+                for result in all_results:
+                    if result.get('success') and result.get('call_id'):
+                        # Use stored duration if available (from webhook updates)
+                        stored_duration = result.get('duration', 0)
+                        if stored_duration and stored_duration > 0:
+                            campaign_duration += stored_duration
+                            print(f"📊 Dashboard: Adding {stored_duration}s from {result.get('patient_name', 'Unknown')} in campaign {campaign_id}")
+
+                total_duration_seconds += campaign_duration
+                print(f"📊 Dashboard: Campaign {campaign_id} total duration: {campaign_duration}s")
 
         # Format total duration
         formatted_duration = format_duration_display(total_duration_seconds)
+
+        print(f"📊 Dashboard final metrics: {total_calls} calls, {total_duration_seconds}s total ({formatted_duration})")
 
         return {
             "success": True,
@@ -3428,6 +3453,7 @@ async def get_dashboard_metrics():
             }
         }
     except Exception as e:
+        print(f"❌ Error calculating dashboard metrics: {str(e)}")
         return {
             "success": False,
             "message": f"Error calculating metrics: {str(e)}"
