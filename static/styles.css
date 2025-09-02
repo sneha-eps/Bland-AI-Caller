@@ -287,7 +287,9 @@ body {
 }
 
 .theme-toggle:hover {
-    background: var(--bg-secondary);
+    background: var(--bg-tertiary);
+    transform: scale(1.1);
+    box-shadow: var(--shadow-md);
 }
 
 /* Header actions and user menu */
@@ -320,19 +322,19 @@ body {
 }
 
 .header-action {
-    background: var(--bg-secondary);
+    background: none;
     border: 1px solid var(--border-color);
     color: var(--text-primary);
     padding: 0.5rem 1rem;
     border-radius: var(--border-radius-sm);
     font-size: 0.875rem;
+    font-weight: 600;
     cursor: pointer;
     transition: var(--transition);
     display: flex;
     align-items: center;
     gap: 0.5rem;
     text-decoration: none;
-    font-weight: 500;
 }
 
 .header-action:hover {
@@ -1542,19 +1544,19 @@ input[type="file"] {
 }
 
 .header-action {
-    background: var(--bg-secondary);
+    background: none;
     border: 1px solid var(--border-color);
     color: var(--text-primary);
     padding: 0.5rem 1rem;
     border-radius: var(--border-radius-sm);
     font-size: 0.875rem;
+    font-weight: 600;
     cursor: pointer;
     transition: var(--transition);
     display: flex;
     align-items: center;
     gap: 0.5rem;
     text-decoration: none;
-    font-weight: 500;
 }
 
 .header-action:hover {

@@ -1702,58 +1702,7 @@
     </div>
 
     <script>
-        // Theme management
-        const themeToggle = document.getElementById('themeToggle');
-        const body = document.body;
-        const themeIcon = themeToggle.querySelector('i');
-
-        const savedTheme = localStorage.getItem('theme') || 'light';
-        body.setAttribute('data-theme', savedTheme);
-        updateThemeIcon(savedTheme);
-
-        themeToggle.addEventListener('click', () => {
-            const currentTheme = body.getAttribute('data-theme');
-            const newTheme = currentTheme === 'light' ? 'dark' : 'light';
-
-            body.setAttribute('data-theme', newTheme);
-            localStorage.setItem('theme', newTheme);
-            updateThemeIcon(newTheme);
-        });
-
-        function updateThemeIcon(theme) {
-            themeIcon.className = theme === 'light' ? 'fas fa-moon' : 'fas fa-sun';
-        }
-
-        // Sidebar management
-        const sidebar = document.getElementById('sidebar');
-        const sidebarToggle = document.getElementById('sidebarToggle');
-        const sidebarOverlay = document.getElementById('sidebarOverlay');
-        const mainContent = document.getElementById('mainContent');
-
-        if (sidebarToggle) {
-            sidebarToggle.addEventListener('click', toggleSidebar);
-        }
-        if (sidebarOverlay) {
-            sidebarOverlay.addEventListener('click', closeSidebar);
-        }
-
-        function toggleSidebar() {
-            if (sidebar) sidebar.classList.toggle('open');
-            if (sidebarOverlay) sidebarOverlay.classList.toggle('active');
-            if (mainContent) mainContent.classList.toggle('sidebar-open');
-        }
-
-        function closeSidebar() {
-            if (sidebar) sidebar.classList.remove('open');
-            if (sidebarOverlay) sidebarOverlay.classList.remove('active');
-            if (mainContent) mainContent.classList.remove('sidebar-open');
-        }
-
-        window.addEventListener('resize', () => {
-            if (window.innerWidth >= 1024) {
-                closeSidebar();
-            }
-        });
+        // Theme and sidebar management is handled by common.js
 
         // Modal management
         function openCreateCampaignModal() {
