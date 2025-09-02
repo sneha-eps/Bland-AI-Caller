@@ -3721,16 +3721,7 @@ async def bland_webhook(request: Request):
     """Webhook to receive Bland AI call updates and update the main results DB."""
     try:
         data = await request.json()
-        
-        # Enhanced logging for debugging
-        print(f"🔔 WEBHOOK RECEIVED at {datetime.now().isoformat()}")
-        print(f"🔔 Request host: {request.headers.get('host', 'unknown')}")
-        print(f"🔔 Request URL: {request.url}")
-        print(f"🔔 Webhook data: {data}")
-        
-        # Log current environment state
-        print(f"📊 Current environment has {len(campaign_results_db)} campaigns with results")
-        print(f"📊 Campaign IDs in memory: {list(campaign_results_db.keys())}")
+        print(f"🔔 Webhook received: {data}")
 
         call_id = data.get("call_id")
         request_data = data.get("request_data", {})
@@ -3810,71 +3801,6 @@ async def call_history_page(request: Request):
         "request": request,
         "current_user": user
     })
-
-@app.get("/debug/environment_status")
-async def debug_environment_status(request: Request):
-    """Debug endpoint to check current environment status and data"""
-    try:
-        return {
-            "success": True,
-            "environment_info": {
-                "host": request.headers.get('host', 'unknown'),
-                "request_url": str(request.url),
-                "timestamp": datetime.now().isoformat(),
-                "data_files_exist": {
-                    "campaign_results": os.path.exists(CAMPAIGN_RESULTS_FILE),
-                    "campaigns": os.path.exists(CAMPAIGNS_FILE),
-                    "clients": os.path.exists(CLIENTS_FILE)
-                },
-                "in_memory_data": {
-                    "campaigns_count": len(campaigns_db),
-                    "clients_count": len(clients_db),
-                    "campaign_results_count": len(campaign_results_db),
-                    "campaign_result_keys": list(campaign_results_db.keys())
-                },
-                "recent_calls": [
-                    {
-                        "campaign_id": k,
-                        "campaign_name": v.get("campaign_name", "Unknown"),
-                        "total_calls": v.get("total_calls", 0),
-                        "started_at": v.get("started_at", "Unknown")
-                    }
-                    for k, v in list(campaign_results_db.items())[-5:]  # Last 5 campaigns
-                ]
-            }
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "error": str(e)
-        }
-
-@app.post("/debug/force_data_reload")
-async def force_data_reload():
-    """Force reload all data from persistent storage"""
-    global clients_db, campaigns_db, campaign_results_db
-    try:
-        # Reload all data from files
-        clients_db = load_clients_db()
-        campaigns_db = load_campaigns_db()
-        campaign_results_db = load_campaign_results_db()
-        
-        print(f"✅ Force reloaded data: {len(clients_db)} clients, {len(campaigns_db)} campaigns, {len(campaign_results_db)} campaign results")
-        
-        return {
-            "success": True,
-            "message": "Data reloaded from persistent storage",
-            "counts": {
-                "clients": len(clients_db),
-                "campaigns": len(campaigns_db),
-                "campaign_results": len(campaign_results_db)
-            }
-        }
-    except Exception as e:
-        return {
-            "success": False,
-            "error": str(e)
-        }
 
 @app.get("/docs")
 async def get_docs():

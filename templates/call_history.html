@@ -744,14 +744,6 @@
                 <i class="fas fa-sync-alt"></i>
                 Refresh
             </button>
-            <button class="btn-secondary" onclick="debugEnvironment()" style="margin-left: 0.5rem;">
-                <i class="fas fa-bug"></i>
-                Debug Environment
-            </button>
-            <button class="btn-secondary" onclick="forceDataReload()" style="margin-left: 0.5rem;">
-                <i class="fas fa-database"></i>
-                Force Reload Data
-            </button>
         </div>
 
         <!-- Filters Section -->
@@ -1466,64 +1458,6 @@
         // Refresh call history
         function refreshCallHistory() {
             loadCallHistory();
-        }
-
-        // Debug environment status
-        async function debugEnvironment() {
-            try {
-                showLoadingState();
-                const response = await fetch('/debug/environment_status');
-                const data = await response.json();
-                
-                if (data.success) {
-                    console.log('Environment Debug Info:', data.environment_info);
-                    alert(`Environment Status:
-Host: ${data.environment_info.host}
-Campaigns: ${data.environment_info.in_memory_data.campaigns_count}
-Clients: ${data.environment_info.in_memory_data.clients_count}
-Campaign Results: ${data.environment_info.in_memory_data.campaign_results_count}
-Recent Campaigns: ${data.environment_info.recent_calls.length}
-
-Check console for detailed info.`);
-                } else {
-                    alert('Debug failed: ' + data.error);
-                }
-            } catch (error) {
-                console.error('Debug error:', error);
-                alert('Debug error: ' + error.message);
-            } finally {
-                hideLoadingState();
-            }
-        }
-
-        // Force reload data from storage
-        async function forceDataReload() {
-            try {
-                showLoadingState();
-                const response = await fetch('/debug/force_data_reload', { method: 'POST' });
-                const data = await response.json();
-                
-                if (data.success) {
-                    alert(`Data reloaded successfully!
-Clients: ${data.counts.clients}
-Campaigns: ${data.counts.campaigns}
-Campaign Results: ${data.counts.campaign_results}
-
-Refreshing call history...`);
-                    
-                    // Refresh the call history after reloading data
-                    setTimeout(() => {
-                        loadCallHistory();
-                    }, 1000);
-                } else {
-                    alert('Data reload failed: ' + data.error);
-                }
-            } catch (error) {
-                console.error('Data reload error:', error);
-                alert('Data reload error: ' + error.message);
-            } finally {
-                hideLoadingState();
-            }
         }
 
         // Close modal when clicking outside
