@@ -1009,7 +1009,7 @@
                             campaignName: campaign.name || 'Unknown Campaign',
                             patientName: callDetail.patient_name,
                             phoneNumber: enhancedCallData ? enhancedCallData.phone_number : (callDetail.phone_number || 'Unknown'),
-                            status: enhancedCallData ? enhancedCallData.call_status : (callDetail.call_status || 'Unknown'),
+                            status: enhancedCallData ? enhancedCallData.call_status : (callDetail.call_status || 'busy_voicemail'),
                             duration: enhancedCallData ? enhancedCallData.duration : 0,
                             dateTime: enhancedCallData ? enhancedCallData.created_at : (campaignResults.started_at || 'Unknown'),
                             finalSummary: enhancedCallData ? enhancedCallData.final_summary : (callDetail.final_summary || 'No summary available'),
@@ -1164,8 +1164,17 @@
 
             let html = '';
             filteredCallHistory.forEach(call => {
-                // Determine status display and class
-                const status = call.status && call.status !== 'Unknown' ? call.status : 'busy_voicemail';
+                // Determine status display and class - prioritize enhanced analytics data
+                let status = 'busy_voicemail'; // Default fallback
+                
+                if (call.hasEnhancedData && call.status && call.status !== 'Unknown') {
+                    // Use status from enhanced analytics data (most accurate)
+                    status = call.status;
+                } else if (call.status && call.status !== 'Unknown') {
+                    // Use basic status if available
+                    status = call.status;
+                }
+                
                 const statusClass = `status-${status.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
                 
                 // Format date/time
@@ -1270,7 +1279,7 @@
                     return 'Invalid Date';
                 }
                 
-                // Try to create a Date object
+                // Try to create a Date object directly first
                 const date = new Date(cleanedStr);
                 
                 // Check if the date is valid
@@ -1303,13 +1312,28 @@
                             
                             const reconstructedDate = new Date(year, month, day, hour, minute, second);
                             if (!isNaN(reconstructedDate.getTime())) {
-                                return reconstructedDate.toLocaleString() + ' (Reconstructed)';
+                                // Format without the "(Reconstructed)" suffix
+                                const options = {
+                                    year: 'numeric',
+                                    month: '2-digit',
+                                    day: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    second: '2-digit',
+                                    hour12: true
+                                };
+                                return reconstructedDate.toLocaleString('en-US', options);
                             }
                         }
                     }
                     
-                    // If all parsing fails, return a safe representation
-                    return `Invalid Date (${cleanedStr.substring(0, 20)}${cleanedStr.length > 20 ? '...' : ''})`;
+                    // If all parsing fails, return a clean date if possible
+                    const simpleDateMatch = cleanedStr.match(/(\d{4}-\d{1,2}-\d{1,2})/);
+                    if (simpleDateMatch) {
+                        return simpleDateMatch[1] + ' (Time unavailable)';
+                    }
+                    
+                    return 'Invalid Date';
                 }
                 
                 // Check for unreasonable dates
@@ -1333,7 +1357,7 @@
                 
             } catch (error) {
                 console.error('Date formatting error:', error, 'Input:', dateTimeStr);
-                return `Date Error (${String(dateTimeStr).substring(0, 15)}...)`;
+                return 'Invalid Date';
             }
         }
 
