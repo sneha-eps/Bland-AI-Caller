@@ -638,22 +638,22 @@ def convert_utc_to_ist(utc_datetime_str):
         # Handle different datetime formats
         if isinstance(utc_datetime_str, str):
             original_str = utc_datetime_str.strip()
-            
+
             # Skip empty or very short strings
             if len(original_str) < 8:
                 return "Invalid Date"
-            
+
             # Handle common invalid formats early
             if original_str.lower() in ['invalid date', 'nan', 'null', 'none', '']:
                 return "Invalid Date"
-            
+
             utc_datetime_str = original_str
-            
+
             # Fix incomplete timezone formats like "+00:" to "+00:00"
             if utc_datetime_str.endswith(('+00:', '-00:', '+01:', '-01:', '+02:', '-02:')):
                 utc_datetime_str = utc_datetime_str[:-1] + '00'
                 print(f"🔧 Fixed timezone format: {original_str} -> {utc_datetime_str}")
-            
+
             # Fix other malformed timezone patterns
             import re
             # Pattern for fixing "+nn:" or "-nn:" at the end
@@ -661,30 +661,30 @@ def convert_utc_to_ist(utc_datetime_str):
             if tz_pattern.search(utc_datetime_str):
                 utc_datetime_str = tz_pattern.sub(r'\1:00', utc_datetime_str)
                 print(f"🔧 Fixed timezone pattern: {original_str} -> {utc_datetime_str}")
-            
+
             # Handle microseconds - fix malformed microsecond parts
             if '.' in utc_datetime_str and not utc_datetime_str.endswith('Z'):
                 parts = utc_datetime_str.split('.')
                 if len(parts) > 1:
                     # Extract microseconds and timezone parts
                     microsecond_and_tz = parts[1]
-                    
+
                     # Look for timezone indicator
                     tz_index = -1
                     for i, char in enumerate(microsecond_and_tz):
                         if char in ['+', '-']:
                             tz_index = i
                             break
-                    
+
                     if tz_index >= 0:
                         # Split microseconds and timezone
                         microseconds = microsecond_and_tz[:tz_index]
                         timezone_part = microsecond_and_tz[tz_index:]
-                        
+
                         # Clean up microseconds - remove any non-digit characters
                         microseconds = re.sub(r'[^\d]', '', microseconds)[:6]
                         microseconds = microseconds.ljust(6, '0')
-                        
+
                         # Reconstruct the datetime string
                         utc_datetime_str = parts[0] + '.' + microseconds + timezone_part
                     else:
@@ -692,7 +692,7 @@ def convert_utc_to_ist(utc_datetime_str):
                         microseconds = re.sub(r'[^\d]', '', microsecond_and_tz)[:6]
                         microseconds = microseconds.ljust(6, '0')
                         utc_datetime_str = parts[0] + '.' + microseconds
-                        
+
                     print(f"🔧 Fixed microseconds: {original_str} -> {utc_datetime_str}")
 
             # Handle Z suffix
@@ -704,7 +704,7 @@ def convert_utc_to_ist(utc_datetime_str):
 
         # Parse the datetime string with multiple strategies
         utc_dt = None
-        
+
         # Strategy 1: Direct ISO format parsing
         try:
             if any(tz in utc_datetime_str for tz in ['+', '-']) and not utc_datetime_str.endswith('UTC'):
@@ -716,7 +716,7 @@ def convert_utc_to_ist(utc_datetime_str):
                 utc_dt = utc_dt.replace(tzinfo=pytz.UTC)
         except ValueError as e:
             print(f"🔧 ISO parsing failed for {utc_datetime_str}: {e}")
-            
+
         # Strategy 2: Manual parsing if ISO failed
         if utc_dt is None:
             try:
@@ -733,7 +733,7 @@ def convert_utc_to_ist(utc_datetime_str):
                     '%Y-%m-%dT%H:%M:%S.%f',
                     '%Y-%m-%dT%H:%M:%S'
                 ]
-                
+
                 for pattern in date_patterns:
                     try:
                         if 'Z' in pattern and utc_datetime_str.endswith('Z'):
@@ -749,10 +749,10 @@ def convert_utc_to_ist(utc_datetime_str):
                             break
                     except ValueError:
                         continue
-                        
+
                 if utc_dt:
                     print(f"🔧 Manual parsing succeeded for {utc_datetime_str}")
-                        
+
             except Exception as e:
                 print(f"🔧 Manual parsing also failed for {utc_datetime_str}: {e}")
 
@@ -771,14 +771,14 @@ def convert_utc_to_ist(utc_datetime_str):
             if isinstance(utc_datetime_str, str):
                 # Strategy 1: Extract just the date and time without timezone
                 import re
-                
+
                 # Try to extract ISO-like date and time
                 datetime_patterns = [
                     r'(\d{4}-\d{2}-\d{2})[T\s](\d{2}:\d{2}:\d{2})',
                     r'(\d{4}-\d{2}-\d{2})[T\s](\d{2}:\d{2})',
                     r'(\d{4}-\d{2}-\d{2})'
                 ]
-                
+
                 for pattern in datetime_patterns:
                     match = re.search(pattern, utc_datetime_str)
                     if match:
@@ -789,20 +789,20 @@ def convert_utc_to_ist(utc_datetime_str):
                         else:
                             date_part = match.group(1)
                             return f"{date_part} (Time unavailable)"
-                
+
                 # If no pattern matches, try to extract any valid date
                 date_only_match = re.search(r'\d{4}-\d{1,2}-\d{1,2}', utc_datetime_str)
                 if date_only_match:
                     return f"{date_only_match.group(0)} (Parsed from: {utc_datetime_str[:20]}...)"
-                
+
                 # Last resort: return a safe representation
                 safe_repr = re.sub(r'[^\w\s\-\:\.T]', '', utc_datetime_str)[:30]
                 return f"Date parsing failed ({safe_repr})"
-                
+
         except Exception as fallback_error:
             print(f"🔧 Even fallback parsing failed: {fallback_error}")
             pass
-        
+
         return "Invalid Date"
 
 
@@ -1215,7 +1215,7 @@ async def dashboard(request: Request):
     # Load clients and campaigns data for dashboard
     clients = load_clients()
     campaigns_raw = load_campaigns()
-    
+
     # Remove file data from campaigns to make them JSON serializable
     campaigns = []
     for campaign in campaigns_raw:
@@ -1354,22 +1354,22 @@ async def add_client(request: Request, client: Client):
 async def delete_client(request: Request, client_id: str):
     """Delete a client and all associated campaigns (admin only)"""
     user = require_admin(request)
-    
+
     if client_id not in clients_db:
         raise HTTPException(status_code=404, detail="Client not found")
-    
+
     client_name = clients_db[client_id].get("name", "Unknown")
-    
+
     # Delete the client
     del clients_db[client_id]
     save_clients_db(clients_db)
-    
+
     # Delete all campaigns associated with this client
     campaigns_to_delete = []
     for campaign_id, campaign in campaigns_db.items():
         if campaign.get("client_id") == client_id:
             campaigns_to_delete.append(campaign_id)
-    
+
     for campaign_id in campaigns_to_delete:
         del campaigns_db[campaign_id]
         # Also delete campaign results
@@ -1377,16 +1377,16 @@ async def delete_client(request: Request, client_id: str):
         for result_key in campaign_results_db.keys():
             if result_key == campaign_id or result_key.startswith(f"{campaign_id}_run_"):
                 results_to_delete.append(result_key)
-        
+
         for result_key in results_to_delete:
             del campaign_results_db[result_key]
-    
+
     # Save changes
     save_campaigns_db(campaigns_db)
     save_campaign_results_db(campaign_results_db)
-    
+
     return {
-        "success": True, 
+        "success": True,
         "message": f"Client '{client_name}' and {len(campaigns_to_delete)} associated campaigns deleted successfully"
     }
 
@@ -2399,34 +2399,34 @@ def extract_final_summary(transcript: str) -> str:
         return "No summary available"
 
     transcript_lines = transcript.strip().split('\n')
-    
+
     # First, look for the patient's actual decision in the transcript
     patient_decision = None
-    
+
     # Scan through the transcript to find the patient's final decision
     for line in transcript_lines:
         line = line.strip()
         if line.startswith('user:'):
             user_statement = line.replace('user:', '').strip().lower()
-            
+
             # Check for reschedule requests
             if any(phrase in user_statement for phrase in [
-                "i want to reschedule", "want to reschedule", "reschedule", 
-                "different time", "better time", "new time", "can we reschedule", 
+                "i want to reschedule", "want to reschedule", "reschedule",
+                "different time", "better time", "new time", "can we reschedule",
                 "need to reschedule", "change the time", "move the appointment"
             ]):
                 patient_decision = "Patient requested to reschedule"
-            
+
             # Check for cancellation requests
             elif any(phrase in user_statement for phrase in [
-                "i want to cancel", "want to cancel", "cancel", "can't make it", 
+                "i want to cancel", "want to cancel", "cancel", "can't make it",
                 "won't make it", "cannot make it", "unable to make it"
             ]):
                 patient_decision = "Patient cancelled appointment"
-            
+
             # Check for confirmations (but only if no reschedule/cancel found)
             elif patient_decision is None and any(phrase in user_statement for phrase in [
-                "yes", "okay", "sure", "that works", "sounds good", "i'll be there", 
+                "yes", "okay", "sure", "that works", "sounds good", "i'll be there",
                 "i will be there", "see you then", "confirm"
             ]) and not any(negative in user_statement for negative in [
                 "no", "can't", "won't", "unable", "reschedule", "cancel"
@@ -2629,7 +2629,7 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
 
     # Enhanced transcript analysis as fallback
     if transcript and transcript.strip():
-        # Look specifically for AI assistant's final confirmation statements
+        # Look specifically for AI's final confirmation statements
         transcript_lower = transcript.lower()
 
         # Check for AI's final confirmation patterns
@@ -2725,6 +2725,40 @@ def analyze_call_transcript(transcript: str) -> str:
         if pattern in transcript_lower:
             return 'not_available'
 
+    # Check for interrupted/incomplete conversations EARLY (before other analysis)
+    interrupted_patterns = [
+        "thank you, bye", "bye bye", "goodbye", "gotta go", "have to go",
+        "talk to you later", "see you later", "catch you later", "yes, sir. bye"
+    ]
+
+    # Analyze conversation flow to detect interruptions
+    lines = [line.strip() for line in transcript.split('\n') if line.strip()]
+    ai_was_confirming = False
+    patient_interrupted = False
+
+    for i, line in enumerate(lines):
+        if line.startswith('assistant:'):
+            line_content = line.replace('assistant:', '').strip().lower()
+            # Check if AI was in middle of confirming appointment
+            if any(phrase in line_content for phrase in [
+                'confirm your upcoming appointment', 'reason for my call is to confirm',
+                'upcoming appointment on', 'will you be able to make it'
+            ]):
+                ai_was_confirming = True
+        elif line.startswith('user:'):
+            user_response = line.replace('user:', '').strip().lower()
+            # If user says goodbye/thanks while AI was confirming, it's an interruption
+            if ai_was_confirming and any(pattern in user_response for pattern in interrupted_patterns):
+                patient_interrupted = True
+                break
+            # Reset if user gives substantial response
+            if len(user_response.split()) > 3 and not any(pattern in user_response for pattern in interrupted_patterns):
+                ai_was_confirming = False
+
+    # If conversation was interrupted without clear appointment decision, return busy_voicemail
+    if patient_interrupted:
+        return 'busy_voicemail'
+
     # Split transcript into sentences for better analysis
     sentences = [s.strip() for s in transcript_lower.replace('.', '|').replace('!', '|').replace('?', '|').split('|') if s.strip()]
 
@@ -2733,14 +2767,13 @@ def analyze_call_transcript(transcript: str) -> str:
 
     # Define more comprehensive keyword patterns
     confirmation_patterns = [
-        # Direct confirmations
+        # Direct confirmations - MUST be clear and unambiguous
         "yes, i'll be there", "yes i will be there", "yes that works", "yes that's fine",
         "yes i can make it", "yes i will make it", "yes that's good", "yes sounds good",
         "i'll be there", "i will be there", "i can make it", "i will make it",
         "see you then", "see you there", "sounds good", "that works", "that's fine",
-        "perfect", "great", "excellent", "wonderful", "good", "okay", "sure",
         "confirmed", "confirm", "looking forward", "will be there", "plan to be there",
-        # Contextual confirmations
+        # Contextual confirmations - only if followed by appointment details
         "yes to confirm", "yes for confirmation", "confirming", "i confirm"
     ]
 
@@ -2774,11 +2807,12 @@ def analyze_call_transcript(transcript: str) -> str:
     for i, sentence in enumerate(sentences):
         sentence = sentence.strip()
 
-        # Check for confirmations
+        # Check for confirmations - but be more strict
         for pattern in confirmation_patterns:
             if pattern in sentence:
-                # Make sure it's not negated
-                if not any(neg in sentence for neg in ["don't", "do not", "won't", "will not", "can't", "cannot", "no", "not"]):
+                # Make sure it's not negated AND not followed by goodbye
+                if (not any(neg in sentence for neg in ["don't", "do not", "won't", "will not", "can't", "cannot", "no", "not"]) and
+                    not any(bye in sentence for bye in ["bye", "goodbye", "gotta go", "have to go"])):
                     decisions.append(('confirmed', i))
                 break
 
@@ -2821,16 +2855,32 @@ def analyze_call_transcript(transcript: str) -> str:
 
     has_interaction = any(indicator in transcript_lower for indicator in interaction_indicators)
 
-    # If we have a real conversation but no clear decision, analyze sentiment
+    # If we have a real conversation but no clear decision, check for ambiguous responses
     if has_interaction and len(transcript.strip()) > 20:
+        # Check for ambiguous or polite but non-committal responses
+        ambiguous_patterns = [
+            "thank you", "thanks", "okay", "alright", "yes sir", "yes ma'am"
+        ]
+
+        # If transcript mainly contains polite but non-committal responses, it's ambiguous
+        if any(pattern in transcript_lower for pattern in ambiguous_patterns):
+            # Only count as confirmed if there's explicit appointment confirmation
+            appointment_confirmation = any(phrase in transcript_lower for phrase in [
+                "i'll be there", "i will be there", "see you then", "confirmed",
+                "that works", "sounds good", "i can make it"
+            ])
+
+            if not appointment_confirmation:
+                return 'busy_voicemail'  # Treat ambiguous/interrupted as busy_voicemail
+
         # Look for positive vs negative sentiment in the overall response
-        positive_words = ["yes", "okay", "sure", "fine", "good", "great", "perfect", "alright"]
+        positive_words = ["yes", "sure", "fine", "good", "great", "perfect"]
         negative_words = ["no", "can't", "won't", "unable", "busy", "sorry", "problem"]
 
         positive_count = sum(1 for word in positive_words if word in transcript_lower)
         negative_count = sum(1 for word in negative_words if word in transcript_lower)
 
-        if positive_count > negative_count:
+        if positive_count > negative_count and positive_count > 1:  # Need multiple positive indicators
             return 'confirmed'
         elif negative_count > positive_count:
             return 'busy_voicemail'
@@ -3097,20 +3147,20 @@ async def get_campaign_analytics(campaign_id: str):
 
         # Process runs in chronological order (newer runs override older ones for same patient)
         sorted_runs = sorted(campaign_runs.items(), key=lambda x: x[1].get('started_at', ''))
-        
+
         for run_key, run_data in sorted_runs:
             run_results = run_data.get('results', [])
             print(f"📊 Processing run {run_key} with {len(run_results)} calls")
-            
+
             for result in run_results:
                 # Create unique identifier for each call
                 call_id = result.get('call_id')
                 patient_name = result.get('patient_name', 'Unknown')
                 phone_number = result.get('phone_number', 'Unknown')
-                
+
                 # Use call_id as primary key, fallback to patient+phone combination
                 unique_key = call_id if call_id else f"{patient_name}_{phone_number}"
-                
+
                 # If this is a newer call for the same patient/call_id, update it
                 if unique_key not in unique_calls_map or (
                     call_id and unique_calls_map[unique_key].get('call_id') != call_id
@@ -3216,7 +3266,7 @@ async def get_campaign_analytics(campaign_id: str):
                                     call_details['duration'] = duration
                                     total_duration += duration
 
-                                    # Priority order for status extraction: 
+                                    # Priority order for status extraction:
                                     # 1. Fresh transcript analysis (most accurate)
                                     # 2. Stored webhook data with summary
                                     # 3. Stored status only
@@ -3233,7 +3283,7 @@ async def get_campaign_analytics(campaign_id: str):
                                         final_summary = standardized_summary
                                         analysis_source = f"fresh_transcript_{len(transcript)}_chars"
                                         print(f"📊 Using fresh transcript for {call_details['patient_name']}: {call_status}")
-                                    
+
                                     # Priority 2: Stored final summary from webhook
                                     elif result.get('final_summary') and result.get('final_summary').strip():
                                         stored_final_summary = result.get('final_summary')
@@ -3241,7 +3291,7 @@ async def get_campaign_analytics(campaign_id: str):
                                         final_summary = standardized_summary
                                         analysis_source = "stored_summary"
                                         print(f"📊 Using stored summary for {call_details['patient_name']}: {call_status}")
-                                    
+
                                     # Priority 3: Stored status from webhook
                                     elif result.get('call_status'):
                                         call_status = result.get('call_status')
@@ -3249,7 +3299,7 @@ async def get_campaign_analytics(campaign_id: str):
                                         transcript = result.get('transcript', '')
                                         analysis_source = "stored_status"
                                         print(f"📊 Using stored status for {call_details['patient_name']}: {call_status}")
-                                    
+
                                     # Priority 4: No good data available
                                     else:
                                         call_status = 'busy_voicemail'
@@ -3704,7 +3754,7 @@ async def get_dashboard_metrics():
         # For each campaign, calculate its total duration using the same logic as campaign analytics
         for campaign_id in unique_campaign_ids:
             campaign_runs = {}
-            
+
             # Find all runs for this campaign ID (same logic as campaign analytics)
             for stored_key, stored_results in campaign_results_db.items():
                 if stored_key == campaign_id or stored_key.startswith(f"{campaign_id}_run_"):
@@ -3746,7 +3796,7 @@ async def get_dashboard_metrics():
                                         # Parse duration using same logic as campaign analytics
                                         call_length = call_data.get("call_length")
                                         corrected_duration = call_data.get("corrected_duration")
-                                        
+
                                         if call_length is not None and call_length != 0:
                                             # call_length is in MINUTES, convert to seconds
                                             duration = int(float(call_length) * 60)
@@ -3756,7 +3806,7 @@ async def get_dashboard_metrics():
                                         else:
                                             raw_duration = (call_data.get("duration", 0) or call_data.get("length", 0))
                                             duration = parse_duration(raw_duration)
-                                        
+
                                         if duration > 0:
                                             campaign_duration += duration
                                             print(f"📊 Dashboard: Adding fresh {duration}s from {result.get('patient_name', 'Unknown')} in campaign {campaign_id}")
