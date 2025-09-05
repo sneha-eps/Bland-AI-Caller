@@ -3246,7 +3246,7 @@ async def get_campaign_analytics(campaign_id: str):
 
                                     # Get transcript and other details with better field handling
                                     transcript = call_data.get('transcript', call_data.get('concatenated_transcript', ''))
-                                    # Parse duration more robustly
+                                    # Parse duration more robustly - prioritize call_length parameter
                                     call_length = call_data.get("call_length")
                                     corrected_duration = call_data.get("corrected_duration")
 
@@ -3405,7 +3405,7 @@ async def get_campaign_analytics(campaign_id: str):
         success_rate = round((successful_calls / total_calls * 100) if total_calls > 0 else 0, 1)
 
         # Format total duration
-        formatted_duration = format_duration_display(total_duration_seconds)
+        formatted_duration = format_duration_display(total_duration)
 
         analytics = {
             'total_calls': total_calls,

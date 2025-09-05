@@ -1925,11 +1925,6 @@
                         statusClass = 'busy_voicemail';
                         statusNote = call.transcript ? 'Voicemail detected in transcript' : 'No transcript - likely voicemail';
                         break;
-                    case 'unknown':
-                        statusIcon = 'fa-question-circle';
-                        statusClass = 'unknown';
-                        statusNote = 'Ambiguous or interrupted response';
-                        break;
                     case 'busy':
                         statusIcon = 'fa-phone-slash';
                         statusClass = 'busy';
