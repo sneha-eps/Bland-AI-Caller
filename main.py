@@ -2630,12 +2630,21 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
     if any(phrase in summary_lower for phrase in wrong_number_patterns):
         return 'wrong_number', "Wrong number or patient not available"
 
-    # Check for not available patterns
+    # Check for not available patterns - ENHANCED WITH "NOT THE PERSON" SCENARIOS
     not_available_patterns = [
         "not here right now", "isn't here", "is not here", "not available",
         "not home", "isn't home", "is not home", "out right now",
         "can't come to the phone", "cannot come to the phone", "busy right now",
-        "unavailable", "sleeping", "napping", "can you call back"
+        "unavailable", "sleeping", "napping", "can you call back",
+        # CRITICAL: "Not the person" patterns that should be classified as NOT AVAILABLE
+        "i'm not that person", "that's not me", "i am not that person", "that is not me",
+        "you're looking for someone else", "looking for someone else", "different person",
+        "not the right person", "wrong person", "someone else", "not me",
+        "i don't know who that is", "don't know that person", "never heard of that person",
+        "that person is not here", "that person isn't here", "person is not available",
+        "person is not here", "person isn't available", "they're not here",
+        "they are not here", "they're not available", "they are not available",
+        "not the person you're looking for", "not who you're looking for"
     ]
     if any(phrase in summary_lower for phrase in not_available_patterns):
         return 'not_available', "Patient not available"
@@ -2704,7 +2713,7 @@ def analyze_call_transcript(transcript: str) -> str:
         if pattern in transcript_lower:
             return 'wrong_number'
 
-    # Check for not available scenarios (second priority)
+    # Check for not available scenarios (second priority) - ENHANCED PATTERNS
     not_available_patterns = [
         "not here right now", "isn't here", "is not here", "not available",
         "not home", "isn't home", "is not home", "out right now",
@@ -2712,7 +2721,15 @@ def analyze_call_transcript(transcript: str) -> str:
         "in a meeting", "at work", "not in", "stepped out", "away from",
         "will be back", "call back later", "try calling later", "not around",
         "unavailable", "sleeping", "napping", "can you call back",
-        "not a good time", "isn't a good time", "bad time"
+        "not a good time", "isn't a good time", "bad time",
+        # CRITICAL ADDITIONS for "not the person" scenarios
+        "i'm not that person", "that's not me", "i am not that person", "that is not me",
+        "you're looking for someone else", "looking for someone else", "different person",
+        "not the right person", "wrong person", "someone else", "not me",
+        "i don't know who that is", "don't know that person", "never heard of that person",
+        "that person is not here", "that person isn't here", "person is not available",
+        "person is not here", "person isn't available", "they're not here",
+        "they are not here", "they're not available", "they are not available"
     ]
 
     for pattern in not_available_patterns:
