@@ -390,5 +390,33 @@
         "duration": 0
       }
     ]
+  },
+  "f660c0eb-079f-48a9-96f1-9d5326a09e7e_run_20250905_072524": {
+    "campaign_id": "f660c0eb-079f-48a9-96f1-9d5326a09e7e",
+    "campaign_run_id": "f660c0eb-079f-48a9-96f1-9d5326a09e7e_run_20250905_072524",
+    "campaign_name": "Test 4",
+    "client_name": "Hillside Primary Care",
+    "total_calls": 1,
+    "successful_calls": 1,
+    "failed_calls": 0,
+    "started_at": "2025-09-05T07:25:24.643538",
+    "completed_at": "2025-09-05T07:25:24.643548",
+    "status": "completed",
+    "run_number": 5,
+    "results": [
+      {
+        "success": true,
+        "call_id": "64b39ada-7e85-4870-bd24-6ac0d4069c70",
+        "status": "success",
+        "call_status": "initiated",
+        "transcript": null,
+        "final_summary": null,
+        "message": "Call successfully queued.",
+        "error": null,
+        "patient_name": "Sneha",
+        "phone_number": "+917014608325",
+        "duration": 0
+      }
+    ]
   }
 }
