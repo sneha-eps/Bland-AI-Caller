@@ -2527,24 +2527,48 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
     Determine call status based on final summary content primarily, with transcript as fallback.
     Returns a tuple: (call_status, standardized_summary)
     """
-    if not final_summary or final_summary.strip() == "" or final_summary.strip().lower() in ['unknown status', 'unknown', 'null', 'none']:
+    if not final_summary or final_summary.strip() == "" or final_summary.strip().lower() in ['unknown status', 'unknown', 'null', 'none', 'no summary available']:
         # Fallback to transcript analysis if no summary or unknown status
         if transcript and transcript.strip():
-            return analyze_call_transcript(transcript), "Analysis based on transcript"
+            analyzed_status = analyze_call_transcript(transcript)
+            return analyzed_status, get_standardized_summary_for_status(analyzed_status)
         return 'busy_voicemail', "No summary available"
 
     summary_lower = final_summary.lower().strip()
 
+    # CRITICAL: Check if this is webhook data with final summary from extract_final_summary
+    # If summary starts with standardized phrases, it means it's already analyzed
+    standardized_phrases = [
+        "patient confirmed", "patient cancelled", "patient requested to reschedule",
+        "wrong number", "patient not available", "patient gave ambiguous response",
+        "call completed", "call initiated but no response received"
+    ]
+
+    if any(summary_lower.startswith(phrase) for phrase in standardized_phrases):
+        # This is already a standardized summary, map it to status
+        if summary_lower.startswith("patient confirmed"):
+            return 'confirmed', final_summary
+        elif summary_lower.startswith("patient cancelled"):
+            return 'cancelled', final_summary
+        elif summary_lower.startswith("patient requested to reschedule"):
+            return 'rescheduled', final_summary
+        elif summary_lower.startswith("wrong number") or summary_lower.startswith("patient not available"):
+            return 'not_available', final_summary
+        elif summary_lower.startswith("patient gave ambiguous response"):
+            return 'unknown', final_summary
+        elif summary_lower.startswith("call initiated but no response received"):
+            return 'busy_voicemail', final_summary
+        else:
+            return 'busy_voicemail', final_summary
+
     # Check for ambiguous/unknown responses FIRST (highest priority for new unknown status)
     ambiguous_patterns = [
-        # Direct ambiguous phrases
         "i'm not sure", "not sure", "maybe", "perhaps", "i don't know", "don't know",
         "let me think", "let me check", "i'll have to", "i need to check",
-        "i'm uncertain", "uncertain", "unclear", "confused", "i don't understand",
-        # Vague responses that don't commit
+        "uncertain", "unclear", "confused", "i don't understand",
         "possibly", "might be", "could be", "depends", "we'll see",
-        "i'll get back to you", "call me back", "let me call you back",
-        # AI detecting ambiguous response
+        "let me get back to you", "i'll call you back", "call me back",
+        "i need to ask", "i have to ask", "not right now", "can't say right now",
         "patient gave ambiguous response", "response was unclear", "unclear response",
         "patient was unsure", "ambiguous answer", "non-committal response"
     ]
@@ -2556,22 +2580,22 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
         "appointment will be rescheduled", "will be rescheduled", "reschedule", "rescheduled",
         "scheduling agent will call", "will call you to find a new time", "someone will be in touch",
         "follow-up call arranged", "patient requested to reschedule", "arrange a new time",
-        "find a new time", "different time", "better time", "new appointment time"
+        "find a new time", "different time", "better time", "new appointment time",
+        "call you shortly to find a new time", "will call you soon", "will be in touch soon"
     ]
     if any(phrase in summary_lower for phrase in reschedule_patterns):
         return 'rescheduled', "Patient requested to reschedule"
 
-    # Check for AI cancellation processing patterns (third priority)
+    # Check for AI cancellation processing patterns (third priority) 
     cancellation_patterns = [
-        "ai processed cancellation", "patient cancelled", "appointment cancelled",
-        "appointment has been cancelled", "cancelled for you", "cancel this appointment"
+        "i will cancel", "appointment cancelled", "appointment has been cancelled", 
+        "cancelled for you", "cancel this appointment", "patient cancelled"
     ]
     if any(phrase in summary_lower for phrase in cancellation_patterns):
         return 'cancelled', "Patient cancelled appointment"
 
     # Special handling for "just to confirm" statements - analyze the full context
     if "just to confirm" in summary_lower:
-        # Check for reschedule indicators in the "just to confirm" statement
         if any(phrase in summary_lower for phrase in [
             "will be rescheduled", "reschedule", "scheduling agent", "arrange a new time",
             "find a new time", "different time", "call you soon"
@@ -2586,113 +2610,51 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
         ]):
             return 'confirmed', "Patient confirmed appointment"
 
-    # Check for AI confirmation patterns (lower priority - only if no reschedule/cancel/ambiguous found)
-    # MUST exclude cases that mention rescheduling, cancellation, or ambiguity
+    # Check for AI confirmation patterns
     confirmation_patterns = [
         "patient confirmed", "appointment confirmed", "confirmed appointment",
-        "ai provided confirmation", "confirmation details", "we are glad to have you"
+        "we are glad to have you", "excellent! we are glad", "great. our agent will call",
+        "perfect. someone will be in touch", "you're welcome! have a great day"
     ]
     if any(phrase in summary_lower for phrase in confirmation_patterns):
-        # Double-check that this isn't actually a reschedule, cancellation, or ambiguous response
-        if not any(reschedule_word in summary_lower for reschedule_word in reschedule_patterns + [
-            "different time", "better time", "new time", "call you back", "call you soon"
-        ]) and not any(cancel_word in summary_lower for cancel_word in cancellation_patterns) and not any(ambiguous_word in summary_lower for ambiguous_word in ambiguous_patterns):
-            # Additional check: Look at the actual transcript for user's final decision
-            if transcript and transcript.strip():
-                transcript_lower = transcript.lower()
-                # Check if user actually said ambiguous things in the transcript
-                if any(ambiguous_phrase in transcript_lower for ambiguous_phrase in [
-                    "i'm not sure", "not sure", "maybe", "perhaps", "i don't know",
-                    "let me think", "let me check", "uncertain", "unclear"
-                ]):
-                    return 'unknown', "Patient gave ambiguous response"
-                # Check if user actually said reschedule in the transcript
-                if any(reschedule_phrase in transcript_lower for reschedule_phrase in [
-                    "i want to reschedule", "want to reschedule", "reschedule", "different time",
-                    "better time", "new time", "can we reschedule", "need to reschedule"
-                ]):
-                    return 'rescheduled', "Patient requested to reschedule"
-                # Check if user actually said cancel in the transcript
-                if any(cancel_phrase in transcript_lower for cancel_phrase in [
-                    "i want to cancel", "want to cancel", "cancel", "can't make it", "won't make it"
-                ]):
-                    return 'cancelled', "Patient cancelled appointment"
+        # Only return confirmed if no conflicting patterns found
+        if not any(reschedule_word in summary_lower for reschedule_word in reschedule_patterns) and not any(cancel_word in summary_lower for cancel_word in cancellation_patterns):
             return 'confirmed', "Patient confirmed appointment"
 
-    # Check for AI wrong number patterns from AI response
-    if any(phrase in summary_lower for phrase in [
-        "wrong number", "incorrect contact", "my apologies for the confusion",
-        "no one by that name", "nobody by that name", "don't know", "never heard of",
-        "no such person", "no one here by that name", "nobody here by that name",
-        "you must have the wrong", "this isn't", "that's not me", "i'm not",
-        "who is this", "who are you looking for", "there's no", "nobody named",
-        "no one named", "you must have the wrong", "i think you have the wrong"
-    ]):
+    # Check for wrong number/not available patterns
+    wrong_number_patterns = [
+        "wrong number", "my apologies for the confusion", "no one by that name", 
+        "nobody by that name", "you must have the wrong", "this isn't", "that's not me",
+        "who is this", "who are you looking for", "there's no", "nobody named"
+    ]
+    if any(phrase in summary_lower for phrase in wrong_number_patterns):
         return 'wrong_number', "Wrong number or patient not available"
 
     # Check for not available patterns
-    if any(phrase in summary_lower for phrase in [
+    not_available_patterns = [
         "not here right now", "isn't here", "is not here", "not available",
         "not home", "isn't home", "is not home", "out right now",
         "can't come to the phone", "cannot come to the phone", "busy right now",
-        "in a meeting", "at work", "not in", "stepped out", "away from",
-        "will be back", "call back later", "try calling later", "not around",
-        "unavailable", "sleeping", "napping", "can you call back",
-        "not a good time", "isn't a good time", "bad time"
-    ]):
+        "unavailable", "sleeping", "napping", "can you call back"
+    ]
+    if any(phrase in summary_lower for phrase in not_available_patterns):
         return 'not_available', "Patient not available"
 
     # Check for voicemail/busy patterns
-    if any(phrase in summary_lower for phrase in [
+    voicemail_patterns = [
         "voicemail", "voice mail", "reached voicemail", "left message",
         "no answer", "line busy", "busy signal", "disconnected",
         "no response", "automated message", "no transcript available"
-    ]):
+    ]
+    if any(phrase in summary_lower for phrase in voicemail_patterns):
         return 'busy_voicemail', "Busy, voicemail, or no answer"
 
-    # Enhanced transcript analysis as fallback
+    # Fallback to transcript analysis if no patterns matched
     if transcript and transcript.strip():
-        # Look specifically for ambiguous responses in transcript first
-        transcript_lower = transcript.lower()
-        
-        # Check for ambiguous patterns in transcript
-        if any(phrase in transcript_lower for phrase in [
-            "i'm not sure", "not sure", "maybe", "perhaps", "i don't know",
-            "let me think", "let me check", "uncertain", "unclear", "confused"
-        ]):
-            return 'unknown', "Patient gave ambiguous response"
+        analyzed_status = analyze_call_transcript(transcript)
+        return analyzed_status, get_standardized_summary_for_status(analyzed_status)
 
-        # Check for AI's final confirmation statements
-        if any(phrase in transcript_lower for phrase in [
-            "just to confirm, your appointment", "we are glad to have you",
-            "have a great day", "see you then", "you're welcome"
-        ]):
-            return 'confirmed', "Patient confirmed appointment"
-
-        # Check for AI's cancellation processing
-        if any(phrase in transcript_lower for phrase in [
-            "i will cancel this appointment", "appointment has been cancelled",
-            "feel free to contact us anytime"
-        ]):
-            return 'cancelled', "Patient cancelled appointment"
-
-        # Check for AI's reschedule processing
-        if any(phrase in transcript_lower for phrase in [
-            "our scheduling agent will call you", "someone will be in touch soon",
-            "to find a new time", "will call you shortly"
-        ]):
-            return 'rescheduled', "Patient requested to reschedule"
-
-        # Check for AI's wrong number handling
-        if any(phrase in transcript_lower for phrase in [
-            "my apologies for the confusion", "thank you for your time"
-        ]):
-            return 'wrong_number', "Wrong number or patient not available"
-
-        # Use a more general transcript analyzer if specific patterns aren't found
-        return analyze_call_transcript(transcript), "Analysis based on transcript"
-
-    # Default to busy_voicemail with consistent message for failed/unknown calls
+    # Default fallback
     return 'busy_voicemail', "No summary available"
 
 
@@ -2781,14 +2743,14 @@ def analyze_call_transcript(transcript: str) -> str:
                 ai_was_confirming = True
         elif line.startswith('user:'):
             user_response = line.replace('user:', '').strip().lower()
-            
+
             # CRITICAL FIX: If user says goodbye/bye WHILE AI is explaining appointment details,
             # this is an interruption - they're not confirming the appointment
             if ai_was_confirming and any(pattern in user_response for pattern in interrupted_patterns):
                 # Additional check: make sure this isn't after a full appointment confirmation
                 previous_lines = lines[:i]  # Get all lines before this interruption
                 full_appointment_mentioned = False
-                
+
                 # Check if AI had completed giving appointment details before the interruption
                 for prev_line in previous_lines:
                     if prev_line.startswith('assistant:'):
@@ -2796,12 +2758,12 @@ def analyze_call_transcript(transcript: str) -> str:
                         # If AI mentioned complete appointment details (date, time, provider), then interruption is less likely
                         if all(keyword in prev_content for keyword in ['appointment', 'at']) and any(time_word in prev_content for time_word in ['pm', 'am', 'o\'clock']):
                             full_appointment_mentioned = True
-                
+
                 # If AI was still in middle of explaining OR patient interrupted before full details
                 if not full_appointment_mentioned or "perfect! the reason" in transcript.lower():
                     patient_interrupted = True
                     break
-            
+
             # Reset confirmation tracking if user gives substantial response without goodbye
             if len(user_response.split()) > 3 and not any(pattern in user_response for pattern in interrupted_patterns):
                 ai_was_confirming = False
@@ -2891,7 +2853,7 @@ def analyze_call_transcript(transcript: str) -> str:
         "uncertain", "unclear", "confused", "i don't understand",
         "possibly", "might be", "could be", "depends", "we'll see"
     ]
-    
+
     # Check each sentence for ambiguous responses
     for sentence in sentences:
         if any(ambiguous in sentence for ambiguous in ambiguous_indicators):
@@ -4042,21 +4004,21 @@ async def get_call_history_api():
         # Load clients and campaigns for lookups
         clients = {client['id']: client for client in load_clients()}
         campaigns = {campaign['id']: campaign for campaign in load_campaigns()}
-        
+
         all_calls = []
-        
+
         # Process all campaign results
         for campaign_id, campaign_results in campaign_results_db.items():
             campaign_name = campaign_results.get('campaign_name', 'Unknown Campaign')
             client_name = campaign_results.get('client_name', 'Unknown Client')
-            
+
             # Get actual campaign and client details if available
             if campaign_id in campaigns:
                 campaign_name = campaigns[campaign_id].get('name', campaign_name)
                 client_id = campaigns[campaign_id].get('client_id')
                 if client_id and client_id in clients:
                     client_name = clients[client_id].get('name', client_name)
-            
+
             # Process each call in the campaign results
             for result in campaign_results.get('results', []):
                 call_record = {
@@ -4073,22 +4035,22 @@ async def get_call_history_api():
                     'transcript': result.get('transcript', ''),
                     'campaign_id': campaign_id
                 }
-                
+
                 # Convert UTC to IST for display
                 if call_record['created_at']:
                     call_record['dateTime'] = convert_utc_to_ist(call_record['created_at'])
                 else:
                     call_record['dateTime'] = 'Unknown'
-                
+
                 all_calls.append(call_record)
-        
+
         # Sort calls by created_at timestamp in descending order (most recent first)
         def parse_datetime_for_sorting(datetime_str):
             """Parse datetime string for sorting purposes"""
             try:
                 if not datetime_str or datetime_str == 'Unknown':
                     return datetime.min
-                
+
                 # Try to parse ISO format datetime
                 if 'T' in datetime_str:
                     # Handle ISO format with or without timezone
@@ -4101,21 +4063,21 @@ async def get_call_history_api():
                     return datetime.fromisoformat(datetime_str)
             except:
                 return datetime.min
-        
+
         # Sort by created_at timestamp (most recent first)
         all_calls.sort(key=lambda x: parse_datetime_for_sorting(x.get('created_at', '')), reverse=True)
-        
+
         print(f"📊 Call history API: Returning {len(all_calls)} calls sorted by most recent first")
         if all_calls:
             print(f"📊 First call: {all_calls[0]['patient_name']} at {all_calls[0]['dateTime']}")
             print(f"📊 Last call: {all_calls[-1]['patient_name']} at {all_calls[-1]['dateTime']}")
-        
+
         return {
             "success": True,
             "calls": all_calls,
             "total_calls": len(all_calls)
         }
-        
+
     except Exception as e:
         print(f"❌ Error in call history API: {str(e)}")
         return {
