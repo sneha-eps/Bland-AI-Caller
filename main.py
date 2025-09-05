@@ -4059,18 +4059,58 @@ async def get_call_history_api():
             
             # Process each call in the campaign results
             for result in campaign_results.get('results', []):
+                # Enhanced status analysis - prioritize stored webhook data
+                call_status = 'busy_voicemail'  # Default fallback
+                final_summary = "No summary available"
+                duration = 0
+                transcript = result.get('transcript', '')
+                
+                # Priority 1: Use stored final summary and status from webhook if available
+                if result.get('final_summary') and result.get('final_summary').strip():
+                    stored_summary = result.get('final_summary')
+                    call_status, standardized_summary = analyze_call_status_from_summary(stored_summary, transcript)
+                    final_summary = standardized_summary
+                    print(f"📊 Call History API: Using stored summary for {result.get('patient_name', 'Unknown')}: {call_status}")
+                
+                # Priority 2: Use stored call_status if available and not 'initiated'/'processing'
+                elif result.get('call_status') and result.get('call_status') not in ['initiated', 'processing']:
+                    call_status = result.get('call_status')
+                    final_summary = get_standardized_summary_for_status(call_status)
+                    print(f"📊 Call History API: Using stored status for {result.get('patient_name', 'Unknown')}: {call_status}")
+                
+                # Priority 3: Analyze transcript if available
+                elif transcript and transcript.strip():
+                    extracted_summary = extract_final_summary(transcript)
+                    call_status, standardized_summary = analyze_call_status_from_summary(extracted_summary, transcript)
+                    final_summary = standardized_summary
+                    print(f"📊 Call History API: Using transcript analysis for {result.get('patient_name', 'Unknown')}: {call_status}")
+                
+                # Priority 4: Check if call was successful but no proper status
+                elif result.get('success') and result.get('call_id'):
+                    # Call was initiated but no final status - likely still processing or failed
+                    if result.get('call_status') in ['initiated', 'processing']:
+                        call_status = 'busy_voicemail'  # Treat as no answer
+                        final_summary = "Call initiated but no response received"
+                    else:
+                        call_status = 'busy_voicemail'
+                        final_summary = "No summary available"
+                    print(f"📊 Call History API: Using fallback for successful call {result.get('patient_name', 'Unknown')}: {call_status}")
+                
+                # Use stored duration or default to 0
+                duration = result.get('duration', 0) if result.get('duration') else 0
+                
                 call_record = {
                     'call_id': result.get('call_id'),
                     'patient_name': result.get('patient_name', 'Unknown'),
                     'phone_number': result.get('phone_number', 'Unknown'),
                     'campaign_name': campaign_name,
                     'client_name': client_name,
-                    'status': result.get('call_status', 'busy_voicemail'),
+                    'status': call_status,  # Use analyzed status
                     'success': result.get('success', False),
-                    'duration': result.get('duration', 0),
+                    'duration': duration,
                     'created_at': result.get('created_at') or campaign_results.get('started_at', ''),
-                    'final_summary': result.get('final_summary', 'No summary available'),
-                    'transcript': result.get('transcript', ''),
+                    'final_summary': final_summary,  # Use analyzed summary
+                    'transcript': transcript,
                     'campaign_id': campaign_id
                 }
                 
