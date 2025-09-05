@@ -4035,6 +4035,96 @@ async def call_history_page(request: Request):
         "current_user": user
     })
 
+@app.get("/api/call_history")
+async def get_call_history_api():
+    """Get call history data sorted by most recent first"""
+    try:
+        # Load clients and campaigns for lookups
+        clients = {client['id']: client for client in load_clients()}
+        campaigns = {campaign['id']: campaign for campaign in load_campaigns()}
+        
+        all_calls = []
+        
+        # Process all campaign results
+        for campaign_id, campaign_results in campaign_results_db.items():
+            campaign_name = campaign_results.get('campaign_name', 'Unknown Campaign')
+            client_name = campaign_results.get('client_name', 'Unknown Client')
+            
+            # Get actual campaign and client details if available
+            if campaign_id in campaigns:
+                campaign_name = campaigns[campaign_id].get('name', campaign_name)
+                client_id = campaigns[campaign_id].get('client_id')
+                if client_id and client_id in clients:
+                    client_name = clients[client_id].get('name', client_name)
+            
+            # Process each call in the campaign results
+            for result in campaign_results.get('results', []):
+                call_record = {
+                    'call_id': result.get('call_id'),
+                    'patient_name': result.get('patient_name', 'Unknown'),
+                    'phone_number': result.get('phone_number', 'Unknown'),
+                    'campaign_name': campaign_name,
+                    'client_name': client_name,
+                    'status': result.get('call_status', 'busy_voicemail'),
+                    'success': result.get('success', False),
+                    'duration': result.get('duration', 0),
+                    'created_at': result.get('created_at') or campaign_results.get('started_at', ''),
+                    'final_summary': result.get('final_summary', 'No summary available'),
+                    'transcript': result.get('transcript', ''),
+                    'campaign_id': campaign_id
+                }
+                
+                # Convert UTC to IST for display
+                if call_record['created_at']:
+                    call_record['dateTime'] = convert_utc_to_ist(call_record['created_at'])
+                else:
+                    call_record['dateTime'] = 'Unknown'
+                
+                all_calls.append(call_record)
+        
+        # Sort calls by created_at timestamp in descending order (most recent first)
+        def parse_datetime_for_sorting(datetime_str):
+            """Parse datetime string for sorting purposes"""
+            try:
+                if not datetime_str or datetime_str == 'Unknown':
+                    return datetime.min
+                
+                # Try to parse ISO format datetime
+                if 'T' in datetime_str:
+                    # Handle ISO format with or without timezone
+                    clean_datetime = datetime_str.replace('Z', '+00:00')
+                    if '+' not in clean_datetime and '-' not in clean_datetime[-6:]:
+                        clean_datetime += '+00:00'
+                    return datetime.fromisoformat(clean_datetime.replace('Z', '+00:00'))
+                else:
+                    # Try to parse other formats
+                    return datetime.fromisoformat(datetime_str)
+            except:
+                return datetime.min
+        
+        # Sort by created_at timestamp (most recent first)
+        all_calls.sort(key=lambda x: parse_datetime_for_sorting(x.get('created_at', '')), reverse=True)
+        
+        print(f"📊 Call history API: Returning {len(all_calls)} calls sorted by most recent first")
+        if all_calls:
+            print(f"📊 First call: {all_calls[0]['patient_name']} at {all_calls[0]['dateTime']}")
+            print(f"📊 Last call: {all_calls[-1]['patient_name']} at {all_calls[-1]['dateTime']}")
+        
+        return {
+            "success": True,
+            "calls": all_calls,
+            "total_calls": len(all_calls)
+        }
+        
+    except Exception as e:
+        print(f"❌ Error in call history API: {str(e)}")
+        return {
+            "success": False,
+            "message": f"Error loading call history: {str(e)}",
+            "calls": [],
+            "total_calls": 0
+        }
+
 @app.get("/docs")
 async def get_docs():
     """Access FastAPI automatic documentation"""

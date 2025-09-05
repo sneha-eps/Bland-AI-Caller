@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -867,147 +866,33 @@
             try {
                 showLoadingState();
 
-                // Fetch clients, campaigns, and campaign results in parallel
-                const [clientsResponse, campaignsResponse, debugResponse] = await Promise.all([
-                    fetch('/api/clients'),
-                    fetch('/api/campaigns'),
-                    fetch('/debug/campaign_results')
-                ]);
+                // Use the new call history API endpoint
+                const response = await fetch('/api/call_history');
+                const data = await response.json();
 
-                const clientsData = await clientsResponse.json();
-                const campaignsData = await campaignsResponse.json();
-                const debugData = await debugResponse.json();
-
-                if (!clientsData.success || !campaignsData.success || !debugData.success) {
-                    throw new Error('Failed to load data');
+                if (!data.success) {
+                    throw new Error(data.message || 'Failed to load call history');
                 }
 
-                // Process clients and campaigns for easy lookup
-                allClients = {};
-                clientsData.clients.forEach(client => {
-                    allClients[client.id] = client;
-                });
+                // Convert API response to frontend format
+                allCallHistory = data.calls.map(call => ({
+                    patientName: call.patient_name,
+                    phoneNumber: call.phone_number,
+                    campaignName: call.campaign_name,
+                    clientName: call.client_name,
+                    status: call.status,
+                    duration: call.duration,
+                    dateTime: call.dateTime, // Already converted to IST by backend
+                    finalSummary: call.final_summary,
+                    transcript: call.transcript ? 'View Transcript' : 'No transcript',
+                    callId: call.call_id,
+                    success: call.success,
+                    campaignId: call.campaign_id,
+                    hasEnhancedData: true,
+                    dataSource: 'api_endpoint'
+                }));
 
-                allCampaigns = {};
-                campaignsData.campaigns.forEach(campaign => {
-                    allCampaigns[campaign.id] = campaign;
-                });
-
-                // Process campaign results into call history with enhanced data fetching
-                allCallHistory = [];
-                
-                // Get all unique campaign IDs that have analytics data
-                const uniqueCampaignIds = new Set();
-                Object.entries(debugData.debug_info.campaign_details).forEach(([campaignRunId, campaignResults]) => {
-                    const campaignId = campaignResults.is_csv_upload ? 
-                        campaignRunId : 
-                        campaignRunId.split('_run_')[0];
-                    uniqueCampaignIds.add(campaignId);
-                });
-
-                // Fetch analytics for each campaign to get accurate durations, statuses, and summaries
-                const campaignAnalytics = {};
-                for (const campaignId of uniqueCampaignIds) {
-                    try {
-                        console.log(`Fetching analytics for campaign: ${campaignId}`);
-                        const analyticsResponse = await fetch(`/campaign_analytics/${campaignId}`);
-                        const analyticsData = await analyticsResponse.json();
-                        
-                        if (analyticsData.success) {
-                            campaignAnalytics[campaignId] = analyticsData.analytics;
-                            console.log(`Analytics loaded for ${campaignId}: ${analyticsData.analytics.calls.length} calls`);
-                        }
-                    } catch (error) {
-                        console.error(`Error fetching analytics for campaign ${campaignId}:`, error);
-                    }
-                }
-
-                // Process each unique campaign and use analytics data directly to avoid duplicates
-                const processedCalls = new Map(); // Use Map to track unique calls by call_id
-                
-                // Process analytics data instead of debug data to get accurate, non-duplicated calls
-                Object.entries(campaignAnalytics).forEach(([campaignId, analytics]) => {
-                    if (!analytics || !analytics.calls) return;
-                    
-                    const campaign = allCampaigns[campaignId] || { name: 'Unknown Campaign', client_id: null };
-                    const client = campaign.client_id ? allClients[campaign.client_id] : { name: 'Unknown Client' };
-                    
-                    // Process each call from analytics (this contains the most accurate data)
-                    analytics.calls.forEach(callData => {
-                        // Create unique key for each call - use call_id if available, otherwise patient+phone combination
-                        const uniqueKey = callData.call_id || `${callData.patient_name}_${callData.phone_number}`;
-                        
-                        // Only process if we haven't seen this exact call before
-                        if (!processedCalls.has(uniqueKey)) {
-                            const callRecord = {
-                                clientName: client ? client.name : 'Unknown Client',
-                                campaignName: campaign.name || 'Unknown Campaign',
-                                patientName: callData.patient_name,
-                                phoneNumber: callData.phone_number || 'Unknown',
-                                status: callData.call_status || 'busy_voicemail',
-                                duration: callData.duration || 0,
-                                dateTime: callData.created_at || 'Unknown',
-                                finalSummary: callData.final_summary || 'No summary available',
-                                transcript: (callData.transcript && callData.transcript.trim()) ? 'View Transcript' : 'No transcript',
-                                callId: callData.call_id,
-                                success: callData.success,
-                                campaignId: campaignId,
-                                hasEnhancedData: true,
-                                dataSource: 'analytics'
-                            };
-                            
-                            processedCalls.set(uniqueKey, callRecord);
-                            allCallHistory.push(callRecord);
-                        } else {
-                            console.log(`Skipping duplicate call: ${callData.patient_name} (${uniqueKey})`);
-                        }
-                    });
-                });
-                
-                // Handle any campaigns that don't have analytics data by falling back to debug data
-                Object.entries(debugData.debug_info.campaign_details).forEach(([campaignRunId, campaignResults]) => {
-                    const campaignId = campaignResults.is_csv_upload ? 
-                        campaignRunId : 
-                        campaignRunId.split('_run_')[0];
-                    
-                    // Skip if we already processed this campaign through analytics
-                    if (campaignAnalytics[campaignId]) {
-                        return;
-                    }
-                    
-                    const campaign = allCampaigns[campaignId] || { name: campaignResults.campaign_name, client_id: null };
-                    const client = campaign.client_id ? allClients[campaign.client_id] : { name: campaignResults.client_name };
-
-                    campaignResults.call_details.forEach(callDetail => {
-                        const uniqueKey = callDetail.call_id || `${callDetail.patient_name}_${callDetail.phone_number}`;
-                        
-                        // Only add if not already processed
-                        if (!processedCalls.has(uniqueKey)) {
-                            const callRecord = {
-                                clientName: client ? client.name : 'Unknown Client',
-                                campaignName: campaign.name || 'Unknown Campaign',
-                                patientName: callDetail.patient_name,
-                                phoneNumber: callDetail.phone_number || 'Unknown',
-                                status: callDetail.call_status || 'busy_voicemail',
-                                duration: 0,
-                                dateTime: campaignResults.started_at || 'Unknown',
-                                finalSummary: callDetail.final_summary || 'No summary available',
-                                transcript: callDetail.has_transcript ? 'View Transcript' : 'No transcript',
-                                callId: callDetail.call_id,
-                                success: callDetail.success,
-                                campaignId: campaignId,
-                                campaignRunId: campaignRunId,
-                                hasEnhancedData: false,
-                                dataSource: 'fallback'
-                            };
-                            
-                            processedCalls.set(uniqueKey, callRecord);
-                            allCallHistory.push(callRecord);
-                        }
-                    });
-                });
-
-                console.log(`Processed ${allCallHistory.length} calls with enhanced analytics data`);
+                console.log(`Loaded ${allCallHistory.length} calls from API endpoint (already sorted by most recent)`);
 
                 // Populate filter dropdowns
                 populateFilters();
@@ -1077,7 +962,7 @@
                     try {
                         // Extract date from call.dateTime (which could be in various formats)
                         let callDate = null;
-                        
+
                         if (call.dateTime && call.dateTime !== 'Unknown') {
                             // Try to parse the date from the datetime string
                             const dateObj = new Date(call.dateTime);
@@ -1144,73 +1029,19 @@
 
             resultsCount.textContent = `${filteredCallHistory.length} call${filteredCallHistory.length !== 1 ? 's' : ''} found`;
 
-            // Sort calls by date/time in descending order (most recent first)
-            console.log('Before sorting - first 3 calls:', filteredCallHistory.slice(0, 3).map(call => ({
-                patient: call.patientName, 
-                dateTime: call.dateTime,
-                campaign: call.campaignName
-            })));
-            
-            const sortedCalls = [...filteredCallHistory].sort((a, b) => {
-                // Helper function to parse dates more robustly
-                const parseDate = (dateStr) => {
-                    if (!dateStr || dateStr === 'Unknown' || dateStr === 'Invalid Date') {
-                        return new Date(0); // Epoch time for invalid dates
-                    }
-                    
-                    // Clean the date string
-                    let cleanDateStr = String(dateStr).trim();
-                    
-                    // Handle ISO format with microseconds and timezone
-                    if (cleanDateStr.includes('T')) {
-                        // Remove timezone info if present
-                        if (cleanDateStr.includes('+')) {
-                            cleanDateStr = cleanDateStr.split('+')[0];
-                        } else if (cleanDateStr.includes('Z')) {
-                            cleanDateStr = cleanDateStr.replace('Z', '');
-                        }
-                        
-                        // Handle microseconds - truncate to milliseconds
-                        if (cleanDateStr.includes('.')) {
-                            const parts = cleanDateStr.split('.');
-                            if (parts[1] && parts[1].length > 3) {
-                                cleanDateStr = parts[0] + '.' + parts[1].substring(0, 3);
-                            }
-                        }
-                        
-                        // Add Z for UTC parsing
-                        cleanDateStr += 'Z';
-                    }
-                    
-                    const date = new Date(cleanDateStr);
-                    return isNaN(date.getTime()) ? new Date(0) : date;
-                };
-                
-                const dateA = parseDate(a.dateTime);
-                const dateB = parseDate(b.dateTime);
-                
-                // Debug logging for first few comparisons
-                if (filteredCallHistory.indexOf(a) < 3 || filteredCallHistory.indexOf(b) < 3) {
-                    console.log(`Comparing: ${a.patientName} (${a.dateTime}) vs ${b.patientName} (${b.dateTime})`);
-                    console.log(`Parsed dates: ${dateA.toISOString()} vs ${dateB.toISOString()}`);
-                    console.log(`Result: ${dateB.getTime() - dateA.getTime()}`);
-                }
-                
-                // Sort in descending order (newest first)
-                return dateB.getTime() - dateA.getTime();
-            });
-            
-            console.log('After sorting - first 3 calls:', sortedCalls.slice(0, 3).map(call => ({
+            // Data is already sorted by backend API (most recent first)
+            // Just use the filtered data directly
+            console.log('Using pre-sorted data - first 3 calls:', filteredCallHistory.slice(0, 3).map(call => ({
                 patient: call.patientName, 
                 dateTime: call.dateTime,
                 campaign: call.campaignName
             })));
 
             let html = '';
-            sortedCalls.forEach(call => {
+            filteredCallHistory.forEach(call => {
                 // Determine status display and class - prioritize enhanced analytics data
                 let status = 'busy_voicemail'; // Default fallback
-                
+
                 if (call.hasEnhancedData && call.status && call.status !== 'Unknown') {
                     // Use status from enhanced analytics data (most accurate)
                     status = call.status;
@@ -1218,15 +1049,15 @@
                     // Use basic status if available
                     status = call.status;
                 }
-                
+
                 const statusClass = `status-${status.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
-                
+
                 // Format date/time
                 const formattedDateTime = formatDateTime(call.dateTime);
-                
+
                 // Format duration
                 const durationDisplay = call.duration > 0 ? formatDuration(call.duration) : '-';
-                
+
                 // Format phone number (remove +91 or other country codes for display if needed)
                 let displayPhone = call.phoneNumber;
                 if (displayPhone && displayPhone !== 'Unknown') {
@@ -1237,14 +1068,14 @@
                         displayPhone = `+1 ${displayPhone.slice(2)}`;
                     }
                 }
-                
+
                 // Format final summary with truncation
                 let summaryDisplay = call.finalSummary || 'No summary available';
                 const maxSummaryLength = 80;
                 if (summaryDisplay.length > maxSummaryLength) {
                     summaryDisplay = summaryDisplay.substring(0, maxSummaryLength) + '...';
                 }
-                
+
                 // Enhanced transcript link
                 let transcriptCell;
                 if (call.callId && call.transcript && call.transcript !== 'No transcript') {
@@ -1254,7 +1085,7 @@
                 } else {
                     transcriptCell = '<span style="color: var(--text-tertiary);"><i class="fas fa-ban"></i> No transcript</span>';
                 }
-                
+
                 html += `
                     <tr>
                         <td><strong>${call.clientName}</strong></td>
@@ -1309,43 +1140,43 @@
                 if (!dateTimeStr || dateTimeStr === 'null' || dateTimeStr === 'undefined' || dateTimeStr === 'Invalid Date') {
                     return 'Invalid Date';
                 }
-                
+
                 // Clean the string
                 const cleanedStr = String(dateTimeStr).trim();
-                
+
                 // Check for empty or very short strings
                 if (cleanedStr.length < 8) {
                     return 'Invalid Date';
                 }
-                
+
                 // Check for common invalid patterns
                 if (/^(nan|null|none|invalid|unknown)$/i.test(cleanedStr)) {
                     return 'Invalid Date';
                 }
-                
+
                 // Try to create a Date object directly first
                 const date = new Date(cleanedStr);
-                
+
                 // Check if the date is valid
                 if (isNaN(date.getTime())) {
                     // Try alternative parsing for malformed dates
-                    
+
                     // Extract date parts using regex
                     const dateMatch = cleanedStr.match(/(\d{4})-(\d{1,2})-(\d{1,2})/);
                     const timeMatch = cleanedStr.match(/(\d{1,2}):(\d{1,2}):(\d{1,2})/);
-                    
+
                     if (dateMatch) {
                         const year = parseInt(dateMatch[1]);
                         const month = parseInt(dateMatch[2]) - 1; // JS months are 0-indexed
                         const day = parseInt(dateMatch[3]);
-                        
+
                         let hour = 0, minute = 0, second = 0;
                         if (timeMatch) {
                             hour = parseInt(timeMatch[1]);
                             minute = parseInt(timeMatch[2]);
                             second = parseInt(timeMatch[3]);
                         }
-                        
+
                         // Validate ranges
                         if (year >= 1970 && year <= 2100 && 
                             month >= 0 && month <= 11 &&
@@ -1353,7 +1184,7 @@
                             hour >= 0 && hour <= 23 &&
                             minute >= 0 && minute <= 59 &&
                             second >= 0 && second <= 59) {
-                            
+
                             const reconstructedDate = new Date(year, month, day, hour, minute, second);
                             if (!isNaN(reconstructedDate.getTime())) {
                                 // Format without the "(Reconstructed)" suffix
@@ -1370,22 +1201,22 @@
                             }
                         }
                     }
-                    
+
                     // If all parsing fails, return a clean date if possible
                     const simpleDateMatch = cleanedStr.match(/(\d{4}-\d{1,2}-\d{1,2})/);
                     if (simpleDateMatch) {
                         return simpleDateMatch[1] + ' (Time unavailable)';
                     }
-                    
+
                     return 'Invalid Date';
                 }
-                
+
                 // Check for unreasonable dates
                 const year = date.getFullYear();
                 if (year < 1970 || year > 2100) {
                     return `Invalid Date (Year: ${year})`;
                 }
-                
+
                 // Format the valid date
                 const options = {
                     year: 'numeric',
@@ -1396,9 +1227,9 @@
                     second: '2-digit',
                     hour12: true
                 };
-                
+
                 return date.toLocaleString('en-US', options);
-                
+
             } catch (error) {
                 console.error('Date formatting error:', error, 'Input:', dateTimeStr);
                 return 'Invalid Date';
