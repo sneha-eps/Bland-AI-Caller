@@ -2542,11 +2542,56 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
 
     summary_lower = final_summary.lower().strip()
 
-    # PRIORITY 1: Check transcript FIRST for definitive patient responses
+    # PRIORITY 1: Check transcript FIRST for definitive "not available" and "wrong number" scenarios
     if transcript and transcript.strip():
         transcript_lower = transcript.lower()
         
-        # Look for clear confirmation patterns in transcript
+        # CRITICAL: Check for "not available" scenarios BEFORE confirmation analysis
+        # Look for patterns where someone else answers and patient is not available
+        not_available_indicators = [
+            "but i'm not", "i'm not", "that's not me", "this isn't me",
+            "she's not available", "he's not available", "not available right now",
+            "she's not here", "he's not here", "not here right now",
+            "can't come to the phone", "cannot come to the phone",
+            "will be back", "call back later", "try calling later"
+        ]
+        
+        # If transcript contains "not available" indicators, override everything else
+        if any(indicator in transcript_lower for indicator in not_available_indicators):
+            # Additional check: make sure this follows the pattern of someone else answering
+            lines = [line.strip() for line in transcript.split('\n') if line.strip()]
+            ai_asked_for_patient = False
+            someone_else_answered = False
+            
+            for i, line in enumerate(lines):
+                if line.startswith('assistant:'):
+                    line_content = line.replace('assistant:', '').strip().lower()
+                    # AI asks to speak with specific patient
+                    if any(phrase in line_content for phrase in [
+                        'am i speaking with', 'may i speak with', 'is this'
+                    ]):
+                        ai_asked_for_patient = True
+                elif line.startswith('user:') and ai_asked_for_patient:
+                    user_response = line.replace('user:', '').strip().lower()
+                    # User indicates they're not the patient OR patient not available
+                    if any(indicator in user_response for indicator in not_available_indicators):
+                        someone_else_answered = True
+                        break
+            
+            if someone_else_answered or any(indicator in transcript_lower for indicator in not_available_indicators):
+                return 'not_available', "Patient not available"
+        
+        # Check for wrong number scenarios
+        wrong_number_indicators = [
+            "wrong number", "you have the wrong number", "this is the wrong number",
+            "no one by that name", "nobody by that name", "don't know", "never heard of",
+            "no such person", "you must have the wrong", "who is this", "who are you looking for"
+        ]
+        
+        if any(indicator in transcript_lower for indicator in wrong_number_indicators):
+            return 'wrong_number', "Wrong number or patient not available"
+        
+        # NOW check for confirmation patterns (only if not "not available" or "wrong number")
         confirmation_indicators = [
             "excellent! we are glad to have you",
             "just to confirm, your appointment",
