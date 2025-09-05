@@ -2535,7 +2535,23 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
 
     summary_lower = final_summary.lower().strip()
 
-    # Check for AI reschedule processing patterns FIRST (highest priority)
+    # Check for ambiguous/unknown responses FIRST (highest priority for new unknown status)
+    ambiguous_patterns = [
+        # Direct ambiguous phrases
+        "i'm not sure", "not sure", "maybe", "perhaps", "i don't know", "don't know",
+        "let me think", "let me check", "i'll have to", "i need to check",
+        "i'm uncertain", "uncertain", "unclear", "confused", "i don't understand",
+        # Vague responses that don't commit
+        "possibly", "might be", "could be", "depends", "we'll see",
+        "i'll get back to you", "call me back", "let me call you back",
+        # AI detecting ambiguous response
+        "patient gave ambiguous response", "response was unclear", "unclear response",
+        "patient was unsure", "ambiguous answer", "non-committal response"
+    ]
+    if any(phrase in summary_lower for phrase in ambiguous_patterns):
+        return 'unknown', "Patient gave ambiguous response"
+
+    # Check for AI reschedule processing patterns (second priority)
     reschedule_patterns = [
         "appointment will be rescheduled", "will be rescheduled", "reschedule", "rescheduled",
         "scheduling agent will call", "will call you to find a new time", "someone will be in touch",
@@ -2545,7 +2561,7 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
     if any(phrase in summary_lower for phrase in reschedule_patterns):
         return 'rescheduled', "Patient requested to reschedule"
 
-    # Check for AI cancellation processing patterns (second priority)
+    # Check for AI cancellation processing patterns (third priority)
     cancellation_patterns = [
         "ai processed cancellation", "patient cancelled", "appointment cancelled",
         "appointment has been cancelled", "cancelled for you", "cancel this appointment"
@@ -2570,20 +2586,26 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
         ]):
             return 'confirmed', "Patient confirmed appointment"
 
-    # Check for AI confirmation patterns (lowest priority - only if no reschedule/cancel found)
-    # MUST exclude cases that mention rescheduling or cancellation
+    # Check for AI confirmation patterns (lower priority - only if no reschedule/cancel/ambiguous found)
+    # MUST exclude cases that mention rescheduling, cancellation, or ambiguity
     confirmation_patterns = [
         "patient confirmed", "appointment confirmed", "confirmed appointment",
         "ai provided confirmation", "confirmation details", "we are glad to have you"
     ]
     if any(phrase in summary_lower for phrase in confirmation_patterns):
-        # Double-check that this isn't actually a reschedule or cancellation
+        # Double-check that this isn't actually a reschedule, cancellation, or ambiguous response
         if not any(reschedule_word in summary_lower for reschedule_word in reschedule_patterns + [
             "different time", "better time", "new time", "call you back", "call you soon"
-        ]) and not any(cancel_word in summary_lower for cancel_word in cancellation_patterns):
+        ]) and not any(cancel_word in summary_lower for cancel_word in cancellation_patterns) and not any(ambiguous_word in summary_lower for ambiguous_word in ambiguous_patterns):
             # Additional check: Look at the actual transcript for user's final decision
             if transcript and transcript.strip():
                 transcript_lower = transcript.lower()
+                # Check if user actually said ambiguous things in the transcript
+                if any(ambiguous_phrase in transcript_lower for ambiguous_phrase in [
+                    "i'm not sure", "not sure", "maybe", "perhaps", "i don't know",
+                    "let me think", "let me check", "uncertain", "unclear"
+                ]):
+                    return 'unknown', "Patient gave ambiguous response"
                 # Check if user actually said reschedule in the transcript
                 if any(reschedule_phrase in transcript_lower for reschedule_phrase in [
                     "i want to reschedule", "want to reschedule", "reschedule", "different time",
@@ -2630,10 +2652,17 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
 
     # Enhanced transcript analysis as fallback
     if transcript and transcript.strip():
-        # Look specifically for AI's final confirmation statements
+        # Look specifically for ambiguous responses in transcript first
         transcript_lower = transcript.lower()
+        
+        # Check for ambiguous patterns in transcript
+        if any(phrase in transcript_lower for phrase in [
+            "i'm not sure", "not sure", "maybe", "perhaps", "i don't know",
+            "let me think", "let me check", "uncertain", "unclear", "confused"
+        ]):
+            return 'unknown', "Patient gave ambiguous response"
 
-        # Check for AI's final confirmation patterns
+        # Check for AI's final confirmation statements
         if any(phrase in transcript_lower for phrase in [
             "just to confirm, your appointment", "we are glad to have you",
             "have a great day", "see you then", "you're welcome"
@@ -2681,6 +2710,8 @@ def get_standardized_summary_for_status(status: str) -> str:
         return "Patient not available"
     elif status == 'busy_voicemail':
         return "Busy, voicemail, or no answer"
+    elif status == 'unknown':
+        return "Patient gave ambiguous response"
     elif status == 'failed':
         return "Call failed"
     else:
@@ -2833,6 +2864,19 @@ def analyze_call_transcript(transcript: str) -> str:
     if decisions:
         final_decision = sorted(decisions, key=lambda x: x[1])[-1][0]
         return final_decision
+
+    # Check for ambiguous/unknown responses if no clear decisions found
+    ambiguous_indicators = [
+        "i'm not sure", "not sure", "maybe", "perhaps", "i don't know", "don't know",
+        "let me think", "let me check", "i'll have to", "i need to check",
+        "uncertain", "unclear", "confused", "i don't understand",
+        "possibly", "might be", "could be", "depends", "we'll see"
+    ]
+    
+    # Check each sentence for ambiguous responses
+    for sentence in sentences:
+        if any(ambiguous in sentence for ambiguous in ambiguous_indicators):
+            return 'unknown'
 
     # If no clear decision patterns found, analyze context more broadly
 
