@@ -2432,24 +2432,19 @@ def extract_final_summary(transcript: str) -> str:
         # Direct "not me" statements
         "that's not me", "that is not me", "i'm not that person", "i am not that person",
         "not the right person", "wrong person", "different person", "someone else",
-        "not me", "that isn't me", "i'm not", "i am not",
         
         # "Person not here" statements  
         "that person is not here", "that person isn't here", "they're not here", "they are not here",
         "that person is not available", "that person isn't available", "they're not available", "they are not available",
         "person is not here", "person isn't here", "person is not available", "person isn't available",
-        "person is not here", "person isn't available", "they're not here", "they are not here",
         
         # Direct "not available" statements
         "not available", "not home", "isn't here", "is not here", "not here", "stepped out",
         "not around", "unavailable", "not in", "away", "out", "busy", "in a meeting",
-        "isn't available", "is not available", "not present", "absent",
         
         # Confusion about who is being called
         "i don't know who that is", "don't know that person", "never heard of that person",
-        "no one by that name", "nobody by that name", "who is that", "who are you looking for",
-        "don't know", "never heard of", "no such person", "nobody here by that name",
-        "no one here by that name", "there's no", "nobody named", "no one named"
+        "no one by that name", "nobody by that name", "who is that", "who are you looking for"
     ]
     
     # Check if any "not the person" pattern exists
@@ -2631,25 +2626,16 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
         # Direct "not the person" statements
         "not the person", "that's not me", "i'm not that person", "not the right person",
         "wrong person", "different person", "someone else", "you're looking for someone else",
-        "i am not that person", "that is not me", "not me", "that isn't me",
         
         # "Person not available" statements
         "not here", "isn't here", "is not here", "not available", "not home",
         "unavailable", "stepped out", "not around", "not in", "away", "out",
         "that person is not here", "they're not here", "they are not available",
-        "person is not available", "person isn't here", "person is not here",
-        "they're not available", "they are not here", "isn't available",
-        "is not available", "not present", "absent",
+        "person is not available", "person isn't here",
         
         # Confusion about identity
         "i don't know who that is", "never heard of that person", "don't know that person",
-        "no one by that name", "nobody by that name", "who is that", "who are you looking for",
-        "don't know", "never heard of", "no such person", "nobody here by that name",
-        "no one here by that name", "there's no", "nobody named", "no one named",
-        
-        # AI confusion responses (when AI realizes wrong person/number)
-        "my apologies for the confusion", "thank you for your time", "have a good day",
-        "wrong number", "not the right", "confusion", "apologize"
+        "no one by that name", "nobody by that name", "who is that", "who are you looking for"
     ]
     
     if any(phrase in summary_lower for phrase in not_available_patterns):
@@ -2784,18 +2770,14 @@ def analyze_call_transcript(transcript: str) -> str:
         "will be back", "call back later", "try calling later", "not around",
         "unavailable", "sleeping", "napping", "can you call back",
         "not a good time", "isn't a good time", "bad time",
-        "isn't available", "is not available", "not present", "absent",
         # CRITICAL ADDITIONS for "not the person" scenarios
         "i'm not that person", "that's not me", "i am not that person", "that is not me",
         "you're looking for someone else", "looking for someone else", "different person",
         "not the right person", "wrong person", "someone else", "not me",
-        "that isn't me", "i'm not", "i am not", 
         "i don't know who that is", "don't know that person", "never heard of that person",
         "that person is not here", "that person isn't here", "person is not available",
         "person is not here", "person isn't available", "they're not here",
-        "they are not here", "they're not available", "they are not available",
-        "don't know", "never heard of", "no such person", "nobody here by that name",
-        "no one here by that name", "there's no", "nobody named", "no one named"
+        "they are not here", "they're not available", "they are not available"
     ]
 
     for pattern in not_available_patterns:
