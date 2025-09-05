@@ -2527,11 +2527,11 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
     Determine call status based on final summary content primarily, with transcript as fallback.
     Returns a tuple: (call_status, standardized_summary)
     """
-    if not final_summary or final_summary.strip() == "":
-        # Fallback to transcript analysis if no summary
+    if not final_summary or final_summary.strip() == "" or final_summary.strip().lower() in ['unknown status', 'unknown', 'null', 'none']:
+        # Fallback to transcript analysis if no summary or unknown status
         if transcript and transcript.strip():
             return analyze_call_transcript(transcript), "Analysis based on transcript"
-        return 'busy_voicemail', "No summary or transcript available"
+        return 'busy_voicemail', "No summary available"
 
     summary_lower = final_summary.lower().strip()
 
@@ -2663,8 +2663,8 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
         # Use a more general transcript analyzer if specific patterns aren't found
         return analyze_call_transcript(transcript), "Analysis based on transcript"
 
-    # Default to busy_voicemail if we can't determine
-    return 'busy_voicemail', "Unable to determine status"
+    # Default to busy_voicemail with consistent message for failed/unknown calls
+    return 'busy_voicemail', "No summary available"
 
 
 def get_standardized_summary_for_status(status: str) -> str:
@@ -3386,6 +3386,7 @@ async def get_campaign_analytics(campaign_id: str):
                 else:
                     # Failed calls or calls without call_id count as busy_voicemail
                     call_details['call_status'] = 'busy_voicemail'
+                    call_details['final_summary'] = "No summary available"  # Consistent message
                     call_details['analysis_notes'] = "Call failed or no call_id"
                     status_counts['busy_voicemail'] += 1
 
