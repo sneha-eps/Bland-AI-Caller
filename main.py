@@ -2397,129 +2397,153 @@ def extract_final_summary(transcript: str) -> str:
     Extract the patient's actual decision from the transcript, not just the AI's final statement.
     This analyzes what the patient actually said to determine the true outcome.
     """
+    print(f"🔍 EXTRACTING SUMMARY from transcript length: {len(transcript) if transcript else 0}")
+    
     if not transcript or transcript.strip() == "":
+        print(f"🔍 No transcript available")
         return "No summary available"
 
     transcript_lines = transcript.strip().split('\n')
+    transcript_lower = transcript.lower()
 
-    # First, look for the patient's actual decision in the transcript
-    patient_decision = None
-
-    # Scan through the transcript to find the patient's final decision
+    # Look for patient responses and AI's final actions
+    patient_responses = []
+    ai_final_actions = []
+    
     for line in transcript_lines:
         line = line.strip()
         if line.startswith('user:'):
-            user_statement = line.replace('user:', '').strip().lower()
-
-            # Check for reschedule requests
-            if any(phrase in user_statement for phrase in [
-                "i want to reschedule", "want to reschedule", "reschedule",
-                "different time", "better time", "new time", "can we reschedule",
-                "need to reschedule", "change the time", "move the appointment"
-            ]):
-                patient_decision = "Patient requested to reschedule"
-
-            # Check for cancellation requests
-            elif any(phrase in user_statement for phrase in [
-                "i want to cancel", "want to cancel", "cancel", "can't make it",
-                "won't make it", "cannot make it", "unable to make it"
-            ]):
-                patient_decision = "Patient cancelled appointment"
-
-            # Check for confirmations (but only if no reschedule/cancel found)
-            elif patient_decision is None and any(phrase in user_statement for phrase in [
-                "yes", "okay", "sure", "that works", "sounds good", "i'll be there",
-                "i will be there", "see you then", "confirm"
-            ]) and not any(negative in user_statement for negative in [
-                "no", "can't", "won't", "unable", "reschedule", "cancel"
-            ]):
-                patient_decision = "Patient confirmed appointment"
-
-    # If we found a clear patient decision, return it
-    if patient_decision:
-        return patient_decision
-
-    # Fallback: Look for the AI assistant's final summary statements
-    assistant_final_statements = []
-
-    # Process lines in reverse to find the most recent assistant statements
-    for line in reversed(transcript_lines):
-        line = line.strip()
-        if line.startswith('assistant:'):
-            # Remove the "assistant:" prefix and clean up
-            statement = line.replace('assistant:', '').strip()
-            if statement and len(statement) > 15:  # Meaningful statement
-                assistant_final_statements.append(statement)
-
-                # Check if this is a final summary statement
-                statement_lower = statement.lower()
-                if any(phrase in statement_lower for phrase in [
-                    "just to confirm", "to confirm", "i will cancel", "our scheduling agent will call",
-                    "appointment has been cancelled", "appointment is confirmed"
+            user_text = line.replace('user:', '').strip()
+            if user_text and len(user_text) > 1:
+                patient_responses.append(user_text.lower())
+        elif line.startswith('assistant:'):
+            ai_text = line.replace('assistant:', '').strip()
+            if ai_text and len(ai_text) > 10:
+                # Look for AI taking final actions
+                ai_lower = ai_text.lower()
+                if any(phrase in ai_lower for phrase in [
+                    "just to confirm", "i will cancel", "scheduling agent will call",
+                    "appointment is confirmed", "appointment has been cancelled",
+                    "we are glad to have you"
                 ]):
-                    # Found a final summary statement - return it directly
-                    return statement
-        elif line.startswith('user:') and assistant_final_statements:
-            # Stop when we hit user input after finding assistant statements
-            break
+                    ai_final_actions.append(ai_text)
+    
+    print(f"🔍 Found {len(patient_responses)} patient responses, {len(ai_final_actions)} AI final actions")
+    
+    # Analyze patient responses for clear decisions (in order of priority)
+    for response in reversed(patient_responses):  # Check most recent responses first
+        
+        # Check for NOT THE PERSON / NOT AVAILABLE scenarios (highest priority)
+        if any(phrase in response for phrase in [
+            "i'm not that person", "that's not me", "not the right person",
+            "you're looking for someone else", "different person", "wrong person",
+            "i don't know who that is", "never heard of that person",
+            "that person is not here", "they're not here", "not available",
+            "not home", "isn't here", "stepped out"
+        ]):
+            print(f"🔍 Patient indicated not available/wrong person: {response[:50]}...")
+            return "Patient not available"
+            
+        # Check for wrong number scenarios
+        if any(phrase in response for phrase in [
+            "wrong number", "you have the wrong", "who is this",
+            "no one by that name", "nobody by that name"
+        ]):
+            print(f"🔍 Patient indicated wrong number: {response[:50]}...")
+            return "Wrong number"
+            
+        # Check for cancellation requests
+        if any(phrase in response for phrase in [
+            "cancel", "can't make it", "cannot make it", "won't make it",
+            "will not make it", "unable to make it", "not coming"
+        ]):
+            print(f"🔍 Patient requested cancellation: {response[:50]}...")
+            return "Patient cancelled appointment"
+            
+        # Check for reschedule requests
+        if any(phrase in response for phrase in [
+            "reschedule", "different time", "better time", "new time",
+            "change the time", "move the appointment", "another time"
+        ]):
+            print(f"🔍 Patient requested reschedule: {response[:50]}...")
+            return "Patient requested to reschedule"
+            
+        # Check for confirmations (only if not negated)
+        if any(phrase in response for phrase in [
+            "yes, i'll be there", "yes i will be there", "i'll be there", "i will be there",
+            "yes that works", "yes that's fine", "see you then", "sounds good",
+            "that works", "confirmed"
+        ]) and not any(negative in response for negative in ["don't", "won't", "can't", "no", "not"]):
+            print(f"🔍 Patient confirmed appointment: {response[:50]}...")
+            return "Patient confirmed appointment"
+            
+        # Check for ambiguous responses
+        if any(phrase in response for phrase in [
+            "i'm not sure", "not sure", "maybe", "perhaps", "i don't know",
+            "let me think", "let me check", "uncertain"
+        ]):
+            print(f"🔍 Patient gave ambiguous response: {response[:50]}...")
+            return "Patient gave ambiguous response"
 
-    # If we found assistant statements but no clear final summary, look for specific patterns
-    if assistant_final_statements:
-        # Check the last few statements for summary patterns
-        for statement in assistant_final_statements[:3]:  # Check last 3 statements
-            statement_lower = statement.lower()
-
-            # Look for final confirmation patterns
-            if any(phrase in statement_lower for phrase in [
-                "have a great day", "you're welcome", "see you then", "thank you",
-                "we are glad to have you", "feel free to contact us"
+    # If no clear patient decision found, look at AI's final actions
+    if ai_final_actions:
+        latest_ai_action = ai_final_actions[-1].lower()
+        
+        if "just to confirm" in latest_ai_action:
+            if any(phrase in latest_ai_action for phrase in [
+                "cancelled", "cancel this appointment"
             ]):
-                # This might be the closing, look for the previous confirmation statement
-                continue
-            elif len(statement) > 30:  # Substantial statement
-                return statement
+                print(f"🔍 AI confirmed cancellation")
+                return "Patient cancelled appointment"
+            elif any(phrase in latest_ai_action for phrase in [
+                "rescheduled", "scheduling agent", "call you"
+            ]):
+                print(f"🔍 AI arranged reschedule")
+                return "Patient requested to reschedule"
+            elif any(phrase in latest_ai_action for phrase in [
+                "confirmed", "we are glad"
+            ]):
+                print(f"🔍 AI confirmed appointment")
+                return "Patient confirmed appointment"
+        
+        elif "i will cancel" in latest_ai_action:
+            print(f"🔍 AI stated will cancel")
+            return "Patient cancelled appointment"
+        elif "scheduling agent will call" in latest_ai_action:
+            print(f"🔍 AI arranged callback for reschedule")
+            return "Patient requested to reschedule"
+        elif "we are glad to have you" in latest_ai_action:
+            print(f"🔍 AI expressed gladness (confirmation)")
+            return "Patient confirmed appointment"
 
-        # Return the most substantial statement
-        substantial_statements = [s for s in assistant_final_statements if len(s) > 30]
-        if substantial_statements:
-            return substantial_statements[0]
-
-    # Fallback: Look for final summary patterns anywhere in the transcript
-    transcript_lower = transcript.lower()
-
-    # Look for "Just to confirm" statements specifically
-    for line in transcript_lines:
-        if line.startswith('assistant:'):
-            statement = line.replace('assistant:', '').strip()
-            if statement.lower().startswith('just to confirm'):
-                return statement
-
-    # Other confirmation patterns
-    if "i will cancel this appointment" in transcript_lower:
-        # Find the actual cancellation statement
-        for line in transcript_lines:
-            if line.startswith('assistant:') and 'cancel' in line.lower():
-                return line.replace('assistant:', '').strip()
-        return "Patient cancelled appointment"
-    elif "our scheduling agent will call you" in transcript_lower:
-        # Find the actual reschedule statement
-        for line in transcript_lines:
-            if line.startswith('assistant:') and 'scheduling agent' in line.lower():
-                return line.replace('assistant:', '').strip()
-        return "Patient requested to reschedule"
-    elif "appointment is confirmed" in transcript_lower or "we are glad to have you" in transcript_lower:
-        return "Patient confirmed appointment"
-    elif "my apologies for the confusion" in transcript_lower:
+    # Look for conversation termination patterns
+    if len(patient_responses) == 0:
+        print(f"🔍 No patient responses - likely voicemail")
+        return "Call initiated but no response received"
+    elif len(patient_responses) == 1 and len(patient_responses[0]) < 10:
+        print(f"🔍 Very brief single response - likely hang up")
+        return "Call initiated but no response received"
+    
+    # Final fallback - check overall conversation patterns
+    if any(phrase in transcript_lower for phrase in [
+        "my apologies for the confusion", "wrong number"
+    ]):
         return "Wrong number or patient not available"
+    elif any(phrase in transcript_lower for phrase in [
+        "appointment cancelled", "i will cancel"
+    ]):
+        return "Patient cancelled appointment"
+    elif any(phrase in transcript_lower for phrase in [
+        "scheduling agent", "will call you", "reschedule"
+    ]):
+        return "Patient requested to reschedule"
+    elif any(phrase in transcript_lower for phrase in [
+        "we are glad", "appointment is confirmed"
+    ]):
+        return "Patient confirmed appointment"
     else:
-        # Return the last substantial assistant statement
-        for line in reversed(transcript_lines):
-            if line.startswith('assistant:'):
-                statement = line.replace('assistant:', '').strip()
-                if len(statement) > 20 and not any(word in statement.lower() for word in ['hello', 'hi', 'good morning']):
-                    return statement
-
-        return "Call completed - no clear summary available"
+        print(f"🔍 Could not determine clear outcome from transcript")
+        return "Call completed - status unclear"
 
 
 def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -> tuple[str, str]:
@@ -2527,11 +2551,15 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
     Determine call status based on final summary content primarily, with transcript as fallback.
     Returns a tuple: (call_status, standardized_summary)
     """
+    print(f"🔍 ANALYZING STATUS - Summary: '{final_summary[:100] if final_summary else 'None'}...', Transcript length: {len(transcript) if transcript else 0}")
+    
     if not final_summary or final_summary.strip() == "" or final_summary.strip().lower() in ['unknown status', 'unknown', 'null', 'none', 'no summary available']:
         # Fallback to transcript analysis if no summary or unknown status
         if transcript and transcript.strip():
             analyzed_status = analyze_call_transcript(transcript)
+            print(f"🔍 Using transcript analysis: {analyzed_status}")
             return analyzed_status, get_standardized_summary_for_status(analyzed_status)
+        print(f"🔍 No data available, defaulting to busy_voicemail")
         return 'busy_voicemail', "No summary available"
 
     summary_lower = final_summary.lower().strip()
@@ -2547,124 +2575,105 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
     if any(summary_lower.startswith(phrase) for phrase in standardized_phrases):
         # This is already a standardized summary, map it to status
         if summary_lower.startswith("patient confirmed"):
+            print(f"🔍 Found standardized confirmed status")
             return 'confirmed', final_summary
         elif summary_lower.startswith("patient cancelled"):
+            print(f"🔍 Found standardized cancelled status")
             return 'cancelled', final_summary
         elif summary_lower.startswith("patient requested to reschedule"):
+            print(f"🔍 Found standardized rescheduled status")
             return 'rescheduled', final_summary
         elif summary_lower.startswith("wrong number") or summary_lower.startswith("patient not available"):
+            print(f"🔍 Found standardized not_available status")
             return 'not_available', final_summary
         elif summary_lower.startswith("patient gave ambiguous response"):
+            print(f"🔍 Found standardized unknown status")
             return 'unknown', final_summary
         elif summary_lower.startswith("call initiated but no response received"):
+            print(f"🔍 Found standardized busy_voicemail status")
             return 'busy_voicemail', final_summary
         else:
+            print(f"🔍 Unrecognized standardized phrase, defaulting to busy_voicemail")
             return 'busy_voicemail', final_summary
 
-    # Check for ambiguous/unknown responses FIRST (highest priority for new unknown status)
-    ambiguous_patterns = [
-        "i'm not sure", "not sure", "maybe", "perhaps", "i don't know", "don't know",
-        "let me think", "let me check", "i'll have to", "i need to check",
-        "uncertain", "unclear", "confused", "i don't understand",
-        "possibly", "might be", "could be", "depends", "we'll see",
-        "let me get back to you", "i'll call you back", "call me back",
-        "i need to ask", "i have to ask", "not right now", "can't say right now",
-        "patient gave ambiguous response", "response was unclear", "unclear response",
-        "patient was unsure", "ambiguous answer", "non-committal response"
-    ]
-    if any(phrase in summary_lower for phrase in ambiguous_patterns):
-        return 'unknown', "Patient gave ambiguous response"
-
-    # Check for AI reschedule processing patterns (second priority)
-    reschedule_patterns = [
-        "appointment will be rescheduled", "will be rescheduled", "reschedule", "rescheduled",
-        "scheduling agent will call", "will call you to find a new time", "someone will be in touch",
-        "follow-up call arranged", "patient requested to reschedule", "arrange a new time",
-        "find a new time", "different time", "better time", "new appointment time",
-        "call you shortly to find a new time", "will call you soon", "will be in touch soon"
-    ]
-    if any(phrase in summary_lower for phrase in reschedule_patterns):
-        return 'rescheduled', "Patient requested to reschedule"
-
-    # Check for AI cancellation processing patterns (third priority) 
-    cancellation_patterns = [
-        "i will cancel", "appointment cancelled", "appointment has been cancelled", 
-        "cancelled for you", "cancel this appointment", "patient cancelled"
-    ]
-    if any(phrase in summary_lower for phrase in cancellation_patterns):
-        return 'cancelled', "Patient cancelled appointment"
-
-    # Special handling for "just to confirm" statements - analyze the full context
-    if "just to confirm" in summary_lower:
-        if any(phrase in summary_lower for phrase in [
-            "will be rescheduled", "reschedule", "scheduling agent", "arrange a new time",
-            "find a new time", "different time", "call you soon"
-        ]):
-            return 'rescheduled', "Patient requested to reschedule"
-        elif any(phrase in summary_lower for phrase in [
-            "appointment has been cancelled", "cancelled for you", "cancel this appointment"
-        ]):
-            return 'cancelled', "Patient cancelled appointment"
-        elif any(phrase in summary_lower for phrase in [
-            "is confirmed", "appointment on", "we are glad to have you", "confirmed for"
-        ]):
-            return 'confirmed', "Patient confirmed appointment"
-
-    # Check for AI confirmation patterns
+    # Enhanced pattern matching with more specific keywords
+    
+    # Check for CONFIRMATION patterns first (most specific)
     confirmation_patterns = [
-        "patient confirmed", "appointment confirmed", "confirmed appointment",
-        "we are glad to have you", "excellent! we are glad", "great. our agent will call",
-        "perfect. someone will be in touch", "you're welcome! have a great day"
+        "yes, i'll be there", "yes i will be there", "i'll be there", "i will be there",
+        "see you then", "confirmed", "we are glad to have you", "excellent", 
+        "that works", "sounds good", "appointment is confirmed",
+        "perfect! the reason", "great! we are glad", "thank you! have a great day",
+        "you're welcome! have a great day"
     ]
     if any(phrase in summary_lower for phrase in confirmation_patterns):
-        # Only return confirmed if no conflicting patterns found
-        if not any(reschedule_word in summary_lower for reschedule_word in reschedule_patterns) and not any(cancel_word in summary_lower for cancel_word in cancellation_patterns):
+        # Make sure it's not a reschedule or cancel in disguise
+        if not any(negative in summary_lower for negative in ["reschedule", "cancel", "different time", "new time", "agent will call"]):
+            print(f"🔍 Found confirmation pattern")
             return 'confirmed', "Patient confirmed appointment"
 
-    # Check for wrong number/not available patterns
-    wrong_number_patterns = [
-        "wrong number", "my apologies for the confusion", "no one by that name", 
-        "nobody by that name", "you must have the wrong", "this isn't", "that's not me",
-        "who is this", "who are you looking for", "there's no", "nobody named"
+    # Check for RESCHEDULE patterns
+    reschedule_patterns = [
+        "reschedule", "different time", "better time", "new time", "another time",
+        "scheduling agent will call", "will call you to find", "someone will be in touch",
+        "arrange a new time", "find a time that works", "call you shortly",
+        "will call you soon", "will be in touch soon", "follow-up call"
     ]
-    if any(phrase in summary_lower for phrase in wrong_number_patterns):
-        return 'wrong_number', "Wrong number or patient not available"
+    if any(phrase in summary_lower for phrase in reschedule_patterns):
+        print(f"🔍 Found reschedule pattern")
+        return 'rescheduled', "Patient requested to reschedule"
 
-    # Check for not available patterns - ENHANCED WITH "NOT THE PERSON" SCENARIOS
+    # Check for CANCELLATION patterns
+    cancellation_patterns = [
+        "cancel", "cancelled", "can't make it", "cannot make it", "won't make it",
+        "will not make it", "unable to", "not coming", "appointment cancelled",
+        "i will cancel", "cancelled for you", "cancel this appointment"
+    ]
+    if any(phrase in summary_lower for phrase in cancellation_patterns):
+        print(f"🔍 Found cancellation pattern")
+        return 'cancelled', "Patient cancelled appointment"
+
+    # Check for NOT AVAILABLE patterns (including "not the person" scenarios)
     not_available_patterns = [
-        "not here right now", "isn't here", "is not here", "not available",
-        "not home", "isn't home", "is not home", "out right now",
-        "can't come to the phone", "cannot come to the phone", "busy right now",
-        "unavailable", "sleeping", "napping", "can you call back",
-        # CRITICAL: "Not the person" patterns that should be classified as NOT AVAILABLE
-        "i'm not that person", "that's not me", "i am not that person", "that is not me",
-        "you're looking for someone else", "looking for someone else", "different person",
-        "not the right person", "wrong person", "someone else", "not me",
-        "i don't know who that is", "don't know that person", "never heard of that person",
-        "that person is not here", "that person isn't here", "person is not available",
-        "person is not here", "person isn't available", "they're not here",
-        "they are not here", "they're not available", "they are not available",
-        "not the person you're looking for", "not who you're looking for"
+        "not here", "isn't here", "is not here", "not available", "not home",
+        "unavailable", "not the person", "that's not me", "i'm not that person",
+        "you're looking for someone else", "wrong person", "someone else",
+        "different person", "i don't know who that is", "never heard of that person",
+        "that person is not here", "they're not here", "they are not available"
     ]
     if any(phrase in summary_lower for phrase in not_available_patterns):
+        print(f"🔍 Found not_available pattern")
         return 'not_available', "Patient not available"
 
-    # Check for voicemail/busy patterns
-    voicemail_patterns = [
-        "voicemail", "voice mail", "reached voicemail", "left message",
-        "no answer", "line busy", "busy signal", "disconnected",
-        "no response", "automated message", "no transcript available"
+    # Check for WRONG NUMBER patterns
+    wrong_number_patterns = [
+        "wrong number", "you have the wrong", "no one by that name", 
+        "nobody by that name", "who is this", "who are you looking for",
+        "my apologies for the confusion"
     ]
-    if any(phrase in summary_lower for phrase in voicemail_patterns):
-        return 'busy_voicemail', "Busy, voicemail, or no answer"
+    if any(phrase in summary_lower for phrase in wrong_number_patterns):
+        print(f"🔍 Found wrong_number pattern")
+        return 'wrong_number', "Wrong number"
 
-    # Fallback to transcript analysis if no patterns matched
-    if transcript and transcript.strip():
+    # Check for AMBIGUOUS/UNKNOWN responses
+    ambiguous_patterns = [
+        "i'm not sure", "not sure", "maybe", "perhaps", "i don't know",
+        "let me think", "let me check", "uncertain", "unclear", "confused",
+        "possibly", "might be", "could be", "depends", "we'll see"
+    ]
+    if any(phrase in summary_lower for phrase in ambiguous_patterns):
+        print(f"🔍 Found ambiguous pattern")
+        return 'unknown', "Patient gave ambiguous response"
+
+    # If we have transcript but no clear summary pattern, analyze transcript
+    if transcript and transcript.strip() and len(transcript.strip()) > 20:
+        print(f"🔍 No clear summary pattern, analyzing transcript")
         analyzed_status = analyze_call_transcript(transcript)
         return analyzed_status, get_standardized_summary_for_status(analyzed_status)
 
     # Default fallback
-    return 'busy_voicemail', "No summary available"
+    print(f"🔍 No patterns matched, defaulting to busy_voicemail")
+    return 'busy_voicemail', "No clear status determined"
 
 
 def get_standardized_summary_for_status(status: str) -> str:
@@ -2694,7 +2703,10 @@ def analyze_call_transcript(transcript: str) -> str:
     Analyze transcript to determine final call status based on patient's ultimate decision.
     This function analyzes the entire conversation to understand the patient's final response.
     """
+    print(f"🔍 TRANSCRIPT ANALYSIS - Length: {len(transcript) if transcript else 0}")
+    
     if not transcript or transcript.strip() == "":
+        print(f"🔍 Empty transcript, returning busy_voicemail")
         return 'busy_voicemail'
 
     transcript_lower = transcript.lower().strip()
@@ -2711,6 +2723,7 @@ def analyze_call_transcript(transcript: str) -> str:
 
     for pattern in wrong_number_patterns:
         if pattern in transcript_lower:
+            print(f"🔍 Found wrong number pattern: {pattern}")
             return 'wrong_number'
 
     # Check for not available scenarios (second priority) - ENHANCED PATTERNS
@@ -2734,202 +2747,103 @@ def analyze_call_transcript(transcript: str) -> str:
 
     for pattern in not_available_patterns:
         if pattern in transcript_lower:
+            print(f"🔍 Found not available pattern: {pattern}")
             return 'not_available'
 
-    # Check for interrupted/incomplete conversations EARLY (before other analysis)
-    interrupted_patterns = [
-        "thank you, bye", "bye bye", "goodbye", "gotta go", "have to go",
-        "talk to you later", "see you later", "catch you later", "yes, sir. bye",
-        "thank you bye", "thanks bye", "bye", "goodbye", "ok bye", "okay bye"
-    ]
-
-    # Analyze conversation flow to detect interruptions
+    # Parse user responses more carefully
     lines = [line.strip() for line in transcript.split('\n') if line.strip()]
-    ai_was_confirming = False
-    patient_interrupted = False
+    user_responses = []
+    
+    for line in lines:
+        if line.startswith('user:'):
+            user_text = line.replace('user:', '').strip().lower()
+            if user_text and len(user_text) > 1:  # Ignore single character responses
+                user_responses.append(user_text)
+    
+    print(f"🔍 Found {len(user_responses)} user responses")
+    
+    # Analyze user responses for clear decisions
+    for response in user_responses:
+        # Check for CLEAR CONFIRMATIONS
+        confirmation_indicators = [
+            "yes, i'll be there", "yes i will be there", "i'll be there", "i will be there",
+            "yes that works", "yes that's fine", "yes sounds good", "see you then",
+            "that works", "sounds good", "confirmed", "confirm", "perfect"
+        ]
+        
+        if any(indicator in response for indicator in confirmation_indicators):
+            # Make sure it's not negated
+            if not any(neg in response for neg in ["don't", "won't", "can't", "no", "not"]):
+                print(f"🔍 Found confirmation in response: {response[:50]}...")
+                return 'confirmed'
 
-    for i, line in enumerate(lines):
-        if line.startswith('assistant:'):
-            line_content = line.replace('assistant:', '').strip().lower()
-            # Check if AI was in middle of confirming appointment OR providing appointment details
-            if any(phrase in line_content for phrase in [
-                'confirm your upcoming appointment', 'reason for my call is to confirm',
-                'upcoming appointment on', 'will you be able to make it',
-                'perfect! the reason for my call', 'the reason for my call is to'
-            ]):
-                ai_was_confirming = True
-        elif line.startswith('user:'):
-            user_response = line.replace('user:', '').strip().lower()
+        # Check for RESCHEDULE requests
+        reschedule_indicators = [
+            "reschedule", "different time", "another time", "better time",
+            "change the time", "move the appointment", "new time", "different day"
+        ]
+        
+        if any(indicator in response for indicator in reschedule_indicators):
+            print(f"🔍 Found reschedule in response: {response[:50]}...")
+            return 'rescheduled'
 
-            # CRITICAL FIX: If user says goodbye/bye WHILE AI is explaining appointment details,
-            # this is an interruption - they're not confirming the appointment
-            if ai_was_confirming and any(pattern in user_response for pattern in interrupted_patterns):
-                # Additional check: make sure this isn't after a full appointment confirmation
-                previous_lines = lines[:i]  # Get all lines before this interruption
-                full_appointment_mentioned = False
+        # Check for CANCELLATIONS
+        cancel_indicators = [
+            "cancel", "can't make it", "cannot make it", "won't make it",
+            "will not make it", "unable to", "not coming"
+        ]
+        
+        if any(indicator in response for indicator in cancel_indicators):
+            print(f"🔍 Found cancellation in response: {response[:50]}...")
+            return 'cancelled'
 
-                # Check if AI had completed giving appointment details before the interruption
-                for prev_line in previous_lines:
-                    if prev_line.startswith('assistant:'):
-                        prev_content = prev_line.replace('assistant:', '').strip().lower()
-                        # If AI mentioned complete appointment details (date, time, provider), then interruption is less likely
-                        if all(keyword in prev_content for keyword in ['appointment', 'at']) and any(time_word in prev_content for time_word in ['pm', 'am', 'o\'clock']):
-                            full_appointment_mentioned = True
-
-                # If AI was still in middle of explaining OR patient interrupted before full details
-                if not full_appointment_mentioned or "perfect! the reason" in transcript.lower():
-                    patient_interrupted = True
-                    break
-
-            # Reset confirmation tracking if user gives substantial response without goodbye
-            if len(user_response.split()) > 3 and not any(pattern in user_response for pattern in interrupted_patterns):
-                ai_was_confirming = False
-
-    # If conversation was interrupted without clear appointment decision, return busy_voicemail
-    if patient_interrupted:
-        return 'busy_voicemail'
-
-    # Split transcript into sentences for better analysis
-    sentences = [s.strip() for s in transcript_lower.replace('.', '|').replace('!', '|').replace('?', '|').split('|') if s.strip()]
-
-    # Track decisions throughout the conversation (later decisions override earlier ones)
-    decisions = []
-
-    # Define more comprehensive keyword patterns
-    confirmation_patterns = [
-        # Direct confirmations - MUST be clear and unambiguous
-        "yes, i'll be there", "yes i will be there", "yes that works", "yes that's fine",
-        "yes i can make it", "yes i will make it", "yes that's good", "yes sounds good",
-        "i'll be there", "i will be there", "i can make it", "i will make it",
-        "see you then", "see you there", "sounds good", "that works", "that's fine",
-        "confirmed", "confirm", "looking forward", "will be there", "plan to be there",
-        # Contextual confirmations - only if followed by appointment details
-        "yes to confirm", "yes for confirmation", "confirming", "i confirm"
-    ]
-
-    reschedule_patterns = [
-        # Direct reschedule requests
-        "reschedule", "reschedule it", "reschedule this", "reschedule the appointment",
-        "change the time", "change the date", "move the appointment", "different time",
-        "different date", "different day", "another time", "another date", "another day",
-        "can we schedule", "can we reschedule", "find a new time", "find another time",
-        "not that time", "not that date", "not that day", "better time", "better date",
-        "prefer", "would prefer", "i prefer", "schedule for", "what about", "how about",
-        "can we do", "is there", "available", "free", "open", "works better",
-        # AI responses indicating reschedule processing
-        "scheduling agent will call", "someone will be in touch", "call you shortly",
-        "will call you to find", "arrange a new time", "find a time that works better"
-    ]
-
-    cancellation_patterns = [
-        # Direct cancellations
-        "cancel", "cancel it", "cancel this", "cancel the appointment", "cancel my appointment",
-        "want to cancel", "need to cancel", "have to cancel", "going to cancel",
-        "i'm canceling", "i'm cancelling", "canceling", "cancelling",
-        # Inability to attend
-        "can't make it", "cannot make it", "won't make it", "will not make it",
-        "can't come", "cannot come", "won't come", "will not come",
-        "can't be there", "cannot be there", "won't be there", "will not be there",
-        "unable to", "not coming", "don't need", "do not need", "no longer need"
-    ]
-
-    # Analyze each sentence for decision indicators
-    for i, sentence in enumerate(sentences):
-        sentence = sentence.strip()
-
-        # Check for confirmations - but be more strict
-        for pattern in confirmation_patterns:
-            if pattern in sentence:
-                # Make sure it's not negated AND not followed by goodbye
-                if (not any(neg in sentence for neg in ["don't", "do not", "won't", "will not", "can't", "cannot", "no", "not"]) and
-                    not any(bye in sentence for bye in ["bye", "goodbye", "gotta go", "have to go"])):
-                    decisions.append(('confirmed', i))
-                break
-
-        # Check for rescheduling
-        for pattern in reschedule_patterns:
-            if pattern in sentence:
-                decisions.append(('rescheduled', i))
-                break
-
-        # Check for cancellation
-        for pattern in cancellation_patterns:
-            if pattern in sentence:
-                decisions.append(('cancelled', i))
-                break
-
-    # If we have decisions, return the last one (final decision)
-    if decisions:
-        final_decision = sorted(decisions, key=lambda x: x[1])[-1][0]
-        return final_decision
-
-    # Check for ambiguous/unknown responses if no clear decisions found
-    ambiguous_indicators = [
-        "i'm not sure", "not sure", "maybe", "perhaps", "i don't know", "don't know",
-        "let me think", "let me check", "i'll have to", "i need to check",
-        "uncertain", "unclear", "confused", "i don't understand",
-        "possibly", "might be", "could be", "depends", "we'll see"
-    ]
-
-    # Check each sentence for ambiguous responses
-    for sentence in sentences:
-        if any(ambiguous in sentence for ambiguous in ambiguous_indicators):
+        # Check for AMBIGUOUS responses
+        ambiguous_indicators = [
+            "i'm not sure", "not sure", "maybe", "perhaps", "i don't know",
+            "let me think", "let me check", "uncertain", "unclear"
+        ]
+        
+        if any(indicator in response for indicator in ambiguous_indicators):
+            print(f"🔍 Found ambiguous response: {response[:50]}...")
             return 'unknown'
 
-    # If no clear decision patterns found, analyze context more broadly
-
-    # Check for voicemail/busy indicators
-    voicemail_indicators = [
-        "voicemail", "voice mail", "leave a message", "after the beep", "beep",
-        "mailbox", "voice message", "recording", "automated", "please leave",
-        "can't come to the phone", "not available", "busy", "no answer",
-        "disconnected", "line busy", "dial tone", "no response"
-    ]
-
-    if any(indicator in transcript_lower for indicator in voicemail_indicators):
+    # Look at the overall conversation flow
+    # Check if AI got to ask the confirmation question
+    ai_asked_confirmation = any("will you be able to make it" in line.lower() or 
+                              "can you make it" in line.lower() or
+                              "confirm your upcoming appointment" in line.lower()
+                              for line in lines if line.startswith('assistant:'))
+    
+    print(f"🔍 AI asked confirmation: {ai_asked_confirmation}")
+    
+    # If no clear decision found, check conversation length and interaction quality
+    if len(user_responses) == 0:
+        print(f"🔍 No user responses found")
         return 'busy_voicemail'
-
-    # Check if conversation seems like a real interaction
-    interaction_indicators = [
-        "hello", "hi", "hey", "good morning", "good afternoon", "good evening",
-        "speaking", "this is", "who is", "what", "when", "where", "how",
-        "thank you", "thanks", "sorry", "excuse me", "pardon"
-    ]
-
-    has_interaction = any(indicator in transcript_lower for indicator in interaction_indicators)
-
-    # If we have a real conversation but no clear decision, check for ambiguous responses
-    if has_interaction and len(transcript.strip()) > 20:
-        # Check for ambiguous or polite but non-committal responses
-        ambiguous_patterns = [
-            "thank you", "thanks", "okay", "alright", "yes sir", "yes ma'am"
-        ]
-
-        # If transcript mainly contains polite but non-committal responses, it's ambiguous
-        if any(pattern in transcript_lower for pattern in ambiguous_patterns):
-            # Only count as confirmed if there's explicit appointment confirmation
-            appointment_confirmation = any(phrase in transcript_lower for phrase in [
-                "i'll be there", "i will be there", "see you then", "confirmed",
-                "that works", "sounds good", "i can make it"
-            ])
-
-            if not appointment_confirmation:
-                return 'busy_voicemail'  # Treat ambiguous/interrupted as busy_voicemail
-
-        # Look for positive vs negative sentiment in the overall response
-        positive_words = ["yes", "sure", "fine", "good", "great", "perfect"]
-        negative_words = ["no", "can't", "won't", "unable", "busy", "sorry", "problem"]
-
-        positive_count = sum(1 for word in positive_words if word in transcript_lower)
-        negative_count = sum(1 for word in negative_words if word in transcript_lower)
-
-        if positive_count > negative_count and positive_count > 1:  # Need multiple positive indicators
+    elif len(user_responses) == 1 and len(user_responses[0]) < 10:
+        # Very short single response usually indicates hang-up or voicemail
+        print(f"🔍 Very short single response: {user_responses[0]}")
+        return 'busy_voicemail'
+    elif not ai_asked_confirmation:
+        # If AI never got to ask the main question, likely interrupted
+        print(f"🔍 AI never asked confirmation question")
+        return 'busy_voicemail'
+    else:
+        # Had conversation but no clear decision - analyze sentiment
+        positive_words = ["yes", "okay", "sure", "fine", "good", "great"]
+        negative_words = ["no", "can't", "won't", "unable", "sorry"]
+        
+        positive_count = sum(1 for response in user_responses for word in positive_words if word in response)
+        negative_count = sum(1 for response in user_responses for word in negative_words if word in response)
+        
+        print(f"🔍 Sentiment analysis - Positive: {positive_count}, Negative: {negative_count}")
+        
+        if positive_count > negative_count and positive_count > 0:
             return 'confirmed'
         elif negative_count > positive_count:
-            return 'busy_voicemail'
-
-    # Default to busy_voicemail if we can't determine the status
-    return 'busy_voicemail'
+            return 'cancelled'
+        else:
+            return 'unknown'
 
 
 def get_voicemail_prompt(patient_name: str = "[patient name]",
@@ -3933,11 +3847,15 @@ async def bland_webhook(request: Request):
     """Webhook to receive Bland AI call updates and update the main results DB."""
     try:
         data = await request.json()
-        print(f"🔔 Webhook received: {data}")
+        print(f"🔔 WEBHOOK RECEIVED for call_id: {data.get('call_id')}")
 
         call_id = data.get("call_id")
         request_data = data.get("request_data", {})
         campaign_id = request_data.get("campaign_id")
+        transcript = data.get('transcript', '')
+        call_length = data.get('call_length', 0)
+        
+        print(f"🔔 Webhook data - Call ID: {call_id}, Campaign: {campaign_id}, Transcript length: {len(transcript)}")
 
         if not call_id:
             print(f"⚠️ Webhook ignored: Missing call_id")
@@ -3957,34 +3875,45 @@ async def bland_webhook(request: Request):
                 # Find the specific call within that campaign's results
                 for result in campaign_results_db[check_campaign_id].get("results", []):
                     if result.get("call_id") == call_id:
-                        # Update this call's data with the final results
-                        transcript = data.get('transcript', '')
-                        call_status = data.get('status', 'completed')
-
-                        # Extract final summary first, then determine status based on it
-                        if transcript and transcript.strip():
-                            final_summary = extract_final_summary(transcript)
-                            # Use final summary to determine status (more accurate)
-                            analyzed_status, standardized_summary = analyze_call_status_from_summary(final_summary, transcript)
-                            final_summary = standardized_summary # Use standardized summary
+                        print(f"🔔 Found matching call in campaign {check_campaign_id}")
+                        
+                        # Parse duration properly
+                        if call_length is not None and call_length != 0:
+                            # call_length is in MINUTES, convert to seconds
+                            duration = int(float(call_length) * 60)
                         else:
-                            analyzed_status = 'busy_voicemail'
-                            final_summary = "No transcript available"
+                            duration = parse_duration(data.get('duration', 0))
+                        
+                        print(f"🔔 Parsed duration: {duration} seconds from call_length: {call_length}")
 
-                        duration = parse_duration(data.get('call_length', data.get('duration', 0)))
+                        # Analyze transcript for status and summary
+                        if transcript and transcript.strip():
+                            print(f"🔔 Analyzing transcript for status...")
+                            final_summary = extract_final_summary(transcript)
+                            analyzed_status, standardized_summary = analyze_call_status_from_summary(final_summary, transcript)
+                            print(f"🔔 Analysis result - Status: {analyzed_status}, Summary: {standardized_summary[:100]}...")
+                        else:
+                            print(f"🔔 No transcript available, defaulting to busy_voicemail")
+                            analyzed_status = 'busy_voicemail'
+                            standardized_summary = "No transcript available"
 
                         # Update the result with complete data
+                        old_status = result.get("call_status", "unknown")
                         result.update({
                             "transcript": transcript,
                             "call_status": analyzed_status,
-                            "final_summary": final_summary,
+                            "final_summary": standardized_summary,
                             "duration": duration,
-                            "webhook_status": call_status,
+                            "webhook_status": data.get('status', 'completed'),
                             "webhook_received_at": datetime.now().isoformat()
                         })
 
-                        print(f"✅ Webhook updated call {call_id} in campaign {check_campaign_id}")
-                        print(f"   Status: {analyzed_status}, Transcript length: {len(transcript)}")
+                        print(f"✅ Webhook updated call {call_id}")
+                        print(f"   Patient: {result.get('patient_name', 'Unknown')}")
+                        print(f"   Status: {old_status} → {analyzed_status}")
+                        print(f"   Duration: {duration}s")
+                        print(f"   Summary: {standardized_summary[:100]}...")
+                        
                         call_updated = True
                         break
 
@@ -3995,6 +3924,7 @@ async def bland_webhook(request: Request):
 
         if not call_updated:
             print(f"⚠️ Call {call_id} not found in any campaign results")
+            print(f"⚠️ Available campaigns: {list(campaign_results_db.keys())}")
 
         return {"success": True, "call_updated": call_updated}
 
