@@ -2646,6 +2646,7 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
         "no one by that name", "nobody by that name", "don't know", "never heard of",
         "no such person", "no one here by that name", "nobody here by that name",
         "you must have the wrong", "this isn't", "that's not me", "i'm not",
+        "but i'm not", "i am not", "that is not me", "this is not me",
         "who is this", "who are you looking for", "there's no", "nobody named",
         "no one named", "you must have the wrong", "i think you have the wrong"
     ]):
@@ -2712,19 +2713,47 @@ def analyze_call_transcript(transcript: str) -> str:
 
     transcript_lower = transcript.lower().strip()
 
-    # Check for wrong number scenarios first (highest priority)
+    # PRIORITY 1: Check for wrong number scenarios first (highest priority)
+    # Look for explicit denials of identity
+    identity_denial_patterns = [
+        "but i'm not", "i'm not", "that's not me", "this isn't me",
+        "i am not", "that is not me", "this is not me"
+    ]
+    
+    for pattern in identity_denial_patterns:
+        if pattern in transcript_lower:
+            return 'wrong_number'
+
+    # Check for other wrong number indicators
     wrong_number_patterns = [
         "wrong number", "you have the wrong number", "this is the wrong number",
         "no one by that name", "nobody by that name", "don't know", "never heard of",
         "no such person", "no one here by that name", "nobody here by that name",
-        "you must have the wrong", "this isn't", "that's not me", "i'm not",
-        "who is this", "who are you looking for", "there's no", "nobody named",
-        "no one named", "you must have the wrong", "i think you have the wrong"
+        "you must have the wrong", "there's no", "nobody named",
+        "no one named", "you must have the wrong", "i think you have the wrong",
+        "who is this", "who are you looking for"
     ]
 
     for pattern in wrong_number_patterns:
         if pattern in transcript_lower:
             return 'wrong_number'
+
+    # PRIORITY 2: Check for "not available" scenarios after wrong number check
+    # This handles cases where the right person is contacted but patient is not available
+    not_available_patterns = [
+        "not available", "she's not available", "he's not available",
+        "not here right now", "isn't here", "is not here", 
+        "not home", "isn't home", "is not home", "out right now",
+        "can't come to the phone", "cannot come to the phone", "busy right now",
+        "in a meeting", "at work", "not in", "stepped out", "away from",
+        "will be back", "call back later", "try calling later", "not around",
+        "unavailable", "sleeping", "napping", "can you call back",
+        "not a good time", "isn't a good time", "bad time"
+    ]
+
+    for pattern in not_available_patterns:
+        if pattern in transcript_lower:
+            return 'not_available'
 
     # Check for not available scenarios (second priority)
     not_available_patterns = [
