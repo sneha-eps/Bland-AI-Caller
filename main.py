@@ -4039,6 +4039,8 @@ async def call_history_page(request: Request):
 async def get_call_history_api():
     """Get call history data sorted by most recent first"""
     try:
+        api_key = get_api_key()
+        
         # Load clients and campaigns for lookups
         clients = {client['id']: client for client in load_clients()}
         campaigns = {campaign['id']: campaign for campaign in load_campaigns()}
@@ -4059,45 +4061,102 @@ async def get_call_history_api():
             
             # Process each call in the campaign results
             for result in campaign_results.get('results', []):
-                # Enhanced status analysis - prioritize stored webhook data
                 call_status = 'busy_voicemail'  # Default fallback
                 final_summary = "No summary available"
                 duration = 0
                 transcript = result.get('transcript', '')
                 
-                # Priority 1: Use stored final summary and status from webhook if available
-                if result.get('final_summary') and result.get('final_summary').strip():
+                # Priority 1: Use stored final summary and status from webhook if available and valid
+                if result.get('final_summary') and result.get('final_summary').strip() and result.get('final_summary') not in ['No summary available', 'Call initiated but no response received']:
                     stored_summary = result.get('final_summary')
                     call_status, standardized_summary = analyze_call_status_from_summary(stored_summary, transcript)
                     final_summary = standardized_summary
+                    duration = result.get('duration', 0) if result.get('duration') else 0
                     print(f"📊 Call History API: Using stored summary for {result.get('patient_name', 'Unknown')}: {call_status}")
                 
                 # Priority 2: Use stored call_status if available and not 'initiated'/'processing'
-                elif result.get('call_status') and result.get('call_status') not in ['initiated', 'processing']:
+                elif result.get('call_status') and result.get('call_status') not in ['initiated', 'processing', 'busy_voicemail']:
                     call_status = result.get('call_status')
                     final_summary = get_standardized_summary_for_status(call_status)
+                    duration = result.get('duration', 0) if result.get('duration') else 0
                     print(f"📊 Call History API: Using stored status for {result.get('patient_name', 'Unknown')}: {call_status}")
                 
-                # Priority 3: Analyze transcript if available
+                # Priority 3: Fetch fresh data from API if call was successful but we don't have good stored data
+                elif result.get('success') and result.get('call_id') and api_key:
+                    try:
+                        print(f"📊 Call History API: Fetching fresh data for {result.get('patient_name', 'Unknown')} call {result.get('call_id')}")
+                        
+                        async with aiohttp.ClientSession() as session:
+                            async with session.get(
+                                f"https://api.bland.ai/v1/calls/{result['call_id']}",
+                                headers={"Authorization": f"Bearer {api_key}"},
+                                timeout=aiohttp.ClientTimeout(total=15)
+                            ) as response:
+                                
+                                if response.status == 200:
+                                    call_data = await response.json()
+                                    
+                                    # Get fresh transcript and duration
+                                    fresh_transcript = call_data.get('transcript', call_data.get('concatenated_transcript', ''))
+                                    
+                                    # Parse duration from API response
+                                    call_length = call_data.get("call_length")
+                                    corrected_duration = call_data.get("corrected_duration")
+                                    
+                                    if call_length is not None and call_length != 0:
+                                        # call_length is in MINUTES, convert to seconds
+                                        duration = int(float(call_length) * 60)
+                                    elif corrected_duration is not None and corrected_duration != 0:
+                                        # corrected_duration is in SECONDS
+                                        duration = parse_duration(corrected_duration)
+                                    else:
+                                        raw_duration = (call_data.get("duration", 0) or call_data.get("length", 0))
+                                        duration = parse_duration(raw_duration)
+                                    
+                                    # Analyze fresh transcript for status
+                                    if fresh_transcript and fresh_transcript.strip():
+                                        transcript = fresh_transcript
+                                        extracted_summary = extract_final_summary(fresh_transcript)
+                                        call_status, standardized_summary = analyze_call_status_from_summary(extracted_summary, fresh_transcript)
+                                        final_summary = standardized_summary
+                                        print(f"📊 Call History API: Using fresh data for {result.get('patient_name', 'Unknown')}: {call_status}, Duration: {duration}s")
+                                    else:
+                                        # No transcript available, treat as busy/voicemail
+                                        call_status = 'busy_voicemail'
+                                        final_summary = "No transcript available"
+                                        print(f"📊 Call History API: Fresh data has no transcript for {result.get('patient_name', 'Unknown')}")
+                                        
+                                elif response.status == 404:
+                                    print(f"📊 Call History API: Call {result.get('call_id')} not found in API")
+                                    call_status = 'busy_voicemail'
+                                    final_summary = "Call not found in API"
+                                    duration = 0
+                                else:
+                                    print(f"📊 Call History API: API error {response.status} for call {result.get('call_id')}")
+                                    call_status = 'busy_voicemail'
+                                    final_summary = "API error retrieving call data"
+                                    duration = 0
+                                    
+                    except Exception as e:
+                        print(f"📊 Call History API: Error fetching fresh data for {result.get('call_id')}: {str(e)}")
+                        call_status = 'busy_voicemail'
+                        final_summary = "Error retrieving call data"
+                        duration = 0
+                
+                # Priority 4: Analyze transcript if available but no fresh data was fetched
                 elif transcript and transcript.strip():
                     extracted_summary = extract_final_summary(transcript)
                     call_status, standardized_summary = analyze_call_status_from_summary(extracted_summary, transcript)
                     final_summary = standardized_summary
-                    print(f"📊 Call History API: Using transcript analysis for {result.get('patient_name', 'Unknown')}: {call_status}")
+                    duration = result.get('duration', 0) if result.get('duration') else 0
+                    print(f"📊 Call History API: Using stored transcript analysis for {result.get('patient_name', 'Unknown')}: {call_status}")
                 
-                # Priority 4: Check if call was successful but no proper status
-                elif result.get('success') and result.get('call_id'):
-                    # Call was initiated but no final status - likely still processing or failed
-                    if result.get('call_status') in ['initiated', 'processing']:
-                        call_status = 'busy_voicemail'  # Treat as no answer
-                        final_summary = "Call initiated but no response received"
-                    else:
-                        call_status = 'busy_voicemail'
-                        final_summary = "No summary available"
-                    print(f"📊 Call History API: Using fallback for successful call {result.get('patient_name', 'Unknown')}: {call_status}")
-                
-                # Use stored duration or default to 0
-                duration = result.get('duration', 0) if result.get('duration') else 0
+                # Fallback: Use whatever we have or default
+                else:
+                    call_status = 'busy_voicemail'
+                    final_summary = "No summary available"
+                    duration = result.get('duration', 0) if result.get('duration') else 0
+                    print(f"📊 Call History API: Using fallback for {result.get('patient_name', 'Unknown')}: {call_status}")
                 
                 call_record = {
                     'call_id': result.get('call_id'),
@@ -4105,11 +4164,11 @@ async def get_call_history_api():
                     'phone_number': result.get('phone_number', 'Unknown'),
                     'campaign_name': campaign_name,
                     'client_name': client_name,
-                    'status': call_status,  # Use analyzed status
+                    'status': call_status,
                     'success': result.get('success', False),
                     'duration': duration,
                     'created_at': result.get('created_at') or campaign_results.get('started_at', ''),
-                    'final_summary': final_summary,  # Use analyzed summary
+                    'final_summary': final_summary,
                     'transcript': transcript,
                     'campaign_id': campaign_id
                 }
