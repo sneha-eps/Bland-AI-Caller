@@ -2535,7 +2535,39 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
 
     summary_lower = final_summary.lower().strip()
 
-    # Check for ambiguous/unknown responses FIRST (highest priority for new unknown status)
+    # PRIORITY 1: Check transcript FIRST for definitive patient responses
+    if transcript and transcript.strip():
+        transcript_lower = transcript.lower()
+        
+        # Look for clear confirmation patterns in transcript
+        confirmation_indicators = [
+            "excellent! we are glad to have you",
+            "just to confirm, your appointment",
+            "you're welcome! have a great day",
+            "see you then"
+        ]
+        
+        # Look for patient's actual affirmative responses
+        patient_confirmation_patterns = [
+            "user: yes", "user: sure", "user: okay", "user: that works",
+            "user: sounds good", "user: i'll be there", "user: yes,",
+            "are you saying you'd like to keep the appointment as scheduled?\n user: yes"
+        ]
+        
+        # If AI gave confirmation response AND patient gave affirmative response
+        ai_confirmed = any(phrase in transcript_lower for phrase in confirmation_indicators)
+        patient_confirmed = any(phrase in transcript_lower for phrase in patient_confirmation_patterns)
+        
+        if ai_confirmed and patient_confirmed:
+            # Double-check this isn't actually a reschedule request
+            patient_reschedule_patterns = [
+                "user: i want to reschedule", "user: reschedule", "user: different time",
+                "user: better time", "user: new time", "user: can we reschedule"
+            ]
+            if not any(phrase in transcript_lower for phrase in patient_reschedule_patterns):
+                return 'confirmed', "Patient confirmed appointment"
+
+    # Check for ambiguous/unknown responses SECOND (after transcript confirmation check)
     ambiguous_patterns = [
         # Direct ambiguous phrases
         "i'm not sure", "not sure", "maybe", "perhaps", "i don't know", "don't know",
@@ -2551,7 +2583,7 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
     if any(phrase in summary_lower for phrase in ambiguous_patterns):
         return 'unknown', "Patient gave ambiguous response"
 
-    # Check for AI reschedule processing patterns (second priority)
+    # Check for AI reschedule processing patterns (third priority)
     reschedule_patterns = [
         "appointment will be rescheduled", "will be rescheduled", "reschedule", "rescheduled",
         "scheduling agent will call", "will call you to find a new time", "someone will be in touch",
@@ -2559,9 +2591,23 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
         "find a new time", "different time", "better time", "new appointment time"
     ]
     if any(phrase in summary_lower for phrase in reschedule_patterns):
+        # CRITICAL CHECK: If transcript shows patient confirmed, override reschedule summary
+        if transcript and transcript.strip():
+            transcript_lower = transcript.lower()
+            ai_confirmed = any(phrase in transcript_lower for phrase in [
+                "excellent! we are glad to have you",
+                "just to confirm, your appointment",
+                "you're welcome! have a great day"
+            ])
+            patient_confirmed = any(phrase in transcript_lower for phrase in [
+                "user: yes", "user: sure", "user: okay", "user: that works",
+                "are you saying you'd like to keep the appointment as scheduled?\n user: yes"
+            ])
+            if ai_confirmed and patient_confirmed:
+                return 'confirmed', "Patient confirmed appointment"
         return 'rescheduled', "Patient requested to reschedule"
 
-    # Check for AI cancellation processing patterns (third priority)
+    # Check for AI cancellation processing patterns (fourth priority)
     cancellation_patterns = [
         "ai processed cancellation", "patient cancelled", "appointment cancelled",
         "appointment has been cancelled", "cancelled for you", "cancel this appointment"
@@ -2586,38 +2632,13 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
         ]):
             return 'confirmed', "Patient confirmed appointment"
 
-    # Check for AI confirmation patterns (lower priority - only if no reschedule/cancel/ambiguous found)
-    # MUST exclude cases that mention rescheduling, cancellation, or ambiguity
+    # Check for AI confirmation patterns (lower priority)
     confirmation_patterns = [
         "patient confirmed", "appointment confirmed", "confirmed appointment",
         "ai provided confirmation", "confirmation details", "we are glad to have you"
     ]
     if any(phrase in summary_lower for phrase in confirmation_patterns):
-        # Double-check that this isn't actually a reschedule, cancellation, or ambiguous response
-        if not any(reschedule_word in summary_lower for reschedule_word in reschedule_patterns + [
-            "different time", "better time", "new time", "call you back", "call you soon"
-        ]) and not any(cancel_word in summary_lower for cancel_word in cancellation_patterns) and not any(ambiguous_word in summary_lower for ambiguous_word in ambiguous_patterns):
-            # Additional check: Look at the actual transcript for user's final decision
-            if transcript and transcript.strip():
-                transcript_lower = transcript.lower()
-                # Check if user actually said ambiguous things in the transcript
-                if any(ambiguous_phrase in transcript_lower for ambiguous_phrase in [
-                    "i'm not sure", "not sure", "maybe", "perhaps", "i don't know",
-                    "let me think", "let me check", "uncertain", "unclear"
-                ]):
-                    return 'unknown', "Patient gave ambiguous response"
-                # Check if user actually said reschedule in the transcript
-                if any(reschedule_phrase in transcript_lower for reschedule_phrase in [
-                    "i want to reschedule", "want to reschedule", "reschedule", "different time",
-                    "better time", "new time", "can we reschedule", "need to reschedule"
-                ]):
-                    return 'rescheduled', "Patient requested to reschedule"
-                # Check if user actually said cancel in the transcript
-                if any(cancel_phrase in transcript_lower for cancel_phrase in [
-                    "i want to cancel", "want to cancel", "cancel", "can't make it", "won't make it"
-                ]):
-                    return 'cancelled', "Patient cancelled appointment"
-            return 'confirmed', "Patient confirmed appointment"
+        return 'confirmed', "Patient confirmed appointment"
 
     # Check for AI wrong number patterns from AI response
     if any(phrase in summary_lower for phrase in [
@@ -2652,44 +2673,7 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
 
     # Enhanced transcript analysis as fallback
     if transcript and transcript.strip():
-        # Look specifically for ambiguous responses in transcript first
-        transcript_lower = transcript.lower()
-
-        # Check for ambiguous patterns in transcript
-        if any(phrase in transcript_lower for phrase in [
-            "i'm not sure", "not sure", "maybe", "perhaps", "i don't know",
-            "let me think", "let me check", "uncertain", "unclear", "confused"
-        ]):
-            return 'unknown', "Patient gave ambiguous response"
-
-        # Check for AI's final confirmation statements
-        if any(phrase in transcript_lower for phrase in [
-            "just to confirm, your appointment", "we are glad to have you",
-            "have a great day", "see you then", "you're welcome"
-        ]):
-            return 'confirmed', "Patient confirmed appointment"
-
-        # Check for AI's cancellation processing
-        if any(phrase in transcript_lower for phrase in [
-            "i will cancel this appointment", "appointment has been cancelled",
-            "feel free to contact us anytime"
-        ]):
-            return 'cancelled', "Patient cancelled appointment"
-
-        # Check for AI's reschedule processing
-        if any(phrase in transcript_lower for phrase in [
-            "our scheduling agent will call you", "someone will be in touch soon",
-            "to find a new time", "will call you shortly"
-        ]):
-            return 'rescheduled', "Patient requested to reschedule"
-
-        # Check for AI's wrong number handling
-        if any(phrase in transcript_lower for phrase in [
-            "my apologies for the confusion", "thank you for your time"
-        ]):
-            return 'wrong_number', "Wrong number or patient not available"
-
-        # Use a more general transcript analyzer if specific patterns aren't found
+        # Use the general transcript analyzer
         return analyze_call_transcript(transcript), "Analysis based on transcript"
 
     # Default to busy_voicemail with consistent message for failed/unknown calls
