@@ -2572,18 +2572,21 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
     """
     print(f"🔍 ANALYZING STATUS - Summary: '{final_summary[:100] if final_summary else 'None'}...', Transcript length: {len(transcript) if transcript else 0}")
     
-    # If we have a transcript, prioritize transcript analysis over empty/generic summaries
+    # PRIORITY 1: If we have a transcript, use it for analysis regardless of summary quality
     if transcript and transcript.strip() and len(transcript.strip()) > 20:
-        # Check if summary is just generic/empty
-        if not final_summary or final_summary.strip() == "" or final_summary.strip().lower() in ['unknown status', 'unknown', 'null', 'none', 'no summary available', 'no clear status determined']:
-            analyzed_status = analyze_call_transcript(transcript)
-            print(f"🔍 Using transcript analysis due to empty/generic summary: {analyzed_status}")
-            return analyzed_status, get_standardized_summary_for_status(analyzed_status)
+        analyzed_status = analyze_call_transcript(transcript)
+        standardized_summary = extract_final_summary(transcript)
+        print(f"🔍 Using transcript analysis (PRIORITY 1): {analyzed_status}")
+        return analyzed_status, standardized_summary
     
-    # If no summary and no transcript, default to busy_voicemail
-    if not final_summary or final_summary.strip() == "" or final_summary.strip().lower() in ['unknown status', 'unknown', 'null', 'none', 'no summary available']:
-        print(f"🔍 No data available, defaulting to busy_voicemail")
-        return 'busy_voicemail', "No summary available"
+    # PRIORITY 2: If no transcript but we have some summary, try to analyze it
+    if final_summary and final_summary.strip() and final_summary.strip().lower() not in ['unknown status', 'unknown', 'null', 'none', 'no summary available', 'no clear status determined']:
+        # Continue with existing summary analysis logic
+        pass
+    else:
+        # PRIORITY 3: No transcript and no useful summary - default to busy_voicemail
+        print(f"🔍 No useful data available, defaulting to busy_voicemail")
+        return 'busy_voicemail', "Call completed but no transcript or summary available"
 
     summary_lower = final_summary.lower().strip()
 
@@ -4015,18 +4018,37 @@ async def get_call_history_api():
 
             # Process each call in the campaign results
             for result in campaign_results.get('results', []):
+                # Get stored data
+                stored_status = result.get('call_status', 'busy_voicemail')
+                stored_summary = result.get('final_summary', '')
+                stored_transcript = result.get('transcript', '')
+                stored_duration = result.get('duration', 0)
+                
+                # Re-analyze if we have transcript but generic status/summary
+                final_status = stored_status
+                final_summary = stored_summary
+                
+                if stored_transcript and stored_transcript.strip():
+                    # If we have transcript but generic status, re-analyze
+                    if stored_status in ['busy_voicemail', 'unknown'] or not stored_summary or stored_summary in ['No summary available', 'No clear status determined']:
+                        analyzed_status = analyze_call_transcript(stored_transcript)
+                        extracted_summary = extract_final_summary(stored_transcript)
+                        final_status = analyzed_status
+                        final_summary = extracted_summary
+                        print(f"🔍 Call History API: Re-analyzed {result.get('patient_name', 'Unknown')} - Status: {analyzed_status}")
+                
                 call_record = {
                     'call_id': result.get('call_id'),
                     'patient_name': result.get('patient_name', 'Unknown'),
                     'phone_number': result.get('phone_number', 'Unknown'),
                     'campaign_name': campaign_name,
                     'client_name': client_name,
-                    'status': result.get('call_status', 'busy_voicemail'),
+                    'status': final_status,
                     'success': result.get('success', False),
-                    'duration': result.get('duration', 0),
+                    'duration': stored_duration,
                     'created_at': result.get('created_at') or campaign_results.get('started_at', ''),
-                    'final_summary': result.get('final_summary', 'No summary available'),
-                    'transcript': result.get('transcript', ''),
+                    'final_summary': final_summary if final_summary else 'No summary available',
+                    'transcript': stored_transcript,
                     'campaign_id': campaign_id
                 }
 
