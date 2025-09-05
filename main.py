@@ -2392,15 +2392,52 @@ async def process_csv(file: UploadFile = File(...),
 
 def extract_final_summary(transcript: str) -> str:
     """
-    Extract the AI assistant's final summary statement from the call transcript.
-    This looks for the actual final confirmation/summary statement made by the AI.
+    Extract the patient's actual decision from the transcript, not just the AI's final statement.
+    This analyzes what the patient actually said to determine the true outcome.
     """
     if not transcript or transcript.strip() == "":
         return "No summary available"
 
     transcript_lines = transcript.strip().split('\n')
+    
+    # First, look for the patient's actual decision in the transcript
+    patient_decision = None
+    
+    # Scan through the transcript to find the patient's final decision
+    for line in transcript_lines:
+        line = line.strip()
+        if line.startswith('user:'):
+            user_statement = line.replace('user:', '').strip().lower()
+            
+            # Check for reschedule requests
+            if any(phrase in user_statement for phrase in [
+                "i want to reschedule", "want to reschedule", "reschedule", 
+                "different time", "better time", "new time", "can we reschedule", 
+                "need to reschedule", "change the time", "move the appointment"
+            ]):
+                patient_decision = "Patient requested to reschedule"
+            
+            # Check for cancellation requests
+            elif any(phrase in user_statement for phrase in [
+                "i want to cancel", "want to cancel", "cancel", "can't make it", 
+                "won't make it", "cannot make it", "unable to make it"
+            ]):
+                patient_decision = "Patient cancelled appointment"
+            
+            # Check for confirmations (but only if no reschedule/cancel found)
+            elif patient_decision is None and any(phrase in user_statement for phrase in [
+                "yes", "okay", "sure", "that works", "sounds good", "i'll be there", 
+                "i will be there", "see you then", "confirm"
+            ]) and not any(negative in user_statement for negative in [
+                "no", "can't", "won't", "unable", "reschedule", "cancel"
+            ]):
+                patient_decision = "Patient confirmed appointment"
 
-    # Look for the AI assistant's final summary statements - specifically the "Just to confirm..." pattern
+    # If we found a clear patient decision, return it
+    if patient_decision:
+        return patient_decision
+
+    # Fallback: Look for the AI assistant's final summary statements
     assistant_final_statements = []
 
     # Process lines in reverse to find the most recent assistant statements
@@ -2543,6 +2580,20 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
         if not any(reschedule_word in summary_lower for reschedule_word in reschedule_patterns + [
             "different time", "better time", "new time", "call you back", "call you soon"
         ]) and not any(cancel_word in summary_lower for cancel_word in cancellation_patterns):
+            # Additional check: Look at the actual transcript for user's final decision
+            if transcript and transcript.strip():
+                transcript_lower = transcript.lower()
+                # Check if user actually said reschedule in the transcript
+                if any(reschedule_phrase in transcript_lower for reschedule_phrase in [
+                    "i want to reschedule", "want to reschedule", "reschedule", "different time",
+                    "better time", "new time", "can we reschedule", "need to reschedule"
+                ]):
+                    return 'rescheduled', "Patient requested to reschedule"
+                # Check if user actually said cancel in the transcript
+                if any(cancel_phrase in transcript_lower for cancel_phrase in [
+                    "i want to cancel", "want to cancel", "cancel", "can't make it", "won't make it"
+                ]):
+                    return 'cancelled', "Patient cancelled appointment"
             return 'confirmed', "Patient confirmed appointment"
 
     # Check for AI wrong number patterns from AI response
