@@ -2487,6 +2487,13 @@ def extract_final_summary(transcript: str) -> str:
     # Fallback: Look for final summary patterns anywhere in the transcript
     transcript_lower = transcript.lower()
 
+    # Check for "not available" scenarios first
+    if any(phrase in transcript_lower for phrase in [
+        "she's not available", "he's not available", "not available right now",
+        "patient not available", "but i'm not", "i'm not the patient"
+    ]):
+        return "Patient not available"
+
     # Look for "Just to confirm" statements specifically
     for line in transcript_lines:
         if line.startswith('assistant:'):
@@ -2510,7 +2517,7 @@ def extract_final_summary(transcript: str) -> str:
     elif "appointment is confirmed" in transcript_lower or "we are glad to have you" in transcript_lower:
         return "Patient confirmed appointment"
     elif "my apologies for the confusion" in transcript_lower:
-        return "Wrong number or patient not available"
+        return "Patient not available"
     else:
         # Return the last substantial assistant statement
         for line in reversed(transcript_lines):
@@ -2652,7 +2659,7 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
     ]):
         return 'wrong_number', "Wrong number or patient not available"
 
-    # Check for not available patterns
+    # Check for not available patterns (enhanced to catch more scenarios)
     if any(phrase in summary_lower for phrase in [
         "not here right now", "isn't here", "is not here", "not available",
         "not home", "isn't home", "is not home", "out right now",
@@ -2660,7 +2667,9 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
         "in a meeting", "at work", "not in", "stepped out", "away from",
         "will be back", "call back later", "try calling later", "not around",
         "unavailable", "sleeping", "napping", "can you call back",
-        "not a good time", "isn't a good time", "bad time"
+        "not a good time", "isn't a good time", "bad time",
+        "she's not available", "he's not available", "patient not available",
+        "but i'm not", "i'm not the patient", "that's not me"
     ]):
         return 'not_available', "Patient not available"
 
@@ -2754,6 +2763,27 @@ def analyze_call_transcript(transcript: str) -> str:
     for pattern in not_available_patterns:
         if pattern in transcript_lower:
             return 'not_available'
+
+    # PRIORITY 2.5: Check for scenarios where someone else answers and patient is not available
+    # Look for patterns where caller asks for patient and gets response that they're not available
+    lines = [line.strip() for line in transcript.split('\n') if line.strip()]
+    
+    # Check if AI asks to speak with patient and gets "not available" type response
+    ai_asked_for_patient = False
+    for i, line in enumerate(lines):
+        if line.startswith('assistant:'):
+            line_content = line.replace('assistant:', '').strip().lower()
+            # AI asks to speak with specific patient
+            if any(phrase in line_content for phrase in [
+                'am i speaking with', 'may i speak with', 'is this', 'can i speak with'
+            ]):
+                ai_asked_for_patient = True
+        elif line.startswith('user:') and ai_asked_for_patient:
+            user_response = line.replace('user:', '').strip().lower()
+            # User indicates they're not the patient AND patient is not available
+            if (any(denial in user_response for denial in ["but i'm not", "i'm not", "that's not me"]) or
+                any(not_avail in user_response for not_avail in ["not available", "she's not available", "he's not available"])):
+                return 'not_available'
 
     # Check for not available scenarios (second priority)
     not_available_patterns = [
