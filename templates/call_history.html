@@ -1145,6 +1145,12 @@
             resultsCount.textContent = `${filteredCallHistory.length} call${filteredCallHistory.length !== 1 ? 's' : ''} found`;
 
             // Sort calls by date/time in descending order (most recent first)
+            console.log('Before sorting - first 3 calls:', filteredCallHistory.slice(0, 3).map(call => ({
+                patient: call.patientName, 
+                dateTime: call.dateTime,
+                campaign: call.campaignName
+            })));
+            
             const sortedCalls = [...filteredCallHistory].sort((a, b) => {
                 // Helper function to parse dates more robustly
                 const parseDate = (dateStr) => {
@@ -1155,18 +1161,25 @@
                     // Clean the date string
                     let cleanDateStr = String(dateStr).trim();
                     
-                    // Handle ISO format with microseconds
-                    if (cleanDateStr.includes('T') && cleanDateStr.includes('+')) {
-                        // Extract the date part before the timezone
-                        cleanDateStr = cleanDateStr.split('+')[0];
+                    // Handle ISO format with microseconds and timezone
+                    if (cleanDateStr.includes('T')) {
+                        // Remove timezone info if present
+                        if (cleanDateStr.includes('+')) {
+                            cleanDateStr = cleanDateStr.split('+')[0];
+                        } else if (cleanDateStr.includes('Z')) {
+                            cleanDateStr = cleanDateStr.replace('Z', '');
+                        }
+                        
+                        // Handle microseconds - truncate to milliseconds
                         if (cleanDateStr.includes('.')) {
-                            // Truncate microseconds to milliseconds
                             const parts = cleanDateStr.split('.');
                             if (parts[1] && parts[1].length > 3) {
                                 cleanDateStr = parts[0] + '.' + parts[1].substring(0, 3);
                             }
                         }
-                        cleanDateStr += 'Z'; // Add Z for UTC
+                        
+                        // Add Z for UTC parsing
+                        cleanDateStr += 'Z';
                     }
                     
                     const date = new Date(cleanDateStr);
@@ -1176,10 +1189,22 @@
                 const dateA = parseDate(a.dateTime);
                 const dateB = parseDate(b.dateTime);
                 
+                // Debug logging for first few comparisons
+                if (filteredCallHistory.indexOf(a) < 3 || filteredCallHistory.indexOf(b) < 3) {
+                    console.log(`Comparing: ${a.patientName} (${a.dateTime}) vs ${b.patientName} (${b.dateTime})`);
+                    console.log(`Parsed dates: ${dateA.toISOString()} vs ${dateB.toISOString()}`);
+                    console.log(`Result: ${dateB.getTime() - dateA.getTime()}`);
+                }
+                
                 // Sort in descending order (newest first)
-                // Invalid dates (epoch time) will be sorted to the end
                 return dateB.getTime() - dateA.getTime();
             });
+            
+            console.log('After sorting - first 3 calls:', sortedCalls.slice(0, 3).map(call => ({
+                patient: call.patientName, 
+                dateTime: call.dateTime,
+                campaign: call.campaignName
+            })));
 
             let html = '';
             sortedCalls.forEach(call => {
