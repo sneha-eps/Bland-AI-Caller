@@ -2572,12 +2572,16 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
     """
     print(f"🔍 ANALYZING STATUS - Summary: '{final_summary[:100] if final_summary else 'None'}...', Transcript length: {len(transcript) if transcript else 0}")
     
-    if not final_summary or final_summary.strip() == "" or final_summary.strip().lower() in ['unknown status', 'unknown', 'null', 'none', 'no summary available']:
-        # Fallback to transcript analysis if no summary or unknown status
-        if transcript and transcript.strip():
+    # If we have a transcript, prioritize transcript analysis over empty/generic summaries
+    if transcript and transcript.strip() and len(transcript.strip()) > 20:
+        # Check if summary is just generic/empty
+        if not final_summary or final_summary.strip() == "" or final_summary.strip().lower() in ['unknown status', 'unknown', 'null', 'none', 'no summary available', 'no clear status determined']:
             analyzed_status = analyze_call_transcript(transcript)
-            print(f"🔍 Using transcript analysis: {analyzed_status}")
+            print(f"🔍 Using transcript analysis due to empty/generic summary: {analyzed_status}")
             return analyzed_status, get_standardized_summary_for_status(analyzed_status)
+    
+    # If no summary and no transcript, default to busy_voicemail
+    if not final_summary or final_summary.strip() == "" or final_summary.strip().lower() in ['unknown status', 'unknown', 'null', 'none', 'no summary available']:
         print(f"🔍 No data available, defaulting to busy_voicemail")
         return 'busy_voicemail', "No summary available"
 
@@ -2697,8 +2701,13 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
         analyzed_status = analyze_call_transcript(transcript)
         return analyzed_status, get_standardized_summary_for_status(analyzed_status)
 
-    # Default fallback
-    print(f"🔍 No patterns matched, defaulting to busy_voicemail")
+    # Default fallback - but if we have a transcript, use it
+    if transcript and transcript.strip():
+        print(f"🔍 Using transcript analysis as final fallback")
+        analyzed_status = analyze_call_transcript(transcript)
+        return analyzed_status, get_standardized_summary_for_status(analyzed_status)
+    
+    print(f"🔍 No patterns matched and no transcript, defaulting to busy_voicemail")
     return 'busy_voicemail', "No clear status determined"
 
 
@@ -3912,16 +3921,23 @@ async def bland_webhook(request: Request):
                         
                         print(f"🔔 Parsed duration: {duration} seconds from call_length: {call_length}")
 
-                        # Analyze transcript for status and summary
+                        # Analyze transcript for status and summary - FORCE ANALYSIS
                         if transcript and transcript.strip():
                             print(f"🔔 Analyzing transcript for status...")
                             final_summary = extract_final_summary(transcript)
                             analyzed_status, standardized_summary = analyze_call_status_from_summary(final_summary, transcript)
                             print(f"🔔 Analysis result - Status: {analyzed_status}, Summary: {standardized_summary[:100]}...")
                         else:
-                            print(f"🔔 No transcript available, defaulting to busy_voicemail")
-                            analyzed_status = 'busy_voicemail'
-                            standardized_summary = "No transcript available"
+                            print(f"🔔 No transcript available, checking call data status...")
+                            # Even without transcript, try to determine status from call completion
+                            call_status_from_api = data.get('status', 'completed')
+                            if call_status_from_api == 'completed' and duration > 0:
+                                # Call completed with some duration, likely answered but no transcript yet
+                                analyzed_status = 'busy_voicemail'  # Default for completed calls without transcript
+                                standardized_summary = "Call completed but no transcript available"
+                            else:
+                                analyzed_status = 'busy_voicemail'
+                                standardized_summary = "No transcript available"
 
                         # Update the result with complete data
                         old_status = result.get("call_status", "unknown")
@@ -3933,6 +3949,11 @@ async def bland_webhook(request: Request):
                             "webhook_status": data.get('status', 'completed'),
                             "webhook_received_at": datetime.now().isoformat()
                         })
+                        
+                        # Force re-analysis if the call was previously marked as 'initiated' or 'processing'
+                        if old_status in ['initiated', 'processing'] and transcript:
+                            print(f"🔔 Re-analyzing call that was previously {old_status}")
+                            result['call_status'] = analyzed_status
 
                         print(f"✅ Webhook updated call {call_id}")
                         print(f"   Patient: {result.get('patient_name', 'Unknown')}")
