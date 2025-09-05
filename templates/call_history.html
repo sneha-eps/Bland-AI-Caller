@@ -1144,8 +1144,22 @@
 
             resultsCount.textContent = `${filteredCallHistory.length} call${filteredCallHistory.length !== 1 ? 's' : ''} found`;
 
+            // Sort calls by date/time in descending order (most recent first)
+            const sortedCalls = [...filteredCallHistory].sort((a, b) => {
+                const dateA = new Date(a.dateTime);
+                const dateB = new Date(b.dateTime);
+                
+                // Handle invalid dates by putting them at the end
+                if (isNaN(dateA.getTime()) && isNaN(dateB.getTime())) return 0;
+                if (isNaN(dateA.getTime())) return 1;
+                if (isNaN(dateB.getTime())) return -1;
+                
+                // Sort in descending order (newest first)
+                return dateB.getTime() - dateA.getTime();
+            });
+
             let html = '';
-            filteredCallHistory.forEach(call => {
+            sortedCalls.forEach(call => {
                 // Determine status display and class - prioritize enhanced analytics data
                 let status = 'busy_voicemail'; // Default fallback
                 
