@@ -1146,15 +1146,38 @@
 
             // Sort calls by date/time in descending order (most recent first)
             const sortedCalls = [...filteredCallHistory].sort((a, b) => {
-                const dateA = new Date(a.dateTime);
-                const dateB = new Date(b.dateTime);
+                // Helper function to parse dates more robustly
+                const parseDate = (dateStr) => {
+                    if (!dateStr || dateStr === 'Unknown' || dateStr === 'Invalid Date') {
+                        return new Date(0); // Epoch time for invalid dates
+                    }
+                    
+                    // Clean the date string
+                    let cleanDateStr = String(dateStr).trim();
+                    
+                    // Handle ISO format with microseconds
+                    if (cleanDateStr.includes('T') && cleanDateStr.includes('+')) {
+                        // Extract the date part before the timezone
+                        cleanDateStr = cleanDateStr.split('+')[0];
+                        if (cleanDateStr.includes('.')) {
+                            // Truncate microseconds to milliseconds
+                            const parts = cleanDateStr.split('.');
+                            if (parts[1] && parts[1].length > 3) {
+                                cleanDateStr = parts[0] + '.' + parts[1].substring(0, 3);
+                            }
+                        }
+                        cleanDateStr += 'Z'; // Add Z for UTC
+                    }
+                    
+                    const date = new Date(cleanDateStr);
+                    return isNaN(date.getTime()) ? new Date(0) : date;
+                };
                 
-                // Handle invalid dates by putting them at the end
-                if (isNaN(dateA.getTime()) && isNaN(dateB.getTime())) return 0;
-                if (isNaN(dateA.getTime())) return 1;
-                if (isNaN(dateB.getTime())) return -1;
+                const dateA = parseDate(a.dateTime);
+                const dateB = parseDate(b.dateTime);
                 
                 // Sort in descending order (newest first)
+                // Invalid dates (epoch time) will be sorted to the end
                 return dateB.getTime() - dateA.getTime();
             });
 
