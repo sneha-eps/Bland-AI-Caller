@@ -2654,7 +2654,7 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
     if transcript and transcript.strip():
         # Look specifically for ambiguous responses in transcript first
         transcript_lower = transcript.lower()
-        
+
         # Check for ambiguous patterns in transcript
         if any(phrase in transcript_lower for phrase in [
             "i'm not sure", "not sure", "maybe", "perhaps", "i don't know",
@@ -2781,14 +2781,14 @@ def analyze_call_transcript(transcript: str) -> str:
                 ai_was_confirming = True
         elif line.startswith('user:'):
             user_response = line.replace('user:', '').strip().lower()
-            
+
             # CRITICAL FIX: If user says goodbye/bye WHILE AI is explaining appointment details,
             # this is an interruption - they're not confirming the appointment
             if ai_was_confirming and any(pattern in user_response for pattern in interrupted_patterns):
                 # Additional check: make sure this isn't after a full appointment confirmation
                 previous_lines = lines[:i]  # Get all lines before this interruption
                 full_appointment_mentioned = False
-                
+
                 # Check if AI had completed giving appointment details before the interruption
                 for prev_line in previous_lines:
                     if prev_line.startswith('assistant:'):
@@ -2796,12 +2796,12 @@ def analyze_call_transcript(transcript: str) -> str:
                         # If AI mentioned complete appointment details (date, time, provider), then interruption is less likely
                         if all(keyword in prev_content for keyword in ['appointment', 'at']) and any(time_word in prev_content for time_word in ['pm', 'am', 'o\'clock']):
                             full_appointment_mentioned = True
-                
+
                 # If AI was still in middle of explaining OR patient interrupted before full details
                 if not full_appointment_mentioned or "perfect! the reason" in transcript.lower():
                     patient_interrupted = True
                     break
-            
+
             # Reset confirmation tracking if user gives substantial response without goodbye
             if len(user_response.split()) > 3 and not any(pattern in user_response for pattern in interrupted_patterns):
                 ai_was_confirming = False
@@ -2891,7 +2891,7 @@ def analyze_call_transcript(transcript: str) -> str:
         "uncertain", "unclear", "confused", "i don't understand",
         "possibly", "might be", "could be", "depends", "we'll see"
     ]
-    
+
     # Check each sentence for ambiguous responses
     for sentence in sentences:
         if any(ambiguous in sentence for ambiguous in ambiguous_indicators):
@@ -3987,7 +3987,7 @@ async def bland_webhook(request: Request):
                             final_summary = extract_final_summary(transcript)
                             # Use final summary to determine status (more accurate)
                             analyzed_status, standardized_summary = analyze_call_status_from_summary(final_summary, transcript)
-                            final_summary = standardized_summary # Use standardized summary
+                            final_summary = standardized_summary
                         else:
                             analyzed_status = 'busy_voicemail'
                             final_summary = "No transcript available"
@@ -4040,32 +4040,32 @@ async def get_call_history_api():
     """Get call history data sorted by most recent first"""
     try:
         api_key = get_api_key()
-        
+
         # Load clients and campaigns for lookups
         clients = {client['id']: client for client in load_clients()}
         campaigns = {campaign['id']: campaign for campaign in load_campaigns()}
-        
+
         all_calls = []
-        
+
         # Process all campaign results
         for campaign_id, campaign_results in campaign_results_db.items():
             campaign_name = campaign_results.get('campaign_name', 'Unknown Campaign')
             client_name = campaign_results.get('client_name', 'Unknown Client')
-            
+
             # Get actual campaign and client details if available
             if campaign_id in campaigns:
                 campaign_name = campaigns[campaign_id].get('name', campaign_name)
                 client_id = campaigns[campaign_id].get('client_id')
                 if client_id and client_id in clients:
                     client_name = clients[client_id].get('name', client_name)
-            
+
             # Process each call in the campaign results
             for result in campaign_results.get('results', []):
                 call_status = 'busy_voicemail'  # Default fallback
                 final_summary = "No summary available"
                 duration = 0
                 transcript = result.get('transcript', '')
-                
+
                 # Priority 1: Use stored final summary and status from webhook if available and valid
                 if result.get('final_summary') and result.get('final_summary').strip() and result.get('final_summary') not in ['No summary available', 'Call initiated but no response received']:
                     stored_summary = result.get('final_summary')
@@ -4073,36 +4073,36 @@ async def get_call_history_api():
                     final_summary = standardized_summary
                     duration = result.get('duration', 0) if result.get('duration') else 0
                     print(f"📊 Call History API: Using stored summary for {result.get('patient_name', 'Unknown')}: {call_status}")
-                
+
                 # Priority 2: Use stored call_status if available and not 'initiated'/'processing'
-                elif result.get('call_status') and result.get('call_status') not in ['initiated', 'processing', 'busy_voicemail']:
+                elif result.get('call_status') and result.get('call_status') not in ['initiated', 'processing']:
                     call_status = result.get('call_status')
                     final_summary = get_standardized_summary_for_status(call_status)
                     duration = result.get('duration', 0) if result.get('duration') else 0
                     print(f"📊 Call History API: Using stored status for {result.get('patient_name', 'Unknown')}: {call_status}")
-                
+
                 # Priority 3: Fetch fresh data from API if call was successful but we don't have good stored data
                 elif result.get('success') and result.get('call_id') and api_key:
                     try:
                         print(f"📊 Call History API: Fetching fresh data for {result.get('patient_name', 'Unknown')} call {result.get('call_id')}")
-                        
+
                         async with aiohttp.ClientSession() as session:
                             async with session.get(
                                 f"https://api.bland.ai/v1/calls/{result['call_id']}",
                                 headers={"Authorization": f"Bearer {api_key}"},
                                 timeout=aiohttp.ClientTimeout(total=15)
                             ) as response:
-                                
+
                                 if response.status == 200:
                                     call_data = await response.json()
-                                    
+
                                     # Get fresh transcript and duration
                                     fresh_transcript = call_data.get('transcript', call_data.get('concatenated_transcript', ''))
-                                    
+
                                     # Parse duration from API response
                                     call_length = call_data.get("call_length")
                                     corrected_duration = call_data.get("corrected_duration")
-                                    
+
                                     if call_length is not None and call_length != 0:
                                         # call_length is in MINUTES, convert to seconds
                                         duration = int(float(call_length) * 60)
@@ -4112,7 +4112,7 @@ async def get_call_history_api():
                                     else:
                                         raw_duration = (call_data.get("duration", 0) or call_data.get("length", 0))
                                         duration = parse_duration(raw_duration)
-                                    
+
                                     # Analyze fresh transcript for status
                                     if fresh_transcript and fresh_transcript.strip():
                                         transcript = fresh_transcript
@@ -4125,7 +4125,7 @@ async def get_call_history_api():
                                         call_status = 'busy_voicemail'
                                         final_summary = "No transcript available"
                                         print(f"📊 Call History API: Fresh data has no transcript for {result.get('patient_name', 'Unknown')}")
-                                        
+
                                 elif response.status == 404:
                                     print(f"📊 Call History API: Call {result.get('call_id')} not found in API")
                                     call_status = 'busy_voicemail'
@@ -4136,13 +4136,13 @@ async def get_call_history_api():
                                     call_status = 'busy_voicemail'
                                     final_summary = "API error retrieving call data"
                                     duration = 0
-                                    
+
                     except Exception as e:
                         print(f"📊 Call History API: Error fetching fresh data for {result.get('call_id')}: {str(e)}")
                         call_status = 'busy_voicemail'
                         final_summary = "Error retrieving call data"
                         duration = 0
-                
+
                 # Priority 4: Analyze transcript if available but no fresh data was fetched
                 elif transcript and transcript.strip():
                     extracted_summary = extract_final_summary(transcript)
@@ -4150,14 +4150,14 @@ async def get_call_history_api():
                     final_summary = standardized_summary
                     duration = result.get('duration', 0) if result.get('duration') else 0
                     print(f"📊 Call History API: Using stored transcript analysis for {result.get('patient_name', 'Unknown')}: {call_status}")
-                
+
                 # Fallback: Use whatever we have or default
                 else:
                     call_status = 'busy_voicemail'
                     final_summary = "No summary available"
                     duration = result.get('duration', 0) if result.get('duration') else 0
                     print(f"📊 Call History API: Using fallback for {result.get('patient_name', 'Unknown')}: {call_status}")
-                
+
                 call_record = {
                     'call_id': result.get('call_id'),
                     'patient_name': result.get('patient_name', 'Unknown'),
@@ -4172,22 +4172,22 @@ async def get_call_history_api():
                     'transcript': transcript,
                     'campaign_id': campaign_id
                 }
-                
+
                 # Convert UTC to IST for display
                 if call_record['created_at']:
                     call_record['dateTime'] = convert_utc_to_ist(call_record['created_at'])
                 else:
                     call_record['dateTime'] = 'Unknown'
-                
+
                 all_calls.append(call_record)
-        
+
         # Sort calls by created_at timestamp in descending order (most recent first)
         def parse_datetime_for_sorting(datetime_str):
             """Parse datetime string for sorting purposes"""
             try:
                 if not datetime_str or datetime_str == 'Unknown':
                     return datetime.min
-                
+
                 # Try to parse ISO format datetime
                 if 'T' in datetime_str:
                     # Handle ISO format with or without timezone
@@ -4200,21 +4200,21 @@ async def get_call_history_api():
                     return datetime.fromisoformat(datetime_str)
             except:
                 return datetime.min
-        
+
         # Sort by created_at timestamp (most recent first)
         all_calls.sort(key=lambda x: parse_datetime_for_sorting(x.get('created_at', '')), reverse=True)
-        
+
         print(f"📊 Call history API: Returning {len(all_calls)} calls sorted by most recent first")
         if all_calls:
             print(f"📊 First call: {all_calls[0]['patient_name']} at {all_calls[0]['dateTime']}")
             print(f"📊 Last call: {all_calls[-1]['patient_name']} at {all_calls[-1]['dateTime']}")
-        
+
         return {
             "success": True,
             "calls": all_calls,
             "total_calls": len(all_calls)
         }
-        
+
     except Exception as e:
         print(f"❌ Error in call history API: {str(e)}")
         return {
