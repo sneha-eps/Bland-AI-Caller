@@ -724,8 +724,8 @@ def convert_utc_to_ist(utc_datetime_str):
                 date_patterns = [
                     '%Y-%m-%dT%H:%M:%S.%f%z',
                     '%Y-%m-%dT%H:%M:%S%z',
-                    '%Y-%m-%dT%H:%M:%S.%fZ',
                     '%Y-%m-%dT%H:%M:%SZ',
+                    '%Y-%m-%dT%H:%M:%S.%fZ',
                     '%Y-%m-%d %H:%M:%S.%f%z',
                     '%Y-%m-%d %H:%M:%S%z',
                     '%Y-%m-%d %H:%M:%S.%f',
@@ -1727,6 +1727,7 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
         'busy_voicemail': 0,
         'not_available': 0,
         'wrong_number': 0,
+        'unknown': 0,
         'failed': 0
     }
 
@@ -1778,7 +1779,7 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
                 else:
                     call_data['processing_status'] = 'retry_needed'
 
-            # Add 60-second delay between each call for international rate limits
+            # Add a small delay to respect rate limits
             if i + batch_size < len(calls_to_retry_sorted):
                 print(f"⏰ Waiting 120 seconds before next call for international rate limit protection...")
                 await asyncio.sleep(120)
@@ -1888,6 +1889,7 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
     print(f"   📧 Busy/Voicemail: {status_counts['busy_voicemail']}")
     print(f"   🚫 Not Available: {status_counts['not_available']}")
     print(f"   📱 Wrong Number: {status_counts['wrong_number']}")
+    print(f"   ❓ Unknown: {status_counts['unknown']}")
     print(f"   💥 Failed: {status_counts['failed']}")
 
     # Show index ranges for debugging
@@ -2545,8 +2547,7 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
 
     # Check for AI cancellation processing patterns (second priority)
     cancellation_patterns = [
-        "ai processed cancellation", "patient cancelled", "cancelled appointment",
-        "appointment cancelled", "i will cancel this appointment",
+        "ai processed cancellation", "patient cancelled", "appointment cancelled",
         "appointment has been cancelled", "cancelled for you", "cancel this appointment"
     ]
     if any(phrase in summary_lower for phrase in cancellation_patterns):
@@ -3129,7 +3130,9 @@ async def get_campaign_analytics(campaign_id: str):
                         'cancelled': 0,
                         'rescheduled': 0,
                         'busy_voicemail': 0,
-                        'completed': 0,
+                        'not_available': 0,
+                        'wrong_number': 0,
+                        'unknown': 0,
                         'failed': 0
                     },
                     'calls': []
@@ -3184,6 +3187,7 @@ async def get_campaign_analytics(campaign_id: str):
             'busy_voicemail': 0,
             'not_available': 0,
             'wrong_number': 0,
+            'unknown': 0,
             'failed': 0
         }
 
@@ -3326,8 +3330,8 @@ async def get_campaign_analytics(campaign_id: str):
                                     if call_status in status_counts:
                                         status_counts[call_status] += 1
                                     else:
-                                        status_counts['busy_voicemail'] += 1
-                                        call_details['call_status'] = 'busy_voicemail'
+                                        status_counts['unknown'] += 1 # Categorize unknown statuses
+                                        call_details['call_status'] = 'unknown'
 
                                     print(f"✅ Call details for {call_details['patient_name']}: Status={call_status}, Duration={duration}s, Transcript={len(transcript)} chars")
 
@@ -3355,7 +3359,7 @@ async def get_campaign_analytics(campaign_id: str):
                                                 if call_status in status_counts:
                                                     status_counts[call_status] += 1
                                                 else:
-                                                    status_counts['busy_voicemail'] += 1
+                                                    status_counts['unknown'] += 1 # Categorize unknown statuses
                                             else:
                                                 call_details['call_status'] = 'busy_voicemail'
                                                 status_counts['busy_voicemail'] += 1
