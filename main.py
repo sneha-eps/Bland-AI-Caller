@@ -3524,9 +3524,9 @@ async def get_campaign_analytics(campaign_id: str):
                                             status_counts['busy_voicemail'] += 1
                                 else:
                                     response_text = await call_response.text()
-                                    print(f"❌ API error for call {result.get('call_id')}: Status {response.status}")
+                                    print(f"❌ API error for call {result.get('call_id')}: Status {call_response.status}")
                                     call_details['call_status'] = 'busy_voicemail'
-                                    call_details['analysis_notes'] = f"API error: {response.status}"
+                                    call_details['analysis_notes'] = f"API error: {call_response.status}"
                                     status_counts['busy_voicemail'] += 1
 
                     except asyncio.TimeoutError:
