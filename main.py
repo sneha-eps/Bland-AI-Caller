@@ -2760,7 +2760,8 @@ def analyze_call_transcript(transcript: str) -> str:
     # Check for interrupted/incomplete conversations EARLY (before other analysis)
     interrupted_patterns = [
         "thank you, bye", "bye bye", "goodbye", "gotta go", "have to go",
-        "talk to you later", "see you later", "catch you later", "yes, sir. bye"
+        "talk to you later", "see you later", "catch you later", "yes, sir. bye",
+        "thank you bye", "thanks bye", "bye", "goodbye", "ok bye", "okay bye"
     ]
 
     # Analyze conversation flow to detect interruptions
@@ -2771,19 +2772,37 @@ def analyze_call_transcript(transcript: str) -> str:
     for i, line in enumerate(lines):
         if line.startswith('assistant:'):
             line_content = line.replace('assistant:', '').strip().lower()
-            # Check if AI was in middle of confirming appointment
+            # Check if AI was in middle of confirming appointment OR providing appointment details
             if any(phrase in line_content for phrase in [
                 'confirm your upcoming appointment', 'reason for my call is to confirm',
-                'upcoming appointment on', 'will you be able to make it'
+                'upcoming appointment on', 'will you be able to make it',
+                'perfect! the reason for my call', 'the reason for my call is to'
             ]):
                 ai_was_confirming = True
         elif line.startswith('user:'):
             user_response = line.replace('user:', '').strip().lower()
-            # If user says goodbye/thanks while AI was confirming, it's an interruption
+            
+            # CRITICAL FIX: If user says goodbye/bye WHILE AI is explaining appointment details,
+            # this is an interruption - they're not confirming the appointment
             if ai_was_confirming and any(pattern in user_response for pattern in interrupted_patterns):
-                patient_interrupted = True
-                break
-            # Reset if user gives substantial response
+                # Additional check: make sure this isn't after a full appointment confirmation
+                previous_lines = lines[:i]  # Get all lines before this interruption
+                full_appointment_mentioned = False
+                
+                # Check if AI had completed giving appointment details before the interruption
+                for prev_line in previous_lines:
+                    if prev_line.startswith('assistant:'):
+                        prev_content = prev_line.replace('assistant:', '').strip().lower()
+                        # If AI mentioned complete appointment details (date, time, provider), then interruption is less likely
+                        if all(keyword in prev_content for keyword in ['appointment', 'at']) and any(time_word in prev_content for time_word in ['pm', 'am', 'o\'clock']):
+                            full_appointment_mentioned = True
+                
+                # If AI was still in middle of explaining OR patient interrupted before full details
+                if not full_appointment_mentioned or "perfect! the reason" in transcript.lower():
+                    patient_interrupted = True
+                    break
+            
+            # Reset confirmation tracking if user gives substantial response without goodbye
             if len(user_response.split()) > 3 and not any(pattern in user_response for pattern in interrupted_patterns):
                 ai_was_confirming = False
 
