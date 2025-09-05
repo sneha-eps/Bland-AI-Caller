@@ -2414,8 +2414,7 @@ def extract_final_summary(transcript: str) -> str:
             # Check for reschedule requests
             if any(phrase in user_statement for phrase in [
                 "i want to reschedule", "want to reschedule", "reschedule",
-                "different time", "better time", "new time", "can we reschedule",
-                "need to reschedule", "change the time", "move the appointment"
+                "different time", "better time", "new time", "can we reschedule", "need to reschedule", "change the time", "move the appointment"
             ]):
                 patient_decision = "Patient requested to reschedule"
 
@@ -2545,7 +2544,7 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
     # PRIORITY 1: Check transcript FIRST for definitive "not available" and "wrong number" scenarios
     if transcript and transcript.strip():
         transcript_lower = transcript.lower()
-        
+
         # CRITICAL: Check for "not available" scenarios BEFORE confirmation analysis
         # Look for patterns where someone else answers and patient is not available
         not_available_indicators = [
@@ -2555,20 +2554,20 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
             "can't come to the phone", "cannot come to the phone",
             "will be back", "call back later", "try calling later"
         ]
-        
+
         # If transcript contains "not available" indicators, override everything else
         if any(indicator in transcript_lower for indicator in not_available_indicators):
             # Additional check: make sure this follows the pattern of someone else answering
             lines = [line.strip() for line in transcript.split('\n') if line.strip()]
             ai_asked_for_patient = False
             someone_else_answered = False
-            
+
             for i, line in enumerate(lines):
                 if line.startswith('assistant:'):
                     line_content = line.replace('assistant:', '').strip().lower()
                     # AI asks to speak with specific patient
                     if any(phrase in line_content for phrase in [
-                        'am i speaking with', 'may i speak with', 'is this'
+                        'am i speaking with', 'may i speak with', 'is this', 'can i speak with'
                     ]):
                         ai_asked_for_patient = True
                 elif line.startswith('user:') and ai_asked_for_patient:
@@ -2577,20 +2576,22 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
                     if any(indicator in user_response for indicator in not_available_indicators):
                         someone_else_answered = True
                         break
-            
+
             if someone_else_answered or any(indicator in transcript_lower for indicator in not_available_indicators):
                 return 'not_available', "Patient not available"
-        
+
         # Check for wrong number scenarios
         wrong_number_indicators = [
             "wrong number", "you have the wrong number", "this is the wrong number",
             "no one by that name", "nobody by that name", "don't know", "never heard of",
-            "no such person", "you must have the wrong", "who is this", "who are you looking for"
+            "no such person", "no one here by that name", "nobody here by that name",
+            "you must have the wrong", "this isn't", "that's not me", "i'm not",
+            "who is this", "who are you looking for"
         ]
-        
+
         if any(indicator in transcript_lower for indicator in wrong_number_indicators):
             return 'wrong_number', "Wrong number or patient not available"
-        
+
         # NOW check for confirmation patterns (only if not "not available" or "wrong number")
         confirmation_indicators = [
             "excellent! we are glad to have you",
@@ -2598,18 +2599,18 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
             "you're welcome! have a great day",
             "see you then"
         ]
-        
+
         # Look for patient's actual affirmative responses
         patient_confirmation_patterns = [
             "user: yes", "user: sure", "user: okay", "user: that works",
             "user: sounds good", "user: i'll be there", "user: yes,",
             "are you saying you'd like to keep the appointment as scheduled?\n user: yes"
         ]
-        
+
         # If AI gave confirmation response AND patient gave affirmative response
         ai_confirmed = any(phrase in transcript_lower for phrase in confirmation_indicators)
         patient_confirmed = any(phrase in transcript_lower for phrase in patient_confirmation_patterns)
-        
+
         if ai_confirmed and patient_confirmed:
             # Double-check this isn't actually a reschedule request
             patient_reschedule_patterns = [
@@ -2618,7 +2619,6 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
             ]
             if not any(phrase in transcript_lower for phrase in patient_reschedule_patterns):
                 return 'confirmed', "Patient confirmed appointment"
-
     # Check for ambiguous/unknown responses SECOND (after transcript confirmation check)
     ambiguous_patterns = [
         # Direct ambiguous phrases
@@ -2712,17 +2712,14 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
         "in a meeting", "at work", "not in", "stepped out", "away from",
         "will be back", "call back later", "try calling later", "not around",
         "unavailable", "sleeping", "napping", "can you call back",
-        "not a good time", "isn't a good time", "bad time",
-        "she's not available", "he's not available", "patient not available",
-        "but i'm not", "i'm not the patient", "that's not me"
+        "not a good time", "isn't a good time", "bad time"
     ]):
         return 'not_available', "Patient not available"
 
     # Check for voicemail/busy patterns
     if any(phrase in summary_lower for phrase in [
-        "voicemail", "voice mail", "reached voicemail", "left message",
-        "no answer", "line busy", "busy signal", "disconnected",
-        "no response", "automated message", "no transcript available"
+        "voicemail", "voice mail", "leave a message", "after the beep", "beep",
+        "mailbox", "voice message", "recording", "automated", "no response"
     ]):
         return 'busy_voicemail', "Busy, voicemail, or no answer"
 
@@ -2767,13 +2764,38 @@ def analyze_call_transcript(transcript: str) -> str:
 
     transcript_lower = transcript.lower().strip()
 
-    # PRIORITY 1: Check for wrong number scenarios first (highest priority)
+    # PRIORITY 1: Check for RESCHEDULE requests FIRST (highest priority for patient intent)
+    # Look for direct reschedule requests from the patient
+    reschedule_user_patterns = [
+        "user: reschedule", "user: i want to reschedule", "user: can we reschedule", 
+        "user: need to reschedule", "user: different time", "user: better time",
+        "user: new time", "user: another time", "user: change the time",
+        "user: move the appointment", "user: can we do", "user: what about",
+        "user: how about", "user: is there", "user: available", "user: free"
+    ]
+
+    # If patient explicitly requests reschedule, this overrides everything else
+    for pattern in reschedule_user_patterns:
+        if pattern in transcript_lower:
+            return 'rescheduled'
+
+    # Also check for AI responses indicating reschedule was processed
+    ai_reschedule_responses = [
+        "scheduling agent will call", "will call you to find a new time", 
+        "someone will be in touch", "will be in touch soon to reschedule",
+        "arrange a new time", "find a time that works better"
+    ]
+
+    if any(response in transcript_lower for response in ai_reschedule_responses):
+        return 'rescheduled'
+
+    # PRIORITY 2: Check for wrong number scenarios (second highest priority)
     # Look for explicit denials of identity
     identity_denial_patterns = [
         "but i'm not", "i'm not", "that's not me", "this isn't me",
         "i am not", "that is not me", "this is not me"
     ]
-    
+
     for pattern in identity_denial_patterns:
         if pattern in transcript_lower:
             return 'wrong_number'
@@ -2792,7 +2814,7 @@ def analyze_call_transcript(transcript: str) -> str:
         if pattern in transcript_lower:
             return 'wrong_number'
 
-    # PRIORITY 2: Check for "not available" scenarios after wrong number check
+    # PRIORITY 3: Check for "not available" scenarios
     # This handles cases where the right person is contacted but patient is not available
     not_available_patterns = [
         "not available", "she's not available", "he's not available",
@@ -2809,10 +2831,10 @@ def analyze_call_transcript(transcript: str) -> str:
         if pattern in transcript_lower:
             return 'not_available'
 
-    # PRIORITY 2.5: Check for scenarios where someone else answers and patient is not available
-    # Look for patterns where caller asks for patient and gets response that they're not available
+    # PRIORITY 3.5: Check for scenarios where someone else answers and patient is not available
+    # Look for patterns where caller asks for patient and gets "not available" type response
     lines = [line.strip() for line in transcript.split('\n') if line.strip()]
-    
+
     # Check if AI asks to speak with patient and gets "not available" type response
     ai_asked_for_patient = False
     for i, line in enumerate(lines):
@@ -2830,22 +2852,7 @@ def analyze_call_transcript(transcript: str) -> str:
                 any(not_avail in user_response for not_avail in ["not available", "she's not available", "he's not available"])):
                 return 'not_available'
 
-    # Check for not available scenarios (second priority)
-    not_available_patterns = [
-        "not here right now", "isn't here", "is not here", "not available",
-        "not home", "isn't home", "is not home", "out right now",
-        "can't come to the phone", "cannot come to the phone", "busy right now",
-        "in a meeting", "at work", "not in", "stepped out", "away from",
-        "will be back", "call back later", "try calling later", "not around",
-        "unavailable", "sleeping", "napping", "can you call back",
-        "not a good time", "isn't a good time", "bad time"
-    ]
-
-    for pattern in not_available_patterns:
-        if pattern in transcript_lower:
-            return 'not_available'
-
-    # Check for interrupted/incomplete conversations EARLY (before other analysis)
+    # PRIORITY 4: Check for interrupted/incomplete conversations
     interrupted_patterns = [
         "thank you, bye", "bye bye", "goodbye", "gotta go", "have to go",
         "talk to you later", "see you later", "catch you later", "yes, sir. bye",
@@ -2853,7 +2860,6 @@ def analyze_call_transcript(transcript: str) -> str:
     ]
 
     # Analyze conversation flow to detect interruptions
-    lines = [line.strip() for line in transcript.split('\n') if line.strip()]
     ai_was_confirming = False
     patient_interrupted = False
 
@@ -2946,16 +2952,7 @@ def analyze_call_transcript(transcript: str) -> str:
     for i, sentence in enumerate(sentences):
         sentence = sentence.strip()
 
-        # Check for confirmations - but be more strict
-        for pattern in confirmation_patterns:
-            if pattern in sentence:
-                # Make sure it's not negated AND not followed by goodbye
-                if (not any(neg in sentence for neg in ["don't", "do not", "won't", "will not", "can't", "cannot", "no", "not"]) and
-                    not any(bye in sentence for bye in ["bye", "goodbye", "gotta go", "have to go"])):
-                    decisions.append(('confirmed', i))
-                break
-
-        # Check for rescheduling
+        # Check for rescheduling FIRST (highest priority)
         for pattern in reschedule_patterns:
             if pattern in sentence:
                 decisions.append(('rescheduled', i))
@@ -2965,6 +2962,15 @@ def analyze_call_transcript(transcript: str) -> str:
         for pattern in cancellation_patterns:
             if pattern in sentence:
                 decisions.append(('cancelled', i))
+                break
+
+        # Check for confirmations - but be more strict
+        for pattern in confirmation_patterns:
+            if pattern in sentence:
+                # Make sure it's not negated AND not followed by goodbye
+                if (not any(neg in sentence for neg in ["don't", "do not", "won't", "will not", "can't", "cannot", "no", "not"]) and
+                    not any(bye in sentence for bye in ["bye", "goodbye", "gotta go", "have to go"])):
+                    decisions.append(('confirmed', i))
                 break
 
     # If we have decisions, return the last one (final decision)
@@ -3368,13 +3374,6 @@ async def get_campaign_analytics(campaign_id: str):
                     'analysis_notes': ''
                 }
 
-                stored_call_id = result.get('call_id')
-                print(f"📞 ANALYTICS CALL ID TRACKING:")
-                print(f"   Patient: {result.get('patient_name', 'Unknown')}")
-                print(f"   Stored Call ID: {stored_call_id}")
-                print(f"   Call ID Type: {type(stored_call_id)}")
-                print(f"   Success Flag: {result.get('success', False)}")
-
                 stored_call_data = result.get('stored_call_data', {})
 
                 # If call was successful and has call_id, try to get detailed info
@@ -3389,7 +3388,7 @@ async def get_campaign_analytics(campaign_id: str):
                                 timeout=aiohttp.ClientTimeout(total=30)
                             ) as call_response:
 
-                                print(f"🔍 API Response Status: {call_response.status} for call {result['call_id']}")
+                                print(f"📊 API Response Status: {call_response.status} for call {result['call_id']}")
 
                                 if call_response.status == 200:
                                     call_data = await call_response.json()
@@ -3525,9 +3524,9 @@ async def get_campaign_analytics(campaign_id: str):
                                             status_counts['busy_voicemail'] += 1
                                 else:
                                     response_text = await call_response.text()
-                                    print(f"❌ API error for call {result.get('call_id')}: Status {call_response.status}")
+                                    print(f"❌ API error for call {result.get('call_id')}: Status {response.status}")
                                     call_details['call_status'] = 'busy_voicemail'
-                                    call_details['analysis_notes'] = f"API error: {call_response.status}"
+                                    call_details['analysis_notes'] = f"API error: {response.status}"
                                     status_counts['busy_voicemail'] += 1
 
                     except asyncio.TimeoutError:
@@ -4023,12 +4022,12 @@ async def view_campaign_results(campaign_id: str):
             "started_at": results.get("started_at", "Unknown"),
             "results_summary": [
                 {
-                    "patient_name": r.get("patient_name", "Unknown"),
-                    "success": r.get("success", False),
-                    "error": r.get("error", None),
-                    "call_id": r.get("call_id", None)
+                    "patient_name": result.get("patient_name", "Unknown"),
+                    "success": result.get("success", False),
+                    "error": result.get("error", None),
+                    "call_id": result.get("call_id", None)
                 }
-                for r in results.get("results", [])
+                for result in results.get("results", [])
             ]
         }
     except Exception as e:
