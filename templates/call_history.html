@@ -471,8 +471,9 @@
         }
 
         .status-unknown {
-            background: rgba(107, 114, 128, 0.1);
-            color: var(--text-secondary);
+            background: rgba(156, 163, 175, 0.1);
+            color: #6B7280;
+            border: 1px solid rgba(156, 163, 175, 0.3);
         }
 
         .status-busy {
@@ -1222,10 +1223,10 @@
                 'initiated': 'In Progress',
                 'processing': 'Processing',
                 'completed': 'Completed',
-                'unknown': 'Unknown',
+                'unknown': 'Unknown Response',
                 'busy': 'Busy/Voicemail'
             };
-            return statusMap[status] || (status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Unknown');
+            return statusMap[status] || (status ? status.charAt(0).toUpperCase() + status.slice(1) : 'Busy/Voicemail');
         }
 
         // Format duration

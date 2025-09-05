@@ -3296,19 +3296,25 @@ async def get_campaign_analytics(campaign_id: str):
                                         analysis_source = "stored_summary"
                                         print(f"📊 Using stored summary for {call_details['patient_name']}: {call_status}")
 
-                                    # Priority 3: Stored status from webhook
-                                    elif result.get('call_status'):
+                                    # Priority 3: Stored status from webhook - but validate it's not 'initiated' or 'processing'
+                                    elif result.get('call_status') and result.get('call_status') not in ['initiated', 'processing']:
                                         call_status = result.get('call_status')
                                         final_summary = get_standardized_summary_for_status(call_status)
                                         transcript = result.get('transcript', '')
                                         analysis_source = "stored_status"
                                         print(f"📊 Using stored status for {call_details['patient_name']}: {call_status}")
 
-                                    # Priority 4: No good data available
+                                    # Priority 4: No good data available or status is 'initiated'/'processing'
                                     else:
-                                        call_status = 'busy_voicemail'
-                                        final_summary = "No transcript or status data available"
-                                        analysis_source = "no_data_fallback"
+                                        # If status is 'initiated' or 'processing', it means call was started but not completed
+                                        if result.get('call_status') in ['initiated', 'processing']:
+                                            call_status = 'busy_voicemail'
+                                            final_summary = "Call initiated but no response received"
+                                            analysis_source = "initiated_fallback"
+                                        else:
+                                            call_status = 'busy_voicemail'
+                                            final_summary = "No summary available"
+                                            analysis_source = "no_data_fallback"
                                         print(f"📊 No data available for {call_details['patient_name']}, using fallback")
 
                                     call_details['analysis_notes'] = analysis_source
