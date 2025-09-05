@@ -1092,6 +1092,12 @@ input[type="file"] {
     border: 1px solid rgba(245, 158, 11, 0.3);
 }
 
+.status-unknown {
+    background: linear-gradient(135deg, rgba(156, 163, 175, 0.2) 0%, rgba(107, 114, 128, 0.1) 100%);
+    color: var(--text-secondary);
+    border: 1px solid rgba(156, 163, 175, 0.3);
+}
+
 .status-busy_voicemail, .status-busy {
     background: linear-gradient(135deg, rgba(107, 114, 128, 0.2) 0%, rgba(75, 85, 99, 0.1) 100%);
     color: var(--text-secondary);
