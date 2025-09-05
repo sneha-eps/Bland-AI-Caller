@@ -2640,7 +2640,8 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
         "appointment will be rescheduled", "will be rescheduled", "reschedule", "rescheduled",
         "scheduling agent will call", "will call you to find a new time", "someone will be in touch",
         "follow-up call arranged", "patient requested to reschedule", "arrange a new time",
-        "find a new time", "different time", "better time", "new appointment time"
+        "find a new time", "different time", "better time", "new appointment time",
+        "call you shortly to find a new time", "will call you soon", "will be in touch soon"
     ]
     if any(phrase in summary_lower for phrase in reschedule_patterns):
         # CRITICAL CHECK: If transcript shows patient confirmed, override reschedule summary
@@ -2771,7 +2772,9 @@ def analyze_call_transcript(transcript: str) -> str:
         "user: need to reschedule", "user: different time", "user: better time",
         "user: new time", "user: another time", "user: change the time",
         "user: move the appointment", "user: can we do", "user: what about",
-        "user: how about", "user: is there", "user: available", "user: free"
+        "user: how about", "user: is there", "user: available", "user: free",
+        "user: can we change", "user: let's reschedule", "user: i'd like to reschedule",
+        "user: could we reschedule", "user: would it be possible to reschedule"
     ]
 
     # If patient explicitly requests reschedule, this overrides everything else
@@ -2783,7 +2786,9 @@ def analyze_call_transcript(transcript: str) -> str:
     ai_reschedule_responses = [
         "scheduling agent will call", "will call you to find a new time", 
         "someone will be in touch", "will be in touch soon to reschedule",
-        "arrange a new time", "find a time that works better"
+        "arrange a new time", "find a time that works better",
+        "call you shortly to find a new time", "will call you soon",
+        "our scheduling agent will call you", "agent will call you"
     ]
 
     if any(response in transcript_lower for response in ai_reschedule_responses):
@@ -2983,7 +2988,9 @@ def analyze_call_transcript(transcript: str) -> str:
         "i'm not sure", "not sure", "maybe", "perhaps", "i don't know", "don't know",
         "let me think", "let me check", "i'll have to", "i need to check",
         "uncertain", "unclear", "confused", "i don't understand",
-        "possibly", "might be", "could be", "depends", "we'll see"
+        "possibly", "might be", "could be", "depends", "we'll see",
+        "let me get back to you", "i'll call you back", "call me back",
+        "i need to ask", "i have to ask", "not right now", "can't say right now"
     ]
 
     # Check each sentence for ambiguous responses
