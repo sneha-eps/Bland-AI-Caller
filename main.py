@@ -2408,7 +2408,7 @@ def extract_final_summary(transcript: str) -> str:
 
     # Look for patient responses and AI's final actions
     patient_responses = []
-    ai_final_actions = []
+    ai_responses = []
     
     for line in transcript_lines:
         line = line.strip()
@@ -2419,39 +2419,64 @@ def extract_final_summary(transcript: str) -> str:
         elif line.startswith('assistant:'):
             ai_text = line.replace('assistant:', '').strip()
             if ai_text and len(ai_text) > 10:
-                # Look for AI taking final actions
-                ai_lower = ai_text.lower()
-                if any(phrase in ai_lower for phrase in [
-                    "just to confirm", "i will cancel", "scheduling agent will call",
-                    "appointment is confirmed", "appointment has been cancelled",
-                    "we are glad to have you"
-                ]):
-                    ai_final_actions.append(ai_text)
+                ai_responses.append(ai_text.lower())
     
-    print(f"🔍 Found {len(patient_responses)} patient responses, {len(ai_final_actions)} AI final actions")
+    print(f"🔍 Found {len(patient_responses)} patient responses, {len(ai_responses)} AI responses")
+    
+    # Enhanced analysis - look for key patterns throughout the conversation
+    all_patient_text = " ".join(patient_responses)
+    all_ai_text = " ".join(ai_responses)
+    
+    # CRITICAL: Enhanced "NOT THE PERSON" detection (HIGHEST PRIORITY)
+    not_the_person_patterns = [
+        # Direct "not me" statements
+        "that's not me", "that is not me", "i'm not that person", "i am not that person",
+        "not the right person", "wrong person", "different person", "someone else",
+        
+        # "Person not here" statements  
+        "that person is not here", "that person isn't here", "they're not here", "they are not here",
+        "that person is not available", "that person isn't available", "they're not available", "they are not available",
+        "person is not here", "person isn't here", "person is not available", "person isn't available",
+        
+        # Direct "not available" statements
+        "not available", "not home", "isn't here", "is not here", "not here", "stepped out",
+        "not around", "unavailable", "not in", "away", "out", "busy", "in a meeting",
+        
+        # Confusion about who is being called
+        "i don't know who that is", "don't know that person", "never heard of that person",
+        "no one by that name", "nobody by that name", "who is that", "who are you looking for"
+    ]
+    
+    # Check if any "not the person" pattern exists
+    for pattern in not_the_person_patterns:
+        if pattern in all_patient_text:
+            print(f"🔍 DETECTED 'NOT AVAILABLE' pattern: '{pattern}' in patient response")
+            return "Patient not available"
+    
+    # Also check if AI concluded the person was not available
+    ai_confusion_patterns = [
+        "my apologies for the confusion", "wrong number", "not the right person",
+        "thank you for your time", "have a good day"
+    ]
+    
+    for pattern in ai_confusion_patterns:
+        if pattern in all_ai_text:
+            print(f"🔍 AI detected confusion/wrong person pattern: '{pattern}'")
+            return "Patient not available"
+    
+    # Check for wrong number scenarios
+    wrong_number_patterns = [
+        "wrong number", "you have the wrong", "who is this", "who are you calling"
+    ]
+    
+    for pattern in wrong_number_patterns:
+        if pattern in all_patient_text:
+            print(f"🔍 Patient indicated wrong number: {pattern}")
+            return "Wrong number"
     
     # Analyze patient responses for clear decisions (in order of priority)
     for response in reversed(patient_responses):  # Check most recent responses first
         
-        # Check for NOT THE PERSON / NOT AVAILABLE scenarios (highest priority)
-        if any(phrase in response for phrase in [
-            "i'm not that person", "that's not me", "not the right person",
-            "you're looking for someone else", "different person", "wrong person",
-            "i don't know who that is", "never heard of that person",
-            "that person is not here", "they're not here", "not available",
-            "not home", "isn't here", "stepped out"
-        ]):
-            print(f"🔍 Patient indicated not available/wrong person: {response[:50]}...")
-            return "Patient not available"
-            
-        # Check for wrong number scenarios
-        if any(phrase in response for phrase in [
-            "wrong number", "you have the wrong", "who is this",
-            "no one by that name", "nobody by that name"
-        ]):
-            print(f"🔍 Patient indicated wrong number: {response[:50]}...")
-            return "Wrong number"
-            
         # Check for cancellation requests
         if any(phrase in response for phrase in [
             "cancel", "can't make it", "cannot make it", "won't make it",
@@ -2485,36 +2510,30 @@ def extract_final_summary(transcript: str) -> str:
             print(f"🔍 Patient gave ambiguous response: {response[:50]}...")
             return "Patient gave ambiguous response"
 
-    # If no clear patient decision found, look at AI's final actions
-    if ai_final_actions:
-        latest_ai_action = ai_final_actions[-1].lower()
+    # Look for AI final conclusions
+    if ai_responses:
+        latest_ai = ai_responses[-1]
         
-        if "just to confirm" in latest_ai_action:
-            if any(phrase in latest_ai_action for phrase in [
-                "cancelled", "cancel this appointment"
+        if any(phrase in latest_ai for phrase in [
+            "just to confirm", "i will cancel", "scheduling agent will call",
+            "appointment is confirmed", "appointment has been cancelled",
+            "we are glad to have you"
+        ]):
+            if any(phrase in latest_ai for phrase in [
+                "cancelled", "cancel this appointment", "i will cancel"
             ]):
                 print(f"🔍 AI confirmed cancellation")
                 return "Patient cancelled appointment"
-            elif any(phrase in latest_ai_action for phrase in [
+            elif any(phrase in latest_ai for phrase in [
                 "rescheduled", "scheduling agent", "call you"
             ]):
                 print(f"🔍 AI arranged reschedule")
                 return "Patient requested to reschedule"
-            elif any(phrase in latest_ai_action for phrase in [
+            elif any(phrase in latest_ai for phrase in [
                 "confirmed", "we are glad"
             ]):
                 print(f"🔍 AI confirmed appointment")
                 return "Patient confirmed appointment"
-        
-        elif "i will cancel" in latest_ai_action:
-            print(f"🔍 AI stated will cancel")
-            return "Patient cancelled appointment"
-        elif "scheduling agent will call" in latest_ai_action:
-            print(f"🔍 AI arranged callback for reschedule")
-            return "Patient requested to reschedule"
-        elif "we are glad to have you" in latest_ai_action:
-            print(f"🔍 AI expressed gladness (confirmation)")
-            return "Patient confirmed appointment"
 
     # Look for conversation termination patterns
     if len(patient_responses) == 0:
@@ -2526,9 +2545,9 @@ def extract_final_summary(transcript: str) -> str:
     
     # Final fallback - check overall conversation patterns
     if any(phrase in transcript_lower for phrase in [
-        "my apologies for the confusion", "wrong number"
+        "my apologies for the confusion", "wrong number", "not the right person"
     ]):
-        return "Wrong number or patient not available"
+        return "Patient not available"
     elif any(phrase in transcript_lower for phrase in [
         "appointment cancelled", "i will cancel"
     ]):
@@ -2596,21 +2615,47 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
             print(f"🔍 Unrecognized standardized phrase, defaulting to busy_voicemail")
             return 'busy_voicemail', final_summary
 
-    # Enhanced pattern matching with more specific keywords
+    # ENHANCED PATTERN MATCHING - Prioritize "NOT AVAILABLE" detection
     
-    # Check for CONFIRMATION patterns first (most specific)
-    confirmation_patterns = [
-        "yes, i'll be there", "yes i will be there", "i'll be there", "i will be there",
-        "see you then", "confirmed", "we are glad to have you", "excellent", 
-        "that works", "sounds good", "appointment is confirmed",
-        "perfect! the reason", "great! we are glad", "thank you! have a great day",
-        "you're welcome! have a great day"
+    # Check for NOT AVAILABLE patterns FIRST (HIGHEST PRIORITY)
+    not_available_patterns = [
+        # Direct "not the person" statements
+        "not the person", "that's not me", "i'm not that person", "not the right person",
+        "wrong person", "different person", "someone else", "you're looking for someone else",
+        
+        # "Person not available" statements
+        "not here", "isn't here", "is not here", "not available", "not home",
+        "unavailable", "stepped out", "not around", "not in", "away", "out",
+        "that person is not here", "they're not here", "they are not available",
+        "person is not available", "person isn't here",
+        
+        # Confusion about identity
+        "i don't know who that is", "never heard of that person", "don't know that person",
+        "no one by that name", "nobody by that name", "who is that", "who are you looking for"
     ]
-    if any(phrase in summary_lower for phrase in confirmation_patterns):
-        # Make sure it's not a reschedule or cancel in disguise
-        if not any(negative in summary_lower for negative in ["reschedule", "cancel", "different time", "new time", "agent will call"]):
-            print(f"🔍 Found confirmation pattern")
-            return 'confirmed', "Patient confirmed appointment"
+    
+    if any(phrase in summary_lower for phrase in not_available_patterns):
+        print(f"🔍 Found not_available pattern (HIGH PRIORITY)")
+        return 'not_available', "Patient not available"
+
+    # Check for WRONG NUMBER patterns (also high priority)
+    wrong_number_patterns = [
+        "wrong number", "you have the wrong", "who is this", "who are you calling",
+        "my apologies for the confusion", "thank you for your time"
+    ]
+    if any(phrase in summary_lower for phrase in wrong_number_patterns):
+        print(f"🔍 Found wrong_number pattern")
+        return 'wrong_number', "Wrong number"
+
+    # Check for CANCELLATION patterns
+    cancellation_patterns = [
+        "cancel", "cancelled", "can't make it", "cannot make it", "won't make it",
+        "will not make it", "unable to", "not coming", "appointment cancelled",
+        "i will cancel", "cancelled for you", "cancel this appointment"
+    ]
+    if any(phrase in summary_lower for phrase in cancellation_patterns):
+        print(f"🔍 Found cancellation pattern")
+        return 'cancelled', "Patient cancelled appointment"
 
     # Check for RESCHEDULE patterns
     reschedule_patterns = [
@@ -2623,37 +2668,18 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
         print(f"🔍 Found reschedule pattern")
         return 'rescheduled', "Patient requested to reschedule"
 
-    # Check for CANCELLATION patterns
-    cancellation_patterns = [
-        "cancel", "cancelled", "can't make it", "cannot make it", "won't make it",
-        "will not make it", "unable to", "not coming", "appointment cancelled",
-        "i will cancel", "cancelled for you", "cancel this appointment"
+    # Check for CONFIRMATION patterns (lower priority to avoid false positives)
+    confirmation_patterns = [
+        "yes, i'll be there", "yes i will be there", "i'll be there", "i will be there",
+        "see you then", "confirmed", "we are glad to have you", "excellent", 
+        "that works", "sounds good", "appointment is confirmed",
+        "perfect! the reason", "great! we are glad"
     ]
-    if any(phrase in summary_lower for phrase in cancellation_patterns):
-        print(f"🔍 Found cancellation pattern")
-        return 'cancelled', "Patient cancelled appointment"
-
-    # Check for NOT AVAILABLE patterns (including "not the person" scenarios)
-    not_available_patterns = [
-        "not here", "isn't here", "is not here", "not available", "not home",
-        "unavailable", "not the person", "that's not me", "i'm not that person",
-        "you're looking for someone else", "wrong person", "someone else",
-        "different person", "i don't know who that is", "never heard of that person",
-        "that person is not here", "they're not here", "they are not available"
-    ]
-    if any(phrase in summary_lower for phrase in not_available_patterns):
-        print(f"🔍 Found not_available pattern")
-        return 'not_available', "Patient not available"
-
-    # Check for WRONG NUMBER patterns
-    wrong_number_patterns = [
-        "wrong number", "you have the wrong", "no one by that name", 
-        "nobody by that name", "who is this", "who are you looking for",
-        "my apologies for the confusion"
-    ]
-    if any(phrase in summary_lower for phrase in wrong_number_patterns):
-        print(f"🔍 Found wrong_number pattern")
-        return 'wrong_number', "Wrong number"
+    if any(phrase in summary_lower for phrase in confirmation_patterns):
+        # Make sure it's not a reschedule or cancel in disguise
+        if not any(negative in summary_lower for negative in ["reschedule", "cancel", "different time", "new time", "agent will call", "not available", "not here"]):
+            print(f"🔍 Found confirmation pattern")
+            return 'confirmed', "Patient confirmed appointment"
 
     # Check for AMBIGUOUS/UNKNOWN responses
     ambiguous_patterns = [
