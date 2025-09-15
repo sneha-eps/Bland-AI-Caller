@@ -2732,12 +2732,12 @@ def analyze_call_transcript(transcript: str) -> str:
     # Look for explicit denials of identity
     identity_denial_patterns = [
         "user: but i'm not",
-        "user: i'm not",
         "user: that's not me",
-        "user: this isn't me",
-        "user: i am not",
+        "user: this isn't me", 
         "user: that is not me",
-        "user: this is not me"
+        "user: this is not me",
+        "user: i'm not that person",
+        "user: i am not that person"
     ]
 
     for pattern in identity_denial_patterns:
@@ -2748,11 +2748,9 @@ def analyze_call_transcript(transcript: str) -> str:
     # Check for other wrong number indicators
     wrong_number_patterns = [
         "wrong number", "you have the wrong number", "this is the wrong number",
-        "no one by that name", "nobody by that name", "don't know", "never heard of",
+        "no one by that name", "nobody by that name", "never heard of",
         "no such person", "no one here by that name", "nobody here by that name",
-        "you must have the wrong", "this isn't", "that's not me", "i'm not",
-        "but i'm not", "i am not", "that is not me", "this is not me",
-        "who is this", "who are you looking for"
+        "you must have the wrong"
     ]
 
     for pattern in wrong_number_patterns:
