@@ -282,9 +282,9 @@ def get_call_prompt(city_name: str = "",
     You are an AI voice agent calling from Passion Health Primary Care Clinic. You are professional, polite, and empathetic. Speak in complete, natural sentences and combine related thoughts smoothly. Always wait for the patient's full response before continuing or ending the call. Do not skip or reorder steps.
 
     CLINIC DETAILS (USE AS-IS WHEN NEEDED)
-    • Website: w w w dot hill side primary care dot com
+    • Website: w w w dot passion health primary care dot com
     • Phone: 2107426555
-    • Email: live oak office @ hill side primary care dot com
+    • Email: passion health physicians @ gmail dot com
     • Hours: 8 a.m. to 5 p.m., Monday to Friday
     • Address: {full_address}
 
@@ -348,7 +348,7 @@ def get_call_prompt(city_name: str = "",
     RESPONSE FLOW BY INTENT
 
     • IF CONFIRM:
-    Say: "Excellent! We are glad to have you. Just a reminder to please arrive 15 minutes early for check-in. If you have any insurance changes, please email them to live oak office @ hill side primary care dot com. For any other issues, you can call the office at 2107426555. Do you have any questions?"
+    Say: "Excellent! We are glad to have you. Just a reminder to please arrive 15 minutes early for check-in. If you have any insurance changes, please email them to passion health physicians @ gmail dot com. For any other issues, you can call the office at 2107426555. Do you have any questions?"
     Wait for response.
     – If they request a detail (phone, email, address, provider, date, time), provide only that item clearly (spelled out as required), then wait for acknowledgment.
     – If they simply acknowledge, say: "You're welcome. Have a great day!" End the call.
@@ -2916,21 +2916,12 @@ def get_voicemail_prompt(patient_name: str = "[patient name]",
                          clinic_phone: str = "[clinic phone]") -> str:
     """Get the voicemail message prompt"""
 
-    # Add provider information if available
-    provider_info_section = ""
-    if available_providers:
-        provider_info_section = f"""
-
-    OTHER AVAILABLE PROVIDERS AT THIS LOCATION:
-    {available_providers}
-    """
-
     return f"""
     ROLE & PERSONA
     You are an AI voice agent leaving a voicemail message from Passion Health Primary Care. You are professional, clear, and concise.
 
     VOICEMAIL MESSAGE
-    Hi Good Morning, I am calling from Passion Health Primary Care. This call is for {patient_name} to remind him/her of an upcoming appointment on {appointment_date} at {appointment_time} with {provider_name} at {office_location}. Please make sure to arrive 15 minutes prior to your appointment. Also, Please make sure to email us your insurance information ASAP so that we can get it verified and avoid any delays on the day of your appointment. If you wish to cancel or reschedule your appointment, please inform us at least 24 hours in advance to avoid cancellation charge of $25.00. For more information, you can call us back on {clinic_phone}. Thank you and have a blessed day.{provider_info_section}
+    Hi Good Morning, I am calling from Passion Health Primary Care. This call is for {patient_name} to remind him/her of an upcoming appointment on {appointment_date} at {appointment_time} with {provider_name} at {office_location}. Please make sure to arrive 15 minutes prior to your appointment. Also, Please make sure to email us your insurance information ASAP so that we can get it verified and avoid any delays on the day of your appointment. If you wish to cancel or reschedule your appointment, please inform us at least 24 hours in advance to avoid cancellation charge of $25.00. For more information, you can call us back on {clinic_phone}. Thank you and have a blessed day.
 
     DELIVERY RULES
     • Speak clearly and at a moderate pace
@@ -3631,7 +3622,7 @@ async def get_clients_api():
         }
 
 @app.get("/api/campaigns")
-asyncasync def get_campaigns_api():
+async def get_campaigns_api():
     """Get all campaigns data for API usage"""
     try:
         campaigns = []
