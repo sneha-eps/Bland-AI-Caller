@@ -2729,6 +2729,16 @@ def analyze_call_transcript(transcript: str) -> str:
         return 'rescheduled'
 
     # PRIORITY 3: Check for wrong number scenarios
+    # First check if there are "not available" clarifications before deciding on wrong number
+    not_available_clarifications = [
+        "she's not available", "he's not available", "not available right now",
+        "not here right now", "isn't here", "is not here", "not home",
+        "can't come to the phone", "cannot come to the phone", "busy right now",
+        "stepped out", "not in", "will be back", "call back later"
+    ]
+    
+    has_availability_clarification = any(clarification in transcript_lower for clarification in not_available_clarifications)
+    
     # Look for explicit denials of identity
     identity_denial_patterns = [
         "user: but i'm not",
@@ -2740,10 +2750,12 @@ def analyze_call_transcript(transcript: str) -> str:
         "user: i am not that person"
     ]
 
-    for pattern in identity_denial_patterns:
-        if pattern in transcript_lower:
-            print(f"🔍 Found identity denial pattern: {pattern}")
-            return 'wrong_number'
+    # Only return wrong_number for identity denial if there's NO availability clarification
+    if not has_availability_clarification:
+        for pattern in identity_denial_patterns:
+            if pattern in transcript_lower:
+                print(f"🔍 Found identity denial pattern: {pattern}")
+                return 'wrong_number'
 
     # Check for other wrong number indicators
     wrong_number_patterns = [
