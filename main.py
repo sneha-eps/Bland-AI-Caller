@@ -274,18 +274,8 @@ def get_call_prompt(city_name: str = "",
                     patient_name: str = "[patient name]",
                     appointment_date: str = "[date]",
                     appointment_time: str = "[time]",
-                    provider_name: str = "[provider name]",
-                    available_providers: str = ""):
+                    provider_name: str = "[provider name]"):
     """Return the call prompt"""
-
-    # Add provider information if available
-    provider_info_section = ""
-    if available_providers:
-        provider_info_section = f"""
-    AVAILABLE PROVIDERS AT THIS LOCATION
-    {available_providers}
-
-    """
 
     return f"""
     ROLE & PERSONA
@@ -297,8 +287,6 @@ def get_call_prompt(city_name: str = "",
     • Email: live oak office @ hill side primary care dot com
     • Hours: 8 a.m. to 5 p.m., Monday to Friday
     • Address: {full_address}
-
-    {provider_info_section}
 
     DELIVERY RULES
     • Speak naturally like a real person having a conversation - don't sound like you're reading a script
@@ -823,23 +811,8 @@ async def make_single_call_async(call_request: CallRequest, api_key: str,
             selected_voice = get_voice_id(voice_name)
             print(f"🎤 Selected voice: {voice_name} (ID: {selected_voice})")
 
-            # Get available providers for this location
-            office_location_key = getattr(call_request, 'office_location_key', call_request.office_location)
-            available_providers_list = clinic_manager.find_providers_by_location(office_location_key)
-
-            # Format provider information for the prompt
-            available_providers_text = ""
-            if available_providers_list:
-                provider_lines = []
-                for provider in available_providers_list:
-                    name = provider.get('name', provider.get('provider_name', 'Unknown'))
-                    specialty = provider.get('specialty', provider.get('specialization', ''))
-                    if specialty:
-                        provider_lines.append(f"• Dr. {name} - {specialty}")
-                    else:
-                        provider_lines.append(f"• Dr. {name}")
-                available_providers_text = "\n".join(provider_lines)
-                print(f"📋 Including {len(available_providers_list)} providers in call prompt for {call_request.office_location}")
+            # Removed provider lookup from here as it's no longer needed.
+            # The get_call_prompt function has been updated to not expect available_providers.
 
             payload = {
                 "phone_number": call_request.phone_number,
@@ -849,8 +822,7 @@ async def make_single_call_async(call_request: CallRequest, api_key: str,
                     patient_name=call_request.patient_name,
                     appointment_date=call_request.appointment_date,
                     appointment_time=call_request.appointment_time,
-                    provider_name=call_request.provider_name,
-                    available_providers=available_providers_text
+                    provider_name=call_request.provider_name
                 ),
                 "voice": selected_voice,
                 "request_data": {
@@ -947,33 +919,18 @@ def make_single_call(call_request: CallRequest, api_key: str, client_voice: Opti
         selected_voice = get_voice_id(voice_name)
         print(f"🎤 Selected voice: {voice_name} (ID: {selected_voice})")
 
-        # Get available providers for this location
-        office_location_key = getattr(call_request, 'office_location_key', call_request.office_location)
-        available_providers_list = clinic_manager.find_providers_by_location(office_location_key)
-
-        # Format provider information for the prompt
-        available_providers_text = ""
-        if available_providers_list:
-            provider_lines = []
-            for provider in available_providers_list:
-                name = provider.get('name', provider.get('provider_name', 'Unknown'))
-                specialty = provider.get('specialty', provider.get('specialization', ''))
-                if specialty:
-                    provider_lines.append(f"• Dr. {name} - {specialty}")
-                else:
-                    provider_lines.append(f"• Dr. {name}")
-            available_providers_text = "\n".join(provider_lines)
-            print(f"📋 Including {len(available_providers_list)} providers in call prompt for {call_request.office_location}")
+        # Removed provider lookup from here as it's no longer needed.
+        # The get_call_prompt function has been updated to not expect available_providers.
 
         payload = {
             "phone_number": call_request.phone_number,
             "task": get_call_prompt(
-                office_location=call_request.office_location,
+                city_name=call_request.office_location,  # This now correctly holds just the city name
+                full_address=getattr(call_request, 'full_address', call_request.office_location), # This gets the full address we attached
                 patient_name=call_request.patient_name,
                 appointment_date=call_request.appointment_date,
                 appointment_time=call_request.appointment_time,
-                provider_name=call_request.provider_name,
-                available_providers=available_providers_text
+                provider_name=call_request.provider_name
             ),
             "voice": selected_voice,
             "request_data": call_data
@@ -1584,8 +1541,7 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
             def safe_str(value):
                 return str(value).strip() if value is not None else ''
 
-            # Use office_location from uploaded file as foreign key to lookup full address
-            # Use the 'office_location' from the campaign file as the lookup key
+            # Get full address for this location
             office_location_key = safe_str(row.get('office_location', ''))
 
             # --- NEW LOGIC TO SEPARATE CITY AND FULL ADDRESS ---
@@ -1612,7 +1568,7 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
                 appointment_time=safe_str(row.get('time', '')),
                 office_location=city_name,  # Pass the CITY NAME to the object
                 full_address=full_address,
-                office_location_key=office_location_key  # Keep the original key for provider lookup
+                office_location_key=office_location_key
             )
             call_requests.append(call_request)
             print(f"📊 Validation complete: {len(validation_failures)} failures, {len(call_requests)} valid calls")
@@ -2288,30 +2244,35 @@ async def process_csv(file: UploadFile = File(...),
                 value_str = str(value).strip()
                 return value_str if value_str.lower() not in ['nan', 'null'] else ''
 
-            # Use office_location from CSV as foreign key to lookup full address
+            # Get full address for this location
             office_location_key = safe_str(row.get('office_location', ''))
+
+            # --- NEW LOGIC TO SEPARATE CITY AND FULL ADDRESS ---
+
+            # 1. Extract just the city name from the key for the initial prompt greeting.
+            # This assumes the city name starts from index 20 in your 'office_location' column.
+            city_name = " ".join(office_location_key.split(" ")[20:]) if " " in office_location_key and len(office_location_key.split(" ")) > 20 else office_location_key
+
+            # 2. Use the clinic_manager to find the full address for on-demand use by the AI.
             full_address = clinic_manager.find_clinic_address(office_location_key)
 
-            if full_address:
-                # Found mapping - use full address from clinic locations CSV
-                office_location = full_address
-                print(f"📍 CSV Foreign Key Mapping: '{office_location_key}' -> '{office_location}'")
-            else:
-                # No mapping found - use original value and log warning
-                office_location = office_location_key
-                print(f"⚠️ CSV Foreign Key NOT FOUND: '{office_location_key}' - using as-is (consider adding to clinic locations)")
+            if not full_address:
+                print(f"⚠️ Full address not found for key '{office_location_key}'. Using the key as a fallback for the address.")
+                full_address = office_location_key # Use the original value if lookup fails
 
+            print(f"📍 Location Mapping: For greeting, AI will use city='{city_name}'. If asked, it will use address='{full_address}'")
+
+            # Create the request object
             call_request = CallRequest(
                 phone_number=formatted_phone,
                 patient_name=safe_str(row.get('patient_name', '')),
                 provider_name=safe_str(row.get('provider_name', '')),
                 appointment_date=safe_str(row.get('date', '')),
                 appointment_time=safe_str(row.get('time', '')),
-                office_location=office_location
+                office_location=city_name,  # Pass the CITY NAME to the object
+                full_address=full_address,
+                office_location_key=office_location_key
             )
-            # Store the original office_location_key for provider lookup
-            call_request.office_location_key = office_location_key
-
             call_requests.append(call_request)
             print(f"✅ Row {actual_row_number} VALID - {call_request.patient_name} at {formatted_phone}")
 
@@ -2637,9 +2598,7 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
     # Check for not available patterns
     if any(phrase in summary_lower for phrase in [
         "not here right now", "isn't here", "is not here", "not available",
-        "not home", "isn't home", "is not home", "out right now",
-        "can't come to the phone", "cannot come to the phone", "busy right now",
-        "in a meeting", "at work", "not in", "stepped out", "away from",
+        "not home", "isn't home", "is not home", "stepped out", "away from",
         "will be back", "call back later", "try calling later", "not around",
         "unavailable", "sleeping", "napping", "can you call back",
         "not a good time", "isn't a good time", "bad time"
@@ -2770,8 +2729,8 @@ def analyze_call_transcript(transcript: str) -> str:
         "wrong number", "you have the wrong number", "this is the wrong number",
         "no one by that name", "nobody by that name", "don't know", "never heard of",
         "no such person", "no one here by that name", "nobody here by that name",
-        "you must have the wrong", "there's no", "nobody named",
-        "no one named", "you must have the wrong", "i think you have the wrong",
+        "you must have the wrong", "this isn't", "that's not me", "i'm not",
+        "but i'm not", "i am not", "that is not me", "this is not me",
         "who is this", "who are you looking for"
     ]
 
@@ -2856,7 +2815,7 @@ def analyze_call_transcript(transcript: str) -> str:
     # PRIORITY 6: Look for clear confirmations - analyze user responses in order
     lines = [line.strip() for line in transcript.split('\n') if line.strip()]
 
-    # Find the final patient decision by going through user responses
+    # Find the final user response by going through user responses
     final_user_response = None
     for line in reversed(lines):
         if line.startswith('user:'):
@@ -3577,7 +3536,6 @@ async def get_call_details(call_id: str):
             print(f"  corrected_duration: {corrected_duration} (type: {type(corrected_duration)})")
 
             if call_length is not None and call_length != 0:
-                # call_length is in MINUTES, convert to seconds
                 duration_in_seconds = int(float(call_length) * 60)
                 print(f"  Using call_length: {call_length} minutes -> {duration_in_seconds} seconds")
                 duration = duration_in_seconds
