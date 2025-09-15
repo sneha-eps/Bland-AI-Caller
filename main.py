@@ -1929,7 +1929,7 @@ async def process_single_call_with_flag_indexed(call_data, api_key, semaphore, c
         call_data['success'] = False
         call_data['final_result'] = CallResult(
             success=False, error=str(e),
-            patient_name=call_data['patient_name'], phone_number=call_data['phone_number']
+            patient_name=call_data['patient_name'], phone_number=call_request.phone_number
         )
         print(f"💥 [Index {sheet_index:03d}] EXCEPTION: {call_data['patient_name']} - {str(e)}")
 
@@ -2395,7 +2395,7 @@ async def process_csv(file: UploadFile = File(...),
 def extract_final_summary(transcript: str) -> str:
     """
     Extract the patient's actual decision from the transcript, not just the AI's final statement.
-    This analyzes what the patient actually said to determine the true outcome.
+    This analyzes the entire conversation to understand the patient's final response.
     """
     if not transcript or transcript.strip() == "":
         return "No summary available"
@@ -2539,12 +2539,12 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
     if transcript and transcript.strip():
         transcript_status = analyze_call_transcript(transcript)
         transcript_summary = get_standardized_summary_for_status(transcript_status)
-        
+
         # If transcript analysis gives a definitive result, use it instead of summary
         if transcript_status in ['cancelled', 'rescheduled', 'wrong_number', 'not_available']:
             print(f"🔍 Transcript analysis overriding summary: {transcript_status} (was {summary_lower[:50]}...)")
             return transcript_status, transcript_summary
-        
+
         # For confirmations, double-check with transcript patterns
         if transcript_status == 'confirmed':
             transcript_lower = transcript.lower()
@@ -2559,7 +2559,7 @@ def analyze_call_status_from_summary(final_summary: str, transcript: str = "") -
                 "user: no", "user: i won't", "user: can't make", "user: i want to cancel",
                 "user: i want to reschedule", "user: but i'm not", "user: she's not available"
             ])
-            
+
             if patient_confirmed and not patient_negative:
                 return 'confirmed', "Patient confirmed appointment"
 
@@ -2714,12 +2714,12 @@ def analyze_call_transcript(transcript: str) -> str:
         "user: will not make it",
         "user: unable to make it"
     ]
-    
+
     for pattern in cancellation_patterns:
         if pattern in transcript_lower:
             print(f"🔍 Found cancellation pattern: {pattern}")
             return 'cancelled'
-    
+
     # Also check for AI confirmation of cancellation
     if "i will cancel this appointment for you" in transcript_lower:
         print(f"🔍 Found AI cancellation confirmation")
@@ -2729,7 +2729,7 @@ def analyze_call_transcript(transcript: str) -> str:
     reschedule_patterns = [
         "user: i want to reschedule",
         "user: reschedule",
-        "user: can we reschedule", 
+        "user: can we reschedule",
         "user: let's reschedule",
         "user: different time",
         "user: better time",
@@ -2737,12 +2737,12 @@ def analyze_call_transcript(transcript: str) -> str:
         "user: change the time",
         "user: move the appointment"
     ]
-    
+
     for pattern in reschedule_patterns:
         if pattern in transcript_lower:
             print(f"🔍 Found reschedule pattern: {pattern}")
             return 'rescheduled'
-    
+
     # Also check for AI confirmation of rescheduling
     if "our scheduling agent will call you shortly" in transcript_lower:
         print(f"🔍 Found AI reschedule confirmation")
@@ -2759,7 +2759,7 @@ def analyze_call_transcript(transcript: str) -> str:
         "user: that is not me",
         "user: this is not me"
     ]
-    
+
     for pattern in identity_denial_patterns:
         if pattern in transcript_lower:
             print(f"🔍 Found identity denial pattern: {pattern}")
@@ -2783,9 +2783,9 @@ def analyze_call_transcript(transcript: str) -> str:
     # PRIORITY 4: Check for "not available" scenarios
     not_available_patterns = [
         "user: she's not available",
-        "user: he's not available", 
+        "user: he's not available",
         "not available", "she's not available", "he's not available",
-        "not here right now", "isn't here", "is not here", 
+        "not here right now", "isn't here", "is not here",
         "not home", "isn't home", "is not home", "out right now",
         "can't come to the phone", "cannot come to the phone", "busy right now",
         "in a meeting", "at work", "not in", "stepped out", "away from",
@@ -2855,34 +2855,34 @@ def analyze_call_transcript(transcript: str) -> str:
 
     # PRIORITY 6: Look for clear confirmations - analyze user responses in order
     lines = [line.strip() for line in transcript.split('\n') if line.strip()]
-    
+
     # Find the final patient decision by going through user responses
     final_user_response = None
     for line in reversed(lines):
         if line.startswith('user:'):
             final_user_response = line.replace('user:', '').strip().lower()
             break
-    
+
     if final_user_response:
         # Check for clear positive confirmations
         positive_confirmations = [
-            "yes", "sure", "okay", "ok", "that works", "sounds good", 
+            "yes", "sure", "okay", "ok", "that works", "sounds good",
             "i'll be there", "i will be there", "see you then", "confirmed",
             "that's fine", "yes that works", "yes sounds good"
         ]
-        
+
         # Check for negative responses
         negative_responses = [
             "no", "can't", "won't", "unable", "cancel", "reschedule",
             "different time", "better time", "not available"
         ]
-        
+
         # If final response is clearly positive and no negative words
         if (any(pos in final_user_response for pos in positive_confirmations) and
             not any(neg in final_user_response for neg in negative_responses)):
-            
+
             # Double check there wasn't a cancellation or reschedule earlier
-            if ("cancel" not in transcript_lower or 
+            if ("cancel" not in transcript_lower or
                 "i will cancel this appointment" not in transcript_lower):
                 if ("reschedule" not in transcript_lower or
                     "scheduling agent will call" not in transcript_lower):
@@ -2950,11 +2950,11 @@ def analyze_call_transcript(transcript: str) -> str:
 
 
 def get_voicemail_prompt(patient_name: str = "[patient name]",
-        appointment_date: str = "[date]",
-        appointment_time: str = "[time]",
-        provider_name: str = "[provider name]",
-        office_location: str = "[office location]",
-        available_providers: str = "") -> str:
+                         appointment_date: str = "[date]",
+                         appointment_time: str = "[time]",
+                         provider_name: str = "[provider name]",
+                         office_location: str = "[office location]",
+                         clinic_phone: str = "[clinic phone]") -> str:
     """Get the voicemail message prompt"""
 
     # Add provider information if available
@@ -2971,7 +2971,7 @@ def get_voicemail_prompt(patient_name: str = "[patient name]",
     You are an AI voice agent leaving a voicemail message from Passion Health Primary Care. You are professional, clear, and concise.
 
     VOICEMAIL MESSAGE
-    Hi Good Morning, I am calling from Passion Health Primary Care. This call is for {patient_name} to remind him/her of an upcoming appointment on {appointment_date} at {appointment_time} with {provider_name} at {office_location}. Please make sure to arrive 15 minutes prior to your appointment. Also, Please make sure to email us your insurance information ASAP so that we can get it verified and avoid any delays on the day of your appointment. If you wish to cancel or reschedule your appointment, please inform us at least 24 hours in advance to avoid cancellation charge of $25.00. For more information, you can call us back on 210-742-6555. Thank you and have a blessed day.{provider_info_section}
+    Hi Good Morning, I am calling from Passion Health Primary Care. This call is for {patient_name} to remind him/her of an upcoming appointment on {appointment_date} at {appointment_time} with {provider_name} at {office_location}. Please make sure to arrive 15 minutes prior to your appointment. Also, Please make sure to email us your insurance information ASAP so that we can get it verified and avoid any delays on the day of your appointment. If you wish to cancel or reschedule your appointment, please inform us at least 24 hours in advance to avoid cancellation charge of $25.00. For more information, you can call us back on {clinic_phone}. Thank you and have a blessed day.{provider_info_section}
 
     DELIVERY RULES
     • Speak clearly and at a moderate pace
@@ -2988,6 +2988,12 @@ async def send_automatic_voicemail(call_request: CallRequest, api_key: str, clie
         selected_voice = VOICE_MAP.get(voice_name, VOICE_MAP.get("Paige", "default_voice_id"))
         print(f"🎤 Selected voice for voicemail: {voice_name} (ID: {selected_voice})")
 
+        # Get clinic phone number for this location
+        office_location_key = getattr(call_request, 'office_location_key', call_request.office_location)
+        clinic_phone = clinic_manager.find_clinic_phone(office_location_key)
+        if not clinic_phone:
+            clinic_phone = "210-742-6555"  # Default fallback
+
         payload = {
             "phone_number": call_request.phone_number,
             "task": get_voicemail_prompt(
@@ -2995,7 +3001,8 @@ async def send_automatic_voicemail(call_request: CallRequest, api_key: str, clie
                 appointment_date=call_request.appointment_date,
                 appointment_time=call_request.appointment_time,
                 provider_name=call_request.provider_name,
-                office_location=call_request.office_location
+                office_location=call_request.office_location,
+                clinic_phone=clinic_phone
             ),
             "voice": selected_voice,
             "request_data": {
@@ -3061,7 +3068,15 @@ async def send_voicemail(call_request: CallRequest):
             detail="BLAND_API_KEY not found in Secrets. Please add your API key.")
 
     try:
-        selected_voice = VOICE_MAP.get("Paige", "default_voice_id")
+        # Use client voice if provided, otherwise default to Paige
+        voice_name = "Paige" # Default voice for this specific endpoint
+        selected_voice = VOICE_MAP.get(voice_name, VOICE_MAP.get("Paige", "default_voice_id"))
+
+        # Get clinic phone number for this location
+        office_location_key = getattr(call_request, 'office_location_key', call_request.office_location)
+        clinic_phone = clinic_manager.find_clinic_phone(office_location_key)
+        if not clinic_phone:
+            clinic_phone = "210-742-6555"  # Default fallback
 
         payload = {
             "phone_number": call_request.phone_number,
@@ -3070,7 +3085,8 @@ async def send_voicemail(call_request: CallRequest):
                 appointment_date=call_request.appointment_date,
                 appointment_time=call_request.appointment_time,
                 provider_name=call_request.provider_name,
-                office_location=call_request.office_location
+                office_location=call_request.office_location,
+                clinic_phone=clinic_phone
             ),
             "voice": selected_voice,
             "request_data": {
@@ -3657,7 +3673,7 @@ async def get_clients_api():
         }
 
 @app.get("/api/campaigns")
-async def get_campaigns_api():
+asyncasync def get_campaigns_api():
     """Get all campaigns data for API usage"""
     try:
         campaigns = []

@@ -26,14 +26,21 @@ class ClinicDataManager:
 
         except FileNotFoundError:
             print(f"⚠️ Warning: '{file_path}' not found. Trying CSV fallback...")
-            # Try loading from the attached CSV file
+            # Try loading from the new PHPC clinic data CSV file first
             try:
-                csv_file = "attached_assets/hillside_clinic_data - Clinic Locations_1756207573609.csv"
+                csv_file = "attached_assets/PHPC_clinic_data_1757918909480.csv"
                 self.locations_df = pd.read_csv(csv_file)
                 self.locations_df.columns = [col.strip() for col in self.locations_df.columns]
-                print(f"✅ Successfully loaded {len(self.locations_df)} clinic locations from CSV.")
-            except Exception as csv_error:
-                print(f"⚠️ Warning: Could not load CSV fallback: {csv_error}. The application will run without pre-loaded clinic data.")
+                print(f"✅ Successfully loaded {len(self.locations_df)} clinic locations from PHPC CSV with phone numbers.")
+            except Exception:
+                # Fallback to the old CSV file
+                try:
+                    csv_file = "attached_assets/hillside_clinic_data - Clinic Locations_1756207573609.csv"
+                    self.locations_df = pd.read_csv(csv_file)
+                    self.locations_df.columns = [col.strip() for col in self.locations_df.columns]
+                    print(f"✅ Successfully loaded {len(self.locations_df)} clinic locations from Hillside CSV.")
+                except Exception as csv_error:
+                    print(f"⚠️ Warning: Could not load CSV fallback: {csv_error}. The application will run without pre-loaded clinic data.")
         except Exception as e:
             print(f"💥 Error loading data from Excel file: {e}")
 
@@ -47,6 +54,22 @@ class ClinicDataManager:
 
         if not match.empty:
             return str(match.iloc[0]['Address'])
+        return None
+
+    def find_clinic_phone(self, location_key: str) -> Optional[str]:
+        """Finds the phone number for a given location key (case-insensitive)."""
+        if self.locations_df.empty or not location_key or 'Phone_number' not in self.locations_df.columns:
+            return None
+
+        location_key_lower = location_key.strip().lower()
+        match = self.locations_df[self.locations_df['office_location'].str.strip().str.lower() == location_key_lower]
+
+        if not match.empty:
+            phone = str(match.iloc[0]['Phone_number']).strip()
+            # Format phone number with dashes for natural speech
+            if len(phone) == 10:
+                return f"{phone[:3]}-{phone[3:6]}-{phone[6:]}"
+            return phone
         return None
 
     def get_all_locations(self) -> List[Tuple[str, str]]:
