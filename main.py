@@ -274,7 +274,8 @@ def get_call_prompt(city_name: str = "",
                     patient_name: str = "[patient name]",
                     appointment_date: str = "[date]",
                     appointment_time: str = "[time]",
-                    provider_name: str = "[provider name]"):
+                    provider_name: str = "[provider name]",
+                    clinic_phone: str = "2107426555"):
     """Return the call prompt"""
 
     return f"""
@@ -283,7 +284,7 @@ def get_call_prompt(city_name: str = "",
 
     CLINIC DETAILS (USE AS-IS WHEN NEEDED)
     • Website: w w w dot passion health primary care dot com
-    • Phone: 2107426555
+    • Phone: {clinic_phone}
     • Email: passion health physicians @ gmail dot com
     • Hours: 8 a.m. to 5 p.m., Monday to Friday
     • Address: {full_address}
@@ -348,7 +349,7 @@ def get_call_prompt(city_name: str = "",
     RESPONSE FLOW BY INTENT
 
     • IF CONFIRM:
-    Say: "Excellent! We are glad to have you. Just a reminder to please arrive 15 minutes early for check-in. If you have any insurance changes, please email them to passion health physicians @ gmail dot com. For any other issues, you can call the office at 2107426555. Do you have any questions?"
+    Say: "Excellent! We are glad to have you. Just a reminder to please arrive 15 minutes early for check-in. If you have any insurance changes, please email them to passion health physicians @ gmail dot com. For any other issues, you can call the office at {clinic_phone}. Do you have any questions?"
     Wait for response.
     – If they request a detail (phone, email, address, provider, date, time), provide only that item clearly (spelled out as required), then wait for acknowledgment.
     – If they simply acknowledge, say: "You're welcome. Have a great day!" End the call.
@@ -411,6 +412,7 @@ class CallRequest(BaseModel):
     office_location: str
     full_address: Optional[str] = None
     office_location_key: Optional[str] = None
+    clinic_phone: Optional[str] = None
 
 
 class CallResult(BaseModel):
@@ -822,7 +824,8 @@ async def make_single_call_async(call_request: CallRequest, api_key: str,
                     patient_name=call_request.patient_name,
                     appointment_date=call_request.appointment_date,
                     appointment_time=call_request.appointment_time,
-                    provider_name=call_request.provider_name
+                    provider_name=call_request.provider_name,
+                    clinic_phone=getattr(call_request, 'clinic_phone', '2107426555')
                 ),
                 "voice": selected_voice,
                 "request_data": {
@@ -930,7 +933,8 @@ def make_single_call(call_request: CallRequest, api_key: str, client_voice: Opti
                 patient_name=call_request.patient_name,
                 appointment_date=call_request.appointment_date,
                 appointment_time=call_request.appointment_time,
-                provider_name=call_request.provider_name
+                provider_name=call_request.provider_name,
+                clinic_phone=getattr(call_request, 'clinic_phone', '2107426555')
             ),
             "voice": selected_voice,
             "request_data": call_data
@@ -1557,7 +1561,14 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
                 print(f"⚠️ Full address not found for key '{office_location_key}'. Using the key as a fallback for the address.")
                 full_address = office_location_key # Use the original value if lookup fails
 
-            print(f"📍 Location Mapping: For greeting, AI will use city='{city_name}'. If asked, it will use address='{full_address}'")
+            # 3. Use the clinic_manager to find the clinic phone number for this location.
+            clinic_phone = clinic_manager.find_clinic_phone(office_location_key)
+
+            if not clinic_phone:
+                print(f"⚠️ Clinic phone number not found for key '{office_location_key}'. Using default phone number.")
+                clinic_phone = "2107426555"  # Use the default phone number if lookup fails
+
+            print(f"📍 Location Mapping: For greeting, AI will use city='{city_name}'. If asked, it will use address='{full_address}' and phone='{clinic_phone}'")
 
             # Create the request object
             call_request = CallRequest(
@@ -1568,7 +1579,8 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
                 appointment_time=safe_str(row.get('time', '')),
                 office_location=city_name,  # Pass the CITY NAME to the object
                 full_address=full_address,
-                office_location_key=office_location_key
+                office_location_key=office_location_key,
+                clinic_phone=clinic_phone
             )
             call_requests.append(call_request)
             print(f"📊 Validation complete: {len(validation_failures)} failures, {len(call_requests)} valid calls")
@@ -1907,8 +1919,9 @@ async def send_final_voicemail(call_request: CallRequest, api_key: str, client_v
         print(f"🎤 Selected voice for voicemail: {voice_name} (ID: {selected_voice})")
 
         # Updated voicemail template as per your request
+        clinic_phone = getattr(call_request, 'clinic_phone', '210-742-6555')
         voicemail_template = f"""
-        Hi Good Morning, I am calling from Passion Health Primary Care Clinic. This call is for {call_request.patient_name} to remind him/her of an upcoming appointment on {call_request.appointment_date} at {call_request.appointment_time} with {call_request.provider_name} at {call_request.office_location}. Please make sure to arrive 15 minutes prior to your appointment. Also, Please make sure to email us your insurance information ASAP so that we can get it verified and avoid any delays on the day of your appointment. If you wish to cancel or reschedule your appointment, please inform us at least 24 hours in advance to avoid cancellation charge of $25.00. For more information, you can call us back on 210-742-6555. Thank you and have a blessed day.
+        Hi Good Morning, I am calling from Passion Health Primary Care Clinic. This call is for {call_request.patient_name} to remind him/her of an upcoming appointment on {call_request.appointment_date} at {call_request.appointment_time} with {call_request.provider_name} at {call_request.office_location}. Please make sure to arrive 15 minutes prior to your appointment. Also, Please make sure to email us your insurance information ASAP so that we can get it verified and avoid any delays on the day of your appointment. If you wish to cancel or reschedule your appointment, please inform us at least 24 hours in advance to avoid cancellation charge of $25.00. For more information, you can call us back on {clinic_phone}. Thank you and have a blessed day.
         """
 
         payload = {
@@ -2260,7 +2273,14 @@ async def process_csv(file: UploadFile = File(...),
                 print(f"⚠️ Full address not found for key '{office_location_key}'. Using the key as a fallback for the address.")
                 full_address = office_location_key # Use the original value if lookup fails
 
-            print(f"📍 Location Mapping: For greeting, AI will use city='{city_name}'. If asked, it will use address='{full_address}'")
+            # 3. Use the clinic_manager to find the clinic phone number for this location.
+            clinic_phone = clinic_manager.find_clinic_phone(office_location_key)
+
+            if not clinic_phone:
+                print(f"⚠️ Clinic phone number not found for key '{office_location_key}'. Using default phone number.")
+                clinic_phone = "2107426555"  # Use the default phone number if lookup fails
+
+            print(f"📍 Location Mapping: For greeting, AI will use city='{city_name}'. If asked, it will use address='{full_address}' and phone='{clinic_phone}'")
 
             # Create the request object
             call_request = CallRequest(
@@ -2271,7 +2291,8 @@ async def process_csv(file: UploadFile = File(...),
                 appointment_time=safe_str(row.get('time', '')),
                 office_location=city_name,  # Pass the CITY NAME to the object
                 full_address=full_address,
-                office_location_key=office_location_key
+                office_location_key=office_location_key,
+                clinic_phone=clinic_phone
             )
             call_requests.append(call_request)
             print(f"✅ Row {actual_row_number} VALID - {call_request.patient_name} at {formatted_phone}")
