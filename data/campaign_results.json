@@ -474,5 +474,225 @@
         "duration": 0
       }
     ]
+  },
+  "9bef8c01-b3e1-4a39-89d5-7da8bde18a79_run_20250915_073324": {
+    "campaign_id": "9bef8c01-b3e1-4a39-89d5-7da8bde18a79",
+    "campaign_run_id": "9bef8c01-b3e1-4a39-89d5-7da8bde18a79_run_20250915_073324",
+    "campaign_name": "Testing",
+    "client_name": "Passion Health",
+    "total_calls": 1,
+    "successful_calls": 1,
+    "failed_calls": 0,
+    "started_at": "2025-09-15T07:33:24.638658",
+    "completed_at": "2025-09-15T07:33:24.638666",
+    "status": "completed",
+    "run_number": 1,
+    "results": [
+      {
+        "success": true,
+        "call_id": "596587d7-fc30-4571-8bf2-88950c5d8cc7",
+        "status": "success",
+        "call_status": "initiated",
+        "transcript": null,
+        "final_summary": null,
+        "message": "Call successfully queued.",
+        "error": null,
+        "patient_name": "Sneha",
+        "phone_number": "+917014608325",
+        "duration": 0
+      }
+    ]
+  },
+  "9bef8c01-b3e1-4a39-89d5-7da8bde18a79_run_20250915_073615": {
+    "campaign_id": "9bef8c01-b3e1-4a39-89d5-7da8bde18a79",
+    "campaign_run_id": "9bef8c01-b3e1-4a39-89d5-7da8bde18a79_run_20250915_073615",
+    "campaign_name": "Testing",
+    "client_name": "Passion Health",
+    "total_calls": 1,
+    "successful_calls": 1,
+    "failed_calls": 0,
+    "started_at": "2025-09-15T07:36:15.689339",
+    "completed_at": "2025-09-15T07:36:15.689350",
+    "status": "completed",
+    "run_number": 2,
+    "results": [
+      {
+        "success": true,
+        "call_id": "d2bc3a75-3999-4739-ad30-00c2aa23416f",
+        "status": "success",
+        "call_status": "initiated",
+        "transcript": null,
+        "final_summary": null,
+        "message": "Call successfully queued.",
+        "error": null,
+        "patient_name": "Sneha",
+        "phone_number": "+917014608325",
+        "duration": 0
+      }
+    ]
+  },
+  "9bef8c01-b3e1-4a39-89d5-7da8bde18a79_run_20250915_074222": {
+    "campaign_id": "9bef8c01-b3e1-4a39-89d5-7da8bde18a79",
+    "campaign_run_id": "9bef8c01-b3e1-4a39-89d5-7da8bde18a79_run_20250915_074222",
+    "campaign_name": "Testing",
+    "client_name": "Passion Health",
+    "total_calls": 1,
+    "successful_calls": 1,
+    "failed_calls": 0,
+    "started_at": "2025-09-15T07:42:22.002812",
+    "completed_at": "2025-09-15T07:42:22.002820",
+    "status": "completed",
+    "run_number": 3,
+    "results": [
+      {
+        "success": true,
+        "call_id": "95a9e458-8529-4d06-9ff3-70aa281a6781",
+        "status": "success",
+        "call_status": "initiated",
+        "transcript": null,
+        "final_summary": null,
+        "message": "Call successfully queued.",
+        "error": null,
+        "patient_name": "Sneha",
+        "phone_number": "+917014608325",
+        "duration": 0
+      }
+    ]
+  },
+  "9bef8c01-b3e1-4a39-89d5-7da8bde18a79_run_20250915_074224": {
+    "campaign_id": "9bef8c01-b3e1-4a39-89d5-7da8bde18a79",
+    "campaign_run_id": "9bef8c01-b3e1-4a39-89d5-7da8bde18a79_run_20250915_074224",
+    "campaign_name": "Testing",
+    "client_name": "Passion Health",
+    "total_calls": 1,
+    "successful_calls": 1,
+    "failed_calls": 0,
+    "started_at": "2025-09-15T07:42:24.887479",
+    "completed_at": "2025-09-15T07:42:24.887489",
+    "status": "completed",
+    "run_number": 4,
+    "results": [
+      {
+        "success": true,
+        "call_id": "0ee22922-5195-44cb-b28b-65a73b8509a7",
+        "status": "success",
+        "call_status": "initiated",
+        "transcript": null,
+        "final_summary": null,
+        "message": "Call successfully queued.",
+        "error": null,
+        "patient_name": "Sneha",
+        "phone_number": "+917014608325",
+        "duration": 0
+      }
+    ]
+  },
+  "9bef8c01-b3e1-4a39-89d5-7da8bde18a79_run_20250915_075115": {
+    "campaign_id": "9bef8c01-b3e1-4a39-89d5-7da8bde18a79",
+    "campaign_run_id": "9bef8c01-b3e1-4a39-89d5-7da8bde18a79_run_20250915_075115",
+    "campaign_name": "Testing",
+    "client_name": "Passion Health",
+    "total_calls": 1,
+    "successful_calls": 1,
+    "failed_calls": 0,
+    "started_at": "2025-09-15T07:51:15.378543",
+    "completed_at": "2025-09-15T07:51:15.378555",
+    "status": "completed",
+    "run_number": 5,
+    "results": [
+      {
+        "success": true,
+        "call_id": "03369cad-a0cc-4c97-bfd2-73cfbbdb4147",
+        "status": "success",
+        "call_status": "initiated",
+        "transcript": null,
+        "final_summary": null,
+        "message": "Call successfully queued.",
+        "error": null,
+        "patient_name": "Sneha",
+        "phone_number": "+917014608325",
+        "duration": 0
+      }
+    ]
+  },
+  "9bef8c01-b3e1-4a39-89d5-7da8bde18a79_run_20250915_092038": {
+    "campaign_id": "9bef8c01-b3e1-4a39-89d5-7da8bde18a79",
+    "campaign_run_id": "9bef8c01-b3e1-4a39-89d5-7da8bde18a79_run_20250915_092038",
+    "campaign_name": "Testing",
+    "client_name": "Passion Health",
+    "total_calls": 5,
+    "successful_calls": 5,
+    "failed_calls": 0,
+    "started_at": "2025-09-15T09:20:38.618079",
+    "completed_at": "2025-09-15T09:20:38.618092",
+    "status": "completed",
+    "run_number": 6,
+    "results": [
+      {
+        "success": true,
+        "call_id": "d1a70ee9-1896-45a0-91f2-7b8576d6250c",
+        "status": "success",
+        "call_status": "initiated",
+        "transcript": null,
+        "final_summary": null,
+        "message": "Call successfully queued.",
+        "error": null,
+        "patient_name": "Sneha",
+        "phone_number": "+917014608325",
+        "duration": 0
+      },
+      {
+        "success": true,
+        "call_id": "68b24a5b-72f5-4677-9c72-6e044cec8c18",
+        "status": "success",
+        "call_status": "initiated",
+        "transcript": null,
+        "final_summary": null,
+        "message": "Call successfully queued.",
+        "error": null,
+        "patient_name": "Aditya",
+        "phone_number": "+919694496288",
+        "duration": 0
+      },
+      {
+        "success": true,
+        "call_id": "dd4ae41d-c75b-47b6-9eea-3dc6caa5b63e",
+        "status": "success",
+        "call_status": "initiated",
+        "transcript": null,
+        "final_summary": null,
+        "message": "Call successfully queued.",
+        "error": null,
+        "patient_name": "Akshay",
+        "phone_number": "+916378188813",
+        "duration": 0
+      },
+      {
+        "success": true,
+        "call_id": "537c53e5-2270-4b40-8036-437a0e25ee7c",
+        "status": "success",
+        "call_status": "initiated",
+        "transcript": null,
+        "final_summary": null,
+        "message": "Call successfully queued.",
+        "error": null,
+        "patient_name": "Priyanka",
+        "phone_number": "+916375847275",
+        "duration": 0
+      },
+      {
+        "success": true,
+        "call_id": "34a4060b-090f-45f5-aa3d-3667d0a02f04",
+        "status": "success",
+        "call_status": "initiated",
+        "transcript": null,
+        "final_summary": null,
+        "message": "Call successfully queued.",
+        "error": null,
+        "patient_name": "Vijay",
+        "phone_number": "+918329811978",
+        "duration": 0
+      }
+    ]
   }
 }

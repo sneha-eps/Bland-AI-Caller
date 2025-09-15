@@ -38,5 +38,15 @@
     "country_code": "+1",
     "file_name": "sample_campaign_data.csv",
     "file_data_b64": "cGhvbmVfbnVtYmVyLHBhdGllbnRfbmFtZSxvZmZpY2VfbG9jYXRpb24sZGF0ZSx0aW1lLHByb3ZpZGVyX25hbWUNCjk3ODMzMzYzNTgsQXNpdCBHb2VsLEhpbGxzaWRlIFByaW1hcnkgQ2FyZSBTY2hlcnR6LDA3LzIzLzIwMjUsMDI6MzAgUE0sUGF0ZWw="
+  },
+  "9bef8c01-b3e1-4a39-89d5-7da8bde18a79": {
+    "id": "9bef8c01-b3e1-4a39-89d5-7da8bde18a79",
+    "name": "Testing",
+    "client_id": "31d9e2f8-f79e-4428-b5d5-11db29f11886",
+    "max_attempts": 3,
+    "retry_interval": 30,
+    "country_code": "+91",
+    "file_name": "Untitled spreadsheet - Untitled spreadsheet - Sheet1 (1) (2).csv",
+    "file_data_b64": "cGhvbmVfbnVtYmVyLHBhdGllbnRfbmFtZSxvZmZpY2VfbG9jYXRpb24sZGF0ZSx0aW1lLHByb3ZpZGVyX25hbWUNCjcwMTQ2MDgzMjUsU25laGEsIlBhc3Npb24gSGVhbHRoIElydmluZyIsMTAvMTAvMjAyNSwxNDowMCxEci4gUHVydXNob3RoYW0NCjk2OTQ0OTYyODgsQWRpdHlhLCJQYXNzaW9uIEhlYWx0aCBLZW1wIiwxMC8wOS8yMDI1LDE2OjMwLERyLiBOZWhhDQo2Mzc4MTg4ODEzLEFrc2hheSwiUGFzc2lvbiBIZWFsdGggS2F1Zm1hbiIsMTAvMDgvMjAyNSwxMzozMCxEci4gR3VlcnJhDQo2Mzc1ODQ3Mjc1LFByaXlhbmthLCJQYXNzaW9uIEhlYWx0aCBQcm9zcGVyIiwgMTAvMDcvMjAyNSwxMTowMCxEci4gTmFpaw0KODMyOTgxMTk3OCxWaWpheSwiUGFzc2lvbiBIZWFsdGggRnJpc2NvIiwxMC8wNS8yMDI1LDE1OjQ1LERyLiBTdW5rYXJh"
   }
 }

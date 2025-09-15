@@ -280,7 +280,7 @@ def get_call_prompt(city_name: str = "",
 
     return f"""
     ROLE & PERSONA
-    You are an AI voice agent calling from Passion Health Primary Care Clinic. You are professional, polite, and empathetic. Speak in complete, natural sentences and combine related thoughts smoothly. Always wait for the patient's full response before continuing or ending the call. Do not skip or reorder steps.
+    You are an AI voice agent calling from Passion Health Primary Care. You are professional, polite, and empathetic. Speak in complete, natural sentences and combine related thoughts smoothly. Always wait for the patient's full response before continuing or ending the call. Do not skip or reorder steps.
 
     CLINIC DETAILS (USE AS-IS WHEN NEEDED)
     • Website: w w w dot passion health primary care dot com
@@ -1552,7 +1552,7 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
 
             # 1. Extract just the city name from the key for the initial prompt greeting.
             # This assumes the city name starts from index 20 in your 'office_location' column.
-            city_name = " ".join(office_location_key.split(" ")[20:]) if " " in office_location_key and len(office_location_key.split(" ")) > 20 else office_location_key
+            city_name = " ".join(office_location_key.split(" ")[15:]) if " " in office_location_key and len(office_location_key.split(" ")) > 20 else office_location_key
 
             # 2. Use the clinic_manager to find the full address for on-demand use by the AI.
             full_address = clinic_manager.find_clinic_address(office_location_key)
@@ -2844,11 +2844,17 @@ def analyze_call_transcript(transcript: str) -> str:
             break
 
     if final_user_response:
+        # Check if response starts with a clear positive word (prioritize this)
+        starts_with_positive = any(final_user_response.startswith(word) for word in [
+            "yes", "yep", "yeah", "sure", "okay", "ok", "absolutely", "definitely"
+        ])
+        
         # Check for clear positive confirmations
         positive_confirmations = [
-            "yes", "sure", "okay", "ok", "that works", "sounds good",
+            "yes", "sure", "okay", "ok", "yep", "yeah", "that works", "sounds good",
             "i'll be there", "i will be there", "see you then", "confirmed",
-            "that's fine", "yes that works", "yes sounds good"
+            "that's fine", "yes that works", "yes sounds good", "absolutely",
+            "definitely", "of course", "correct", "that's right"
         ]
 
         # Check for negative responses
@@ -2857,8 +2863,8 @@ def analyze_call_transcript(transcript: str) -> str:
             "different time", "better time", "not available"
         ]
 
-        # If final response is clearly positive and no negative words
-        if (any(pos in final_user_response for pos in positive_confirmations) and
+        # If response starts with positive word OR contains positive confirmations, and no negative words
+        if ((starts_with_positive or any(pos in final_user_response for pos in positive_confirmations)) and
             not any(neg in final_user_response for neg in negative_responses)):
 
             # Double check there wasn't a cancellation or reschedule earlier
