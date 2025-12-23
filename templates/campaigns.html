@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Campaigns - Bland AI Call Center</title>
+    <title>Campaigns - aivoiceagent</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="/static/styles.css" rel="stylesheet">
     <script src="/static/common.js"></script>
@@ -91,14 +91,34 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            font-size: 1.25rem;
+            font-size: 1.1rem;
             font-weight: 700;
-            color: var(--primary-color);
             text-decoration: none;
         }
 
-        .sidebar-logo i {
-            font-size: 1.5rem;
+        .sidebar-logo-icon {
+            width: 42px;
+            height: 42px;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+        }
+
+        .sidebar-logo-icon i {
+            font-size: 1.25rem;
+            color: white;
+        }
+
+        .sidebar-logo-text {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            font-weight: 800;
+            letter-spacing: -0.3px;
         }
 
         .sidebar-nav {
@@ -1122,8 +1142,10 @@
     <div class="sidebar" id="sidebar">
         <div class="sidebar-header">
             <a href="/" class="sidebar-logo">
-                <i class="fas fa-phone-alt"></i>
-                <span>Bland AI</span>
+                <div class="sidebar-logo-icon">
+                    <i class="fas fa-phone-volume"></i>
+                </div>
+                <span class="sidebar-logo-text">aivoiceagent</span>
             </a>
         </div>
         <nav class="sidebar-nav">
