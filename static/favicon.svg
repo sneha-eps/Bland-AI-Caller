@@ -6,10 +6,12 @@
       <stop offset="100%" style="stop-color:#a855f7"/>
     </linearGradient>
   </defs>
-  <rect width="100" height="100" rx="20" fill="url(#grad)"/>
-  <g fill="white">
-    <path d="M25,75 C20,70 20,60 25,55 L35,45 C38,42 43,42 46,45 L48,47 C52,43 56,39 60,35 L58,33 C55,30 55,25 58,22 L68,12 C73,7 83,7 88,12 C93,17 93,27 88,32 C78,42 58,62 48,72 C43,77 33,82 25,75 Z"/>
-    <path d="M60,22 C68,22 75,29 75,37" fill="none" stroke="white" stroke-width="5" stroke-linecap="round"/>
-    <path d="M60,10 C80,10 95,25 95,45" fill="none" stroke="white" stroke-width="5" stroke-linecap="round"/>
+  <rect width="100" height="100" rx="18" fill="url(#grad)"/>
+  <g fill="none" stroke="white" stroke-linecap="round">
+    <path d="M22,30 C22,18 30,15 38,22 L38,38 C30,45 22,42 22,30 Z M22,70 C22,82 30,85 38,78 L38,62 C30,55 22,58 22,70 Z" fill="white" stroke="none"/>
+    <path d="M22,30 L22,70" stroke-width="8"/>
+    <path d="M50,50 C58,50 65,43 65,35" stroke-width="6"/>
+    <path d="M50,50 C64,50 75,39 75,25" stroke-width="6"/>
+    <path d="M50,50 C70,50 85,35 85,15" stroke-width="6"/>
   </g>
 </svg>
