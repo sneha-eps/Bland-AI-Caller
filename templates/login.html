@@ -92,13 +92,96 @@
             display: inline-block;
             margin-right: 0.5rem;
         }
+
+        /* Professional Logo Styles */
+        .logo-container {
+            text-align: center;
+            margin-bottom: 2rem;
+        }
+
+        .logo-icon {
+            width: 80px;
+            height: 80px;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 1.25rem;
+            box-shadow: 0 10px 40px rgba(99, 102, 241, 0.4);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .logo-icon::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: linear-gradient(45deg, transparent, rgba(255,255,255,0.1), transparent);
+            transform: rotate(45deg);
+            animation: shimmer 3s infinite;
+        }
+
+        @keyframes shimmer {
+            0% { transform: translateX(-100%) rotate(45deg); }
+            100% { transform: translateX(100%) rotate(45deg); }
+        }
+
+        .logo-icon i {
+            font-size: 2.5rem;
+            color: white;
+            z-index: 1;
+        }
+
+        .logo-text {
+            font-size: 1.75rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 0.5rem;
+            letter-spacing: -0.5px;
+        }
+
+        .logo-tagline {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+        }
+
+        .welcome-text {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-top: 1.5rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .auth-subtitle {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
     </style>
 </head>
 <body>
     <div class="auth-container">
+        <!-- Professional Logo Section -->
+        <div class="logo-container">
+            <div class="logo-icon">
+                <i class="fas fa-phone-volume"></i>
+            </div>
+            <div class="logo-text">Bland AI Caller</div>
+            <div class="logo-tagline">Healthcare Appointment Automation</div>
+        </div>
+
         <div class="auth-header">
-            <h1>🤖 Bland AI Call Center</h1>
-            <p id="authTitle">Please login to continue</p>
+            <h2 class="welcome-text" id="welcomeText">Welcome Back</h2>
+            <p class="auth-subtitle" id="authTitle">Sign in to manage your campaigns</p>
         </div>
 
         <form id="authForm">
@@ -164,13 +247,16 @@
         const messageDiv = document.getElementById('message');
         const loadingDiv = document.getElementById('loading');
 
+        const welcomeText = document.getElementById('welcomeText');
+
         // Switch between login and signup
         switchLink.addEventListener('click', function(e) {
             e.preventDefault();
             isLoginMode = !isLoginMode;
             
             if (isLoginMode) {
-                authTitle.textContent = 'Please login to continue';
+                welcomeText.textContent = 'Welcome Back';
+                authTitle.textContent = 'Sign in to manage your campaigns';
                 authButton.textContent = 'Login';
                 switchText.textContent = "Don't have an account?";
                 switchLink.textContent = 'Sign up';
@@ -178,7 +264,8 @@
                 roleGroup.style.display = 'none';
                 document.getElementById('email').required = false;
             } else {
-                authTitle.textContent = 'Create your account';
+                welcomeText.textContent = 'Get Started';
+                authTitle.textContent = 'Create your account to begin';
                 authButton.textContent = 'Sign Up';
                 switchText.textContent = 'Already have an account?';
                 switchLink.textContent = 'Login';
