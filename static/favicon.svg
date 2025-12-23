@@ -7,10 +7,9 @@
     </linearGradient>
   </defs>
   <rect width="100" height="100" rx="20" fill="url(#grad)"/>
-  <g fill="white" transform="translate(50,50)">
-    <path d="M-22,8 C-22,12 -20,16 -16,18 L-10,12 C-8,10 -8,6 -10,4 L-12,2 C-8,-4 -2,-10 4,-14 L6,-12 C8,-10 12,-10 14,-12 L20,-18 C18,-22 14,-24 10,-24 C-8,-24 -22,-8 -22,8 Z"/>
-    <path d="M6,-4 C10,-4 14,0 14,4" stroke="white" stroke-width="3" fill="none" stroke-linecap="round"/>
-    <path d="M6,-12 C16,-12 24,-4 24,6" stroke="white" stroke-width="3" fill="none" stroke-linecap="round"/>
-    <path d="M6,-20 C22,-20 34,-8 34,8" stroke="white" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g fill="white">
+    <path d="M25,75 C20,70 20,60 25,55 L35,45 C38,42 43,42 46,45 L48,47 C52,43 56,39 60,35 L58,33 C55,30 55,25 58,22 L68,12 C73,7 83,7 88,12 C93,17 93,27 88,32 C78,42 58,62 48,72 C43,77 33,82 25,75 Z"/>
+    <path d="M60,22 C68,22 75,29 75,37" fill="none" stroke="white" stroke-width="5" stroke-linecap="round"/>
+    <path d="M60,10 C80,10 95,25 95,45" fill="none" stroke="white" stroke-width="5" stroke-linecap="round"/>
   </g>
 </svg>
