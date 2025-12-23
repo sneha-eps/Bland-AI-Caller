@@ -8,9 +8,9 @@
   </defs>
   <rect width="100" height="100" rx="20" fill="url(#grad)"/>
   <g fill="white" transform="translate(50,50)">
-    <path d="M-18,-8 C-18,-18 -8,-22 0,-22 C8,-22 18,-18 18,-8 C18,2 8,6 0,6 C-8,6 -18,2 -18,-8 Z M-10,-8 C-10,-2 -5,0 0,0 C5,0 10,-2 10,-8 C10,-14 5,-16 0,-16 C-5,-16 -10,-14 -10,-8 Z" transform="translate(0,-2)"/>
-    <circle cx="22" cy="-8" r="4"/>
-    <circle cx="28" cy="0" r="3"/>
-    <circle cx="32" cy="10" r="2"/>
+    <path d="M-22,8 C-22,12 -20,16 -16,18 L-10,12 C-8,10 -8,6 -10,4 L-12,2 C-8,-4 -2,-10 4,-14 L6,-12 C8,-10 12,-10 14,-12 L20,-18 C18,-22 14,-24 10,-24 C-8,-24 -22,-8 -22,8 Z"/>
+    <path d="M6,-4 C10,-4 14,0 14,4" stroke="white" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M6,-12 C16,-12 24,-4 24,6" stroke="white" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M6,-20 C22,-20 34,-8 34,8" stroke="white" stroke-width="3" fill="none" stroke-linecap="round"/>
   </g>
 </svg>
