@@ -597,19 +597,20 @@
         }
 
         .clients-list-container, .campaigns-list-container {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
         }
 
         .list-item {
             background: var(--bg-tertiary);
             border: 1px solid var(--border-color);
             border-radius: 8px;
-            padding: 1rem;
-            display: flex;
-            justify-content: space-between;
+            padding: 1rem 1.25rem;
+            display: grid;
+            grid-template-columns: 1fr auto;
             align-items: center;
+            gap: 1rem;
             transition: var(--transition);
         }
 
@@ -634,34 +635,46 @@
         }
 
         .list-item-content {
-            flex-grow: 1;
-            margin-right: 1rem;
+            min-width: 0;
         }
 
         .list-item-title {
-            font-size: 1.1rem;
+            font-size: 1rem;
             font-weight: 600;
             color: var(--text-primary);
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.35rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .list-item-meta {
-            font-size: 0.875rem;
+            font-size: 0.8rem;
             color: var(--text-secondary);
             display: flex;
             flex-direction: column;
-            gap: 0.25rem;
+            gap: 0.2rem;
         }
 
         .list-item-meta span {
             display: flex;
             align-items: center;
             gap: 0.5rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .list-item-meta span i {
+            flex-shrink: 0;
+            width: 14px;
+            color: var(--text-tertiary);
         }
 
         .list-item-actions {
             display: flex;
             align-items: center;
+            flex-shrink: 0;
         }
 
         .btn-small {
