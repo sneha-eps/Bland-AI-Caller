@@ -275,17 +275,26 @@ def get_call_prompt(city_name: str = "",
                     appointment_date: str = "[date]",
                     appointment_time: str = "[time]",
                     provider_name: str = "[provider name]",
-                    clinic_phone: str = "2107426555"):
+                    clinic_phone: str = "2107426555",
+                    clinic_name: str = "the clinic",
+                    clinic_email: str = "",
+                    clinic_website: str = ""):
     """Return the call prompt"""
+
+    spoken_email = format_for_speech(clinic_email) if clinic_email else ""
+    spoken_website = format_for_speech(clinic_website) if clinic_website else ""
+
+    website_line = f"    • Website: {spoken_website}" if spoken_website else ""
+    email_line = f"    • Email: {spoken_email}" if spoken_email else ""
 
     return f"""
     ROLE & PERSONA
-    You are an AI voice agent calling from Passion Health Primary Care. You are professional, polite, and empathetic. Speak in complete, natural sentences and combine related thoughts smoothly. Always wait for the patient's full response before continuing or ending the call. Do not skip or reorder steps.
+    You are an AI voice agent calling from {clinic_name}. You are professional, polite, and empathetic. Speak in complete, natural sentences and combine related thoughts smoothly. Always wait for the patient's full response before continuing or ending the call. Do not skip or reorder steps.
 
     CLINIC DETAILS (USE AS-IS WHEN NEEDED)
-    • Website: w w w dot passion health primary care dot com
+{website_line}
     • Phone: {clinic_phone}
-    • Email: passion health physicians @ gmail dot com
+{email_line}
     • Hours: 8 a.m. to 5 p.m., Monday to Friday
     • Address: {full_address}
 
@@ -316,7 +325,7 @@ def get_call_prompt(city_name: str = "",
     CONVERSATION FLOW (STRICT ORDER)
     1) OPENING
     **IMPORTANT:** Deliver this opening line slowly and very clearly, with a distinct pause between the two parts. Wait for the patient's response before proceeding.
-    Respond to their initial greeting with: "Hi, I'm calling from [clinic name]. Am I speaking with {patient_name}?"
+    Respond to their initial greeting with: "Hi, I'm calling from {clinic_name}. Am I speaking with {patient_name}?"
 
     REMEMBER: Any greeting after this opening should be treated as a polite acknowledgment, not a conversation restart.
 
@@ -349,7 +358,7 @@ def get_call_prompt(city_name: str = "",
     RESPONSE FLOW BY INTENT
 
     • IF CONFIRM:
-    Say: "Excellent! We are glad to have you. Just a reminder to please arrive 15 minutes early for check-in. If you have any insurance changes, please email them to passion health physicians @ gmail dot com. For any other issues, you can call the office at {clinic_phone}. Do you have any questions?"
+    Say: "Excellent! We are glad to have you. Just a reminder to please arrive 15 minutes early for check-in. If you have any insurance changes, please email them to {spoken_email if spoken_email else 'our office email'}. For any other issues, you can call the office at {clinic_phone}. Do you have any questions?"
     Wait for response.
     – If they request a detail (phone, email, address, provider, date, time), provide only that item clearly (spelled out as required), then wait for acknowledgment.
     – If they simply acknowledge, say: "You're welcome. Have a great day!" End the call.
@@ -514,6 +523,24 @@ def require_admin(request: Request):
             detail="Admin access required"
         )
     return user
+
+def format_for_speech(text: str) -> str:
+    """Convert a URL or email address into a speech-friendly spoken format."""
+    if not text:
+        return text
+    # Handle email addresses
+    if "@" in text:
+        text = text.replace("@", " at ")
+        text = text.replace(".", " dot ")
+        return text.strip()
+    # Handle URLs
+    text = text.rstrip("/")
+    text = text.replace("https://", "").replace("http://", "")
+    if text.startswith("www."):
+        text = "w w w dot " + text[4:]
+    text = text.replace(".", " dot ")
+    return text.strip()
+
 
 def format_phone_number(phone_number, country_code) -> str:
     """Format phone number with the selected country code"""
@@ -797,7 +824,8 @@ def convert_utc_to_ist(utc_datetime_str):
 
 
 async def make_single_call_async(call_request: CallRequest, api_key: str,
-                                 semaphore: asyncio.Semaphore, campaign_id: Optional[str] = None, client_voice: Optional[str] = None) -> CallResult:
+                                 semaphore: asyncio.Semaphore, campaign_id: Optional[str] = None, client_voice: Optional[str] = None,
+                                 clinic_name: str = "the clinic", clinic_email: str = "", clinic_website: str = "") -> CallResult:
     """Make a single call asynchronously with concurrency control"""
     async with semaphore:  # Limit concurrent calls to 10
         call_data = {
@@ -819,13 +847,16 @@ async def make_single_call_async(call_request: CallRequest, api_key: str,
             payload = {
                 "phone_number": call_request.phone_number,
                 "task": get_call_prompt(
-                    city_name=call_request.office_location,  # This now correctly holds just the city name
-                    full_address=getattr(call_request, 'full_address', call_request.office_location), # This gets the full address we attached
+                    city_name=call_request.office_location,
+                    full_address=getattr(call_request, 'full_address', call_request.office_location),
                     patient_name=call_request.patient_name,
                     appointment_date=call_request.appointment_date,
                     appointment_time=call_request.appointment_time,
                     provider_name=call_request.provider_name,
-                    clinic_phone=getattr(call_request, 'clinic_phone', '2107426555')
+                    clinic_phone=getattr(call_request, 'clinic_phone', '2107426555'),
+                    clinic_name=clinic_name,
+                    clinic_email=clinic_email,
+                    clinic_website=clinic_website
                 ),
                 "voice": selected_voice,
                 "request_data": {
@@ -907,7 +938,8 @@ async def make_single_call_async(call_request: CallRequest, api_key: str,
                               phone_number=call_request.phone_number)
 
 
-def make_single_call(call_request: CallRequest, api_key: str, client_voice: Optional[str] = None) -> CallResult:
+def make_single_call(call_request: CallRequest, api_key: str, client_voice: Optional[str] = None,
+                     clinic_name: str = "the clinic", clinic_email: str = "", clinic_website: str = "") -> CallResult:
     """Make a single call and return the result"""
     call_data = {
         "patient name": call_request.patient_name,
@@ -928,13 +960,16 @@ def make_single_call(call_request: CallRequest, api_key: str, client_voice: Opti
         payload = {
             "phone_number": call_request.phone_number,
             "task": get_call_prompt(
-                city_name=call_request.office_location,  # This now correctly holds just the city name
-                full_address=getattr(call_request, 'full_address', call_request.office_location), # This gets the full address we attached
+                city_name=call_request.office_location,
+                full_address=getattr(call_request, 'full_address', call_request.office_location),
                 patient_name=call_request.patient_name,
                 appointment_date=call_request.appointment_date,
                 appointment_time=call_request.appointment_time,
                 provider_name=call_request.provider_name,
-                clinic_phone=getattr(call_request, 'clinic_phone', '2107426555')
+                clinic_phone=getattr(call_request, 'clinic_phone', '2107426555'),
+                clinic_name=clinic_name,
+                clinic_email=clinic_email,
+                clinic_website=clinic_website
             ),
             "voice": selected_voice,
             "request_data": call_data
@@ -1514,6 +1549,10 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
         # Prepare all call requests
         call_requests = []
         validation_failures = []
+
+        def safe_str(value):
+            return str(value).strip() if value is not None else ''
+
         for row in rows:
             row_count += 1
             # Validate required fields
@@ -1541,10 +1580,6 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
             formatted_phone = format_phone_number(phone_number_str, campaign_country_code)
             print(f"📞 Campaign {campaign['name']}: {phone_number_str} -> Formatted: {formatted_phone} (Country Code: {campaign_country_code})")
 
-            # Create call request - safely handle None values
-            def safe_str(value):
-                return str(value).strip() if value is not None else ''
-
             # Get full address for this location
             office_location_key = safe_str(row.get('office_location', ''))
 
@@ -1552,7 +1587,7 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
 
             # 1. Extract just the city name from the key for the initial prompt greeting.
             # This assumes the city name starts from index 20 in your 'office_location' column.
-            city_name = " ".join(office_location_key.split(" ")[15:]) if " " in office_location_key and len(office_location_key.split(" ")) > 20 else office_location_key
+            city_name = " ".join(office_location_key.split(" ")[20:]) if " " in office_location_key and len(office_location_key.split(" ")) > 20 else office_location_key
 
             # 2. Use the clinic_manager to find the full address for on-demand use by the AI.
             full_address = clinic_manager.find_clinic_address(office_location_key)
@@ -1583,7 +1618,8 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
                 clinic_phone=clinic_phone
             )
             call_requests.append(call_request)
-            print(f"📊 Validation complete: {len(validation_failures)} failures, {len(call_requests)} valid calls")
+
+        print(f"📊 Validation complete: {len(validation_failures)} failures, {len(call_requests)} valid calls")
 
         # Process all valid calls with retry logic and batch delays
         call_results = []
@@ -1603,7 +1639,10 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
                 retry_interval_minutes,
                 campaign['name'],
                 campaign_id,
-                client_voice # Pass client_voice here
+                client_voice,
+                clinic_name=client.get('name', 'the clinic'),
+                clinic_email=client.get('email', ''),
+                clinic_website=client.get('website_url', '')
             )
             results = validation_failures + call_results
 
@@ -1662,7 +1701,8 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
 
 
 
-async def process_calls_with_retry_and_batching(call_requests, api_key, max_attempts, retry_interval_minutes, campaign_name, campaign_id, client_voice: Optional[str] = None):
+async def process_calls_with_retry_and_batching(call_requests, api_key, max_attempts, retry_interval_minutes, campaign_name, campaign_id, client_voice: Optional[str] = None,
+                                                clinic_name: str = "the clinic", clinic_email: str = "", clinic_website: str = ""):
     """Process calls with index-based traversal and flag-based retry system"""
     print(f"🚀 Starting index-based traversal with flag-based retry system for campaign '{campaign_name}'")
     print(f"📊 Total contacts in sheet: {len(call_requests)} (Index 0 to {len(call_requests)-1})")
@@ -1739,7 +1779,8 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
 
             # Process calls sequentially instead of concurrently
             for call_data in batch:
-                await process_single_call_with_flag_indexed(call_data, api_key, semaphore, campaign_id, client_voice)
+                await process_single_call_with_flag_indexed(call_data, api_key, semaphore, campaign_id, client_voice,
+                                                             clinic_name=clinic_name, clinic_email=clinic_email, clinic_website=clinic_website)
 
                 # Mark completed immediately after each call
                 if call_data['success']:
@@ -1869,7 +1910,8 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
     return final_results
 
 
-async def process_single_call_with_flag_indexed(call_data, api_key, semaphore, campaign_id, client_voice: Optional[str] = None):
+async def process_single_call_with_flag_indexed(call_data, api_key, semaphore, campaign_id, client_voice: Optional[str] = None,
+                                                clinic_name: str = "the clinic", clinic_email: str = "", clinic_website: str = ""):
     """Process a single call and update its flag based ONLY on successful initiation."""
     call_request = call_data['call_request']
     call_data['attempts'] += 1
@@ -1879,7 +1921,8 @@ async def process_single_call_with_flag_indexed(call_data, api_key, semaphore, c
 
     try:
         # Pass campaign_id and client_voice to the async call function
-        result = await make_single_call_async(call_request, api_key, semaphore, campaign_id, client_voice)
+        result = await make_single_call_async(call_request, api_key, semaphore, campaign_id, client_voice,
+                                              clinic_name=clinic_name, clinic_email=clinic_email, clinic_website=clinic_website)
 
         # The ONLY goal here is to see if the call was successfully QUEUED.
         # The final status will be handled by the webhook.
