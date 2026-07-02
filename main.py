@@ -11,7 +11,7 @@ import aiohttp
 import uuid
 from datetime import datetime, timedelta
 import pytz
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form, Depends, status
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form, Depends, status, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -1494,9 +1494,64 @@ async def update_campaign(
     save_campaigns_db(campaigns_db)
     return {"success": True, "message": "Campaign updated successfully"}
 
+async def _run_campaign_background(campaign_id: str, campaign: dict, client: dict,
+                                   call_requests: list, validation_failures: list,
+                                   api_key: str, client_voice: Optional[str]):
+    """Background task: processes all calls and stores results after the HTTP response has been sent."""
+    try:
+        max_attempts = campaign.get('max_attempts', 3)
+        retry_interval_minutes = campaign.get('retry_interval', 30)
+
+        print(f"🚀 [BG] Starting campaign '{campaign['name']}' — {len(call_requests)} calls, max_attempts={max_attempts}")
+
+        call_results = await process_calls_with_retry_and_batching(
+            call_requests,
+            api_key,
+            max_attempts,
+            retry_interval_minutes,
+            campaign['name'],
+            campaign_id,
+            client_voice,
+            clinic_name=client.get('name', 'the clinic'),
+            clinic_email=client.get('email', ''),
+            clinic_website=client.get('website_url', '')
+        )
+
+        results = validation_failures + call_results
+        successful_calls = sum(1 for r in results if r.success)
+        failed_calls = len(results) - successful_calls
+
+        run_timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        campaign_run_id = f"{campaign_id}_run_{run_timestamp}"
+
+        campaign_results = {
+            "campaign_id": campaign_id,
+            "campaign_run_id": campaign_run_id,
+            "campaign_name": campaign['name'],
+            "client_name": client['name'],
+            "total_calls": len(results),
+            "successful_calls": successful_calls,
+            "failed_calls": failed_calls,
+            "started_at": datetime.now().isoformat(),
+            "completed_at": datetime.now().isoformat(),
+            "status": "completed",
+            "run_number": len([k for k in campaign_results_db.keys() if k.startswith(campaign_id)]) + 1,
+            "results": [result.dict() for result in results]
+        }
+
+        campaign_results_db[campaign_run_id] = campaign_results
+        save_campaign_results_db(campaign_results_db)
+        print(f"✅ [BG] Campaign '{campaign['name']}' done. Total={len(results)}, Success={successful_calls}, Failed={failed_calls}")
+
+    except Exception as e:
+        import traceback
+        print(f"❌ [BG] Campaign '{campaign.get('name')}' background error: {e}")
+        traceback.print_exc()
+
+
 @app.post("/start_campaign/{campaign_id}")
-async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
-    """Start a campaign using stored file or new upload with retry logic"""
+async def start_campaign(campaign_id: str, background_tasks: BackgroundTasks, file: UploadFile = File(None)):
+    """Start a campaign — validates and prepares calls synchronously, then runs them in the background."""
     api_key = get_api_key()
 
     if not api_key:
@@ -1516,37 +1571,30 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
         raise HTTPException(status_code=404, detail="Client not found")
 
     client = clients_db[client_id]
-    client_voice = client.get("voice") # Get the client's preferred voice
+    client_voice = client.get("voice")
 
     try:
         # Use stored file or new upload
         if file and file.filename:
-            # New file uploaded
             if not (file.filename.endswith('.csv') or file.filename.endswith('.xlsx')):
                 raise HTTPException(status_code=400, detail="Please upload a CSV or XLSX file.")
             content = await file.read()
             filename = file.filename
         else:
-            # Use stored file
             if not campaign.get('file_data') or not campaign.get('file_name'):
                 raise HTTPException(status_code=400, detail="No file found for this campaign. Please upload a file.")
             content = campaign['file_data']
             filename = campaign['file_name']
 
         if filename.endswith('.xlsx'):
-            # Read Excel file
             df = pd.read_excel(io.BytesIO(content))
             rows = df.to_dict('records')
         else:
-            # Read CSV file
             csv_string = content.decode('utf-8')
             csv_reader = csv.DictReader(io.StringIO(csv_string))
             rows = list(csv_reader)
 
-        results = []
-        row_count = 0
-
-        # Prepare all call requests
+        # Validate and prepare call requests synchronously before returning
         call_requests = []
         validation_failures = []
 
@@ -1554,15 +1602,8 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
             return str(value).strip() if value is not None else ''
 
         for row in rows:
-            row_count += 1
-            # Validate required fields
-            required_fields = [
-                'phone_number', 'patient_name', 'date', 'time', 'provider_name', 'office_location'
-            ]
-            missing_fields = [
-                field for field in required_fields
-                if not str(row.get(field, '')).strip()
-            ]
+            required_fields = ['phone_number', 'patient_name', 'date', 'time', 'provider_name', 'office_location']
+            missing_fields = [f for f in required_fields if not str(row.get(f, '')).strip()]
 
             if missing_fields:
                 validation_failures.append(
@@ -1573,122 +1614,56 @@ async def start_campaign(campaign_id: str, file: UploadFile = File(None)):
                         phone_number=row.get('phone_number', 'Unknown')))
                 continue
 
-            # Format phone number with campaign's country code
             phone_number_raw = row.get('phone_number', '')
             phone_number_str = str(phone_number_raw).strip() if phone_number_raw is not None else ''
             campaign_country_code = campaign.get('country_code', '+1') or '+1'
             formatted_phone = format_phone_number(phone_number_str, campaign_country_code)
-            print(f"📞 Campaign {campaign['name']}: {phone_number_str} -> Formatted: {formatted_phone} (Country Code: {campaign_country_code})")
 
-            # Get full address for this location
             office_location_key = safe_str(row.get('office_location', ''))
-
-            # --- NEW LOGIC TO SEPARATE CITY AND FULL ADDRESS ---
-
-            # 1. Extract just the city name from the key for the initial prompt greeting.
-            # This assumes the city name starts from index 20 in your 'office_location' column.
             city_name = " ".join(office_location_key.split(" ")[20:]) if " " in office_location_key and len(office_location_key.split(" ")) > 20 else office_location_key
 
-            # 2. Use the clinic_manager to find the full address for on-demand use by the AI.
-            full_address = clinic_manager.find_clinic_address(office_location_key)
+            full_address = clinic_manager.find_clinic_address(office_location_key) or office_location_key
+            clinic_phone = clinic_manager.find_clinic_phone(office_location_key) or "2107426555"
 
-            if not full_address:
-                print(f"⚠️ Full address not found for key '{office_location_key}'. Using the key as a fallback for the address.")
-                full_address = office_location_key # Use the original value if lookup fails
-
-            # 3. Use the clinic_manager to find the clinic phone number for this location.
-            clinic_phone = clinic_manager.find_clinic_phone(office_location_key)
-
-            if not clinic_phone:
-                print(f"⚠️ Clinic phone number not found for key '{office_location_key}'. Using default phone number.")
-                clinic_phone = "2107426555"  # Use the default phone number if lookup fails
-
-            print(f"📍 Location Mapping: For greeting, AI will use city='{city_name}'. If asked, it will use address='{full_address}' and phone='{clinic_phone}'")
-
-            # Create the request object
-            call_request = CallRequest(
+            call_requests.append(CallRequest(
                 phone_number=formatted_phone,
                 patient_name=safe_str(row.get('patient_name', '')),
                 provider_name=safe_str(row.get('provider_name', '')),
                 appointment_date=safe_str(row.get('date', '')),
                 appointment_time=safe_str(row.get('time', '')),
-                office_location=city_name,  # Pass the CITY NAME to the object
+                office_location=city_name,
                 full_address=full_address,
                 office_location_key=office_location_key,
                 clinic_phone=clinic_phone
-            )
-            call_requests.append(call_request)
+            ))
 
         print(f"📊 Validation complete: {len(validation_failures)} failures, {len(call_requests)} valid calls")
 
-        # Process all valid calls with retry logic and batch delays
-        call_results = []
-        if call_requests:
-            max_attempts = campaign.get('max_attempts', 3)
-            retry_interval_minutes = campaign.get('retry_interval', 30)
+        if not call_requests and not validation_failures:
+            raise HTTPException(status_code=400, detail="No valid rows found in the file.")
 
-            print(f"🚀 Starting campaign '{campaign['name']}' with retry logic - Max attempts: {max_attempts}, Retry interval: {retry_interval_minutes} min")
-            print(f"📊 Total calls to process: {len(call_requests)} (with international rate limit protection)")
-            print(f"🌍 International rate limit protection: 2 concurrent calls, 30s batch delays, extended retry intervals")
-
-            # Process calls with retry logic and batch delays
-            call_results = await process_calls_with_retry_and_batching(
-                call_requests,
-                api_key,
-                max_attempts,
-                retry_interval_minutes,
-                campaign['name'],
-                campaign_id,
-                client_voice,
-                clinic_name=client.get('name', 'the clinic'),
-                clinic_email=client.get('email', ''),
-                clinic_website=client.get('website_url', '')
-            )
-            results = validation_failures + call_results
-
-        # Calculate summary
-        successful_calls = sum(1 for r in results if r.success)
-        failed_calls = len(results) - successful_calls
-
-        # Create a unique run ID for this campaign execution
-        run_timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        campaign_run_id = f"{campaign_id}_run_{run_timestamp}"
-
-        # Store campaign results with unique run ID
-        campaign_results = {
-            "campaign_id": campaign_id,
-            "campaign_run_id": campaign_run_id,
-            "campaign_name": campaign['name'],
-            "client_name": client['name'],
-            "total_calls": len(results),
-            "successful_calls": successful_calls,
-            "failed_calls": failed_calls,
-            "started_at": datetime.now().isoformat(),
-            "completed_at": datetime.now().isoformat(),
-            "status": "completed",
-            "run_number": len([k for k in campaign_results_db.keys() if k.startswith(campaign_id)]) + 1,
-            "results": [result.dict() for result in results]
-        }
-
-        # Store in the global results database with unique run ID
-        campaign_results_db[campaign_run_id] = campaign_results
-        save_campaign_results_db(campaign_results_db)
-        print(f"✅ Stored campaign results for {campaign_id}. Total campaigns with results: {len(campaign_results_db)}")
-        print(f"✅ This campaign results: Total={len(results)}, Success={successful_calls}, Failed={failed_calls}")
+        # Schedule the calls to run in the background and return immediately
+        background_tasks.add_task(
+            _run_campaign_background,
+            campaign_id, campaign, client,
+            call_requests, validation_failures,
+            api_key, client_voice
+        )
 
         return {
             "success": True,
+            "status": "started",
             "campaign_id": campaign_id,
             "campaign_name": campaign['name'],
-            "total_calls": len(results),
-            "successful_calls": successful_calls,
-            "failed_calls": failed_calls,
-            "results": [result.dict() for result in results]
+            "total_queued": len(call_requests),
+            "validation_failures": len(validation_failures),
+            "message": f"Campaign started. {len(call_requests)} calls are being processed in the background."
         }
 
+    except HTTPException:
+        raise
     except Exception as e:
         print(f"❌ Error starting campaign {campaign_id}: {str(e)}")
-        print(f"❌ Campaign details: {campaign.get('name', 'Unknown')} for client {campaign.get('client_id', 'Unknown')}")
         import traceback
         traceback.print_exc()
 

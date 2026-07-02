@@ -2422,16 +2422,19 @@
                 const result = await response.json();
 
                 if (result.success) {
-                    alert(`Campaign started successfully! Total calls: ${result.total_calls}, Successful: ${result.successful_calls}, Failed: ${result.failed_calls}`);
+                    const queued = result.total_queued || 0;
+                    const failed = result.validation_failures || 0;
+                    let msg = `Campaign started! ${queued} call${queued !== 1 ? 's' : ''} are being processed in the background.`;
+                    if (failed > 0) msg += ` (${failed} row${failed !== 1 ? 's' : ''} skipped due to missing fields)`;
+                    msg += '\n\nRefresh the page in a few minutes to see the results.';
+                    alert(msg);
                     closeStartCampaignModal();
-                    // Refresh the page to show updated results
-                    window.location.reload();
                 } else {
                     alert('Error starting campaign: ' + (result.detail || result.message || 'Unknown error'));
                 }
             } catch (error) {
                 console.error('Campaign start error:', error);
-                alert('Error starting campaign: ' + error.message);
+                alert('Error starting campaign: ' + (error.message || 'Unknown error'));
             }
             });
         }
