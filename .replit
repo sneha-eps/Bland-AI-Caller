@@ -1,9 +1,9 @@
-run = "uvicorn main:app --host 0.0.0.0 --port 5000"
+run = "cd backend && uvicorn main:app --host 0.0.0.0 --port 5000"
 modules = ["python-3.11"]
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "5000"]
+run = ["sh", "-c", "cd backend && uvicorn main:app --host 0.0.0.0 --port 5000"]
 
 [nix]
 channel = "stable-25_05"
@@ -19,7 +19,7 @@ mode = "sequential"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "python main.py"
+args = "cd backend && python main.py"
 
 [[workflows.workflow]]
 name = "Run FastAPI App"
@@ -28,7 +28,7 @@ mode = "sequential"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "uvicorn main:app --host 0.0.0.0 --port 5000 --reload"
+args = "cd backend && uvicorn main:app --host 0.0.0.0 --port 5000 --reload"
 
 [[workflows.workflow]]
 name = "Install and Run"
@@ -37,11 +37,11 @@ mode = "sequential"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "pip install -r requirements.txt"
+args = "cd backend && pip install -r requirements.txt"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "uvicorn main:app --host 0.0.0.0 --port 5000 --reload"
+args = "cd backend && uvicorn main:app --host 0.0.0.0 --port 5000 --reload"
 
 [[workflows.workflow]]
 name = "Project"
@@ -58,7 +58,7 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "uvicorn main:app --host 0.0.0.0 --port 5000 --reload"
+args = "cd backend && uvicorn main:app --host 0.0.0.0 --port 5000 --reload"
 waitForPort = 5000
 
 [workflows.workflow.metadata]

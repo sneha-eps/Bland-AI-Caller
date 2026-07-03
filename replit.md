@@ -10,26 +10,30 @@ Preferred communication style: Simple, everyday language.
 
 ## Backend Architecture
 - **Framework**: FastAPI with Python 3.11
-- **Architecture Pattern**: Monolithic web application with file-based data storage
+- **Architecture Pattern**: Monolithic web application (`backend/main.py`), MongoDB-backed persistence
 - **API Design**: RESTful endpoints for CRUD operations on clients, campaigns, and call results
-- **Authentication**: Session-based authentication with JSON file storage for users
+- **Authentication**: Session-based authentication with sessions stored in MongoDB (TTL-indexed, auto-expiring)
 - **File Processing**: CSV/Excel file upload and processing for patient contact lists
 
 ## Frontend Architecture
+- **Location**: `frontend/` (templates + static assets, served by the FastAPI app in `backend/`)
 - **Template Engine**: Jinja2 templates for server-side rendering
 - **Styling**: Custom CSS with theme support (light/dark mode)
 - **UI Framework**: Custom responsive design with Font Awesome icons
 - **Client-Side**: Vanilla JavaScript for interactive elements
 
 ## Data Storage
-- **Primary Storage**: JSON files in the `data/` directory for persistence
-  - `users.json`: User authentication data
-  - `clients.json`: Healthcare client information
-  - `campaigns.json`: Campaign configurations
-  - `campaign_results.json`: Call results and analytics
-  - `sessions.json`: User session management
-- **File Uploads**: Base64 encoding for CSV/Excel files stored within campaign records
-- **Clinic Data**: Excel/CSV files for clinic location mappings via `ClinicDataManager`
+- **Primary Storage**: MongoDB (see `MONGO_URI`/`DB_NAME` in `.env`), one collection per entity:
+  - `users`: User authentication data
+  - `clients`: Healthcare client information
+  - `campaigns`: Campaign configurations (uploaded file bytes stored natively)
+  - `campaign_results`: Call results and analytics
+  - `sessions`: User session management
+- **Legacy backup**: `backend/data/*.json` - the original file-based storage, kept as a
+  point-in-time backup from before the MongoDB migration; no longer read by the app.
+  `backend/migrate_json_to_mongo.py` is the one-off script that performed the migration.
+- **Clinic Data**: Excel/CSV files for clinic location mappings via `ClinicDataManager`,
+  sourced from `backend/clinic_source_data/`
 
 ## Core Business Logic
 - **Campaign Management**: Create, configure, and execute calling campaigns with retry logic
