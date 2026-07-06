@@ -4825,4 +4825,5 @@ async def get_docs():
 
 if __name__ == "__main__":
     import uvicorn
+    print("Hi, vrsion2 here")
     uvicorn.run(app, host="0.0.0.0", port=5000)
