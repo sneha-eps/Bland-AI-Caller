@@ -9,9 +9,10 @@ import time
 import asyncio
 import aiohttp
 import uuid
+from collections import defaultdict
 from datetime import datetime, timedelta
 import pytz
-from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form, Depends, status, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Request, UploadFile, File, Form, Depends, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -65,6 +66,26 @@ campaign_results_db = {}
 campaign_logs = {}
 campaign_results_lock = asyncio.Lock()
 
+# Tracks currently-running campaign background tasks, keyed by campaign_id,
+# so start_campaign can detect an in-flight run and offer to stop+restart it.
+running_campaigns: Dict[str, dict] = {}   # campaign_id -> {"task", "stop_event", "started_at"}
+campaign_start_locks: Dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
+
+
+class CampaignStoppedError(Exception):
+    """Raised inside process_calls_with_retry_and_batching to unwind the retry
+    loop cooperatively when a force-restart requests this run to stop."""
+    pass
+
+
+async def _interruptible_sleep(stop_event: asyncio.Event, seconds: float) -> bool:
+    """Sleep for `seconds`, returning True early if stop_event fires before the full duration elapses."""
+    try:
+        await asyncio.wait_for(stop_event.wait(), timeout=seconds)
+        return True
+    except asyncio.TimeoutError:
+        return False
+
 
 
 # MongoDB connection - persistent storage backing the dicts above.
@@ -90,6 +111,7 @@ sessions_col = mongo_db["sessions"]
 clients_col = mongo_db["clients"]
 campaigns_col = mongo_db["campaigns"]
 campaign_results_col = mongo_db["campaign_results"]
+client_locations_col = mongo_db["client_locations"]
 
 # Auto-expire sessions once their expiry passes (MongoDB TTL index runs its
 # cleanup sweep roughly once a minute - loading still filters defensively).
@@ -116,6 +138,17 @@ def load_users_db():
     """Load users from Mongo, or create default users if the collection is empty"""
     data = _load_collection(users_col)
     if data:
+        # Backfill client_id on any user document that predates multi-tenancy,
+        # so every subsequent read can assume the key exists (None = admin or
+        # not-yet-assigned; a role="user" account with client_id None sees
+        # nothing, fail-closed, until an admin assigns it a client).
+        backfilled = False
+        for user in data.values():
+            if "client_id" not in user:
+                user["client_id"] = None
+                backfilled = True
+        if backfilled:
+            save_users_db(data)
         return data
 
     # Default users if the collection is empty (first run)
@@ -126,6 +159,7 @@ def load_users_db():
             "password_hash": hashlib.sha256("admin123".encode()).hexdigest(),
             "role": "admin",
             "email": "admin@company.com",
+            "client_id": None,
             "created_at": datetime.now().isoformat()
         },
         "user": {
@@ -134,6 +168,7 @@ def load_users_db():
             "password_hash": hashlib.sha256("user123".encode()).hexdigest(),
             "role": "user",
             "email": "user@company.com",
+            "client_id": None,
             "created_at": datetime.now().isoformat()
         }
     }
@@ -169,9 +204,31 @@ def save_clients_db(clients_data):
     """Save clients to Mongo"""
     _sync_collection(clients_col, clients_data)
 
+def load_client_locations_db():
+    """Load client locations from Mongo"""
+    return _load_collection(client_locations_col)
+
+def save_client_locations_db(locations_data):
+    """Save client locations to Mongo"""
+    _sync_collection(client_locations_col, locations_data)
+
 def load_campaigns_db():
-    """Load campaigns from Mongo (file_data is stored/returned as native bytes)"""
-    return _load_collection(campaigns_col)
+    """Load campaigns from Mongo (file_data is stored/returned as native bytes).
+    Backfills language/call_type/voice from each campaign's client for any
+    campaign that predates moving those fields onto Campaign; independently
+    editable from then on."""
+    data = _load_collection(campaigns_col)
+    backfilled = False
+    for campaign in data.values():
+        if "language" not in campaign or "call_type" not in campaign or "voice" not in campaign:
+            client = clients_db.get(campaign.get("client_id"), {})
+            campaign.setdefault("language", client.get("language", ""))
+            campaign.setdefault("call_type", client.get("call_type", ""))
+            campaign.setdefault("voice", client.get("voice", ""))
+            backfilled = True
+    if backfilled:
+        save_campaigns_db(data)
+    return data
 
 def save_campaigns_db(campaigns_data):
     """Save campaigns to Mongo"""
@@ -191,8 +248,9 @@ sessions_db = load_sessions_db()
 clients_db = load_clients_db()
 campaigns_db = load_campaigns_db()
 campaign_results_db = load_campaign_results_db()
+client_locations_db = load_client_locations_db()
 
-print(f"✅ Loaded {len(users_db)} users, {len(sessions_db)} sessions, {len(clients_db)} clients, {len(campaigns_db)} campaigns, {len(campaign_results_db)} campaign results from persistent storage")
+print(f"✅ Loaded {len(users_db)} users, {len(sessions_db)} sessions, {len(clients_db)} clients, {len(campaigns_db)} campaigns, {len(campaign_results_db)} campaign results, {len(client_locations_db)} client locations from persistent storage")
 
 security = HTTPBasic()
 
@@ -390,6 +448,7 @@ class CallRequest(BaseModel):
     full_address: Optional[str] = None
     office_location_key: Optional[str] = None
     clinic_phone: Optional[str] = None
+    clinic_email: Optional[str] = None
 
 
 class CallResult(BaseModel):
@@ -412,9 +471,29 @@ class Client(BaseModel):
     phone_number: str
     email: str
     website_url: str
-    language: str
-    call_type: str
-    voice: str
+
+
+class ClientLocation(BaseModel):
+    id: Optional[str] = None
+    client_id: str
+    location_name: str
+    address: str
+    phone_number: str = ""
+    email: str = ""
+
+
+class ClientLocationCreate(BaseModel):
+    location_name: str
+    address: str
+    phone_number: str = ""
+    email: str = ""
+
+
+class ClientLocationUpdate(BaseModel):
+    location_name: str
+    address: str
+    phone_number: str = ""
+    email: str = ""
 
 
 class Campaign(BaseModel):
@@ -424,6 +503,9 @@ class Campaign(BaseModel):
     max_attempts: int
     retry_interval: int
     country_code: str
+    language: str
+    call_type: str
+    voice: str
     file_name: Optional[str] = None
     file_data: Optional[bytes] = None
 
@@ -432,6 +514,7 @@ class UserCreate(BaseModel):
     password: str
     email: str
     role: str = "user"
+    client_id: Optional[str] = None
 
 class UserLogin(BaseModel):
     username: str
@@ -492,6 +575,54 @@ def require_admin(request: Request):
             detail="Admin access required"
         )
     return user
+
+_UNASSIGNED_SCOPE = "__no_client_assigned__"  # never matches a real client_id
+
+def get_scope_client_id(user: Dict) -> Optional[str]:
+    """None = unrestricted (admin) - the only case where this returns None.
+    A non-admin always gets a non-None scope back: their real client_id, or
+    a sentinel that can never match a real client_id if they haven't been
+    assigned one yet, so every `scope is not None` check downstream still
+    correctly restricts them (fail-closed) instead of being mistaken for
+    an unrestricted admin."""
+    if user["role"] == "admin":
+        return None
+    return user.get("client_id") or _UNASSIGNED_SCOPE
+
+def filter_clients_for_user(clients: List[Dict], user: Dict) -> List[Dict]:
+    scope = get_scope_client_id(user)
+    if scope is None:
+        return clients
+    return [c for c in clients if c.get("id") == scope]
+
+def filter_campaigns_for_user(campaigns: List[Dict], user: Dict) -> List[Dict]:
+    scope = get_scope_client_id(user)
+    if scope is None:
+        return campaigns
+    return [c for c in campaigns if c.get("client_id") == scope]
+
+def result_client_id(result_doc: Dict) -> Optional[str]:
+    """Resolve the client_id that owns a campaign_results_db entry. Prefers an
+    explicit client_id stored on the doc itself (present on CSV-upload runs)
+    over a campaigns_db join, since the owning campaign can be deleted."""
+    if result_doc.get("client_id"):
+        return result_doc["client_id"]
+    campaign = campaigns_db.get(result_doc.get("campaign_id"))
+    return campaign.get("client_id") if campaign else None
+
+def filter_campaign_results_for_user(results_db: Dict[str, Dict], user: Dict) -> Dict[str, Dict]:
+    scope = get_scope_client_id(user)
+    if scope is None:
+        return results_db
+    return {k: v for k, v in results_db.items() if result_client_id(v) == scope}
+
+def user_display(user: Dict) -> Dict:
+    """Attach a resolved client_name for template rendering (current_user
+    only carries client_id natively)."""
+    u = dict(user)
+    if u.get("client_id"):
+        u["client_name"] = clients_db.get(u["client_id"], {}).get("name")
+    return u
 
 def format_for_speech(text: str) -> str:
     """Convert a URL or email address into a speech-friendly spoken format."""
@@ -806,6 +937,34 @@ def convert_utc_to_ist(utc_datetime_str):
         return "Invalid Date"
 
 
+def parse_datetime_for_sorting(datetime_str) -> datetime:
+    """Parse a call timestamp for sort-key purposes, tolerating the several
+    shapes 'created_at' can arrive in: raw ISO (from campaign_results before
+    IST conversion), '%Y-%m-%d %I:%M:%S %p IST' (after convert_utc_to_ist),
+    or an unparseable fallback string (e.g. 'Invalid Date', 'N/A') - any of
+    which sort to the very back rather than raising."""
+    if not datetime_str or not isinstance(datetime_str, str):
+        return datetime.min
+    cleaned = datetime_str.strip()
+    if not cleaned or cleaned in ('Unknown', 'N/A', 'Invalid Date'):
+        return datetime.min
+    try:
+        # Check the IST-suffixed shape first and specifically - a naive
+        # 'T' in cleaned check also matches the letter T inside "IST" itself.
+        if cleaned.upper().endswith('IST'):
+            return datetime.strptime(cleaned[:-3].strip(), '%Y-%m-%d %I:%M:%S %p')
+        if re.match(r'^\d{4}-\d{2}-\d{2}T', cleaned):
+            iso_str = cleaned.replace('Z', '+00:00')
+            if len(iso_str) >= 6 and iso_str[-6] not in '+-':
+                iso_str += '+00:00'
+            # Drop tzinfo so this always compares against the naive
+            # datetimes the IST/plain-ISO branches below produce.
+            return datetime.fromisoformat(iso_str).replace(tzinfo=None)
+        return datetime.fromisoformat(cleaned).replace(tzinfo=None)
+    except (ValueError, TypeError):
+        return datetime.min
+
+
 async def make_single_call_async(call_request: CallRequest, api_key: str,
                                  semaphore: asyncio.Semaphore, campaign_id: Optional[str] = None, client_voice: Optional[str] = None,
                                  clinic_name: str = "the clinic", clinic_email: str = "", clinic_website: str = "") -> CallResult:
@@ -838,7 +997,7 @@ async def make_single_call_async(call_request: CallRequest, api_key: str,
                     provider_name=call_request.provider_name,
                     clinic_phone=getattr(call_request, 'clinic_phone', '2107426555'),
                     clinic_name=clinic_name,
-                    clinic_email=clinic_email,
+                    clinic_email=getattr(call_request, 'clinic_email', None) or clinic_email,
                     clinic_website=clinic_website
                 ),
                 "voice": selected_voice,
@@ -1026,8 +1185,13 @@ def make_single_call(call_request: CallRequest, api_key: str, client_voice: Opti
 
 
 @app.post("/make-call")
-async def make_call(call_request: CallRequest, country_code: str = "+1", client_id: Optional[str] = None):
+async def make_call(request: Request, call_request: CallRequest, country_code: str = "+1", client_id: Optional[str] = None):
     """Make a single call"""
+    user = require_auth(request)
+    scope = get_scope_client_id(user)
+    if scope is not None:
+        client_id = scope
+
     api_key = get_api_key()
 
     if not api_key:
@@ -1087,16 +1251,6 @@ async def login_page(request: Request):
 
     return templates.TemplateResponse("login.html", {"request": request})
 
-@app.get("/signup", response_class=HTMLResponse)
-async def signup_page(request: Request):
-    """Signup page"""
-    # Check if user is already logged in
-    user = get_current_user(request)
-    if user:
-        return RedirectResponse(url="/", status_code=302)
-
-    return templates.TemplateResponse("signup.html", {"request": request})
-
 @app.post("/api/login")
 async def login(request: Request, username: str = Form(...), password: str = Form(...)):
     """Handle login"""
@@ -1129,48 +1283,6 @@ async def login(request: Request, username: str = Form(...), password: str = For
     except Exception as e:
         return {"success": False, "message": f"Login error: {str(e)}"}
 
-@app.post("/api/signup")
-async def signup(request: Request, user_data: UserCreate):
-    """Handle signup"""
-    try:
-        # Check if username already exists
-        for existing_user in users_db.values():
-            if existing_user["username"] == user_data.username:
-                return {"success": False, "message": "Username already exists"}
-
-        # Create new user
-        user_id = str(uuid.uuid4())
-        new_user = {
-            "id": user_id,
-            "username": user_data.username,
-            "password_hash": hash_password(user_data.password),
-            "role": user_data.role,
-            "email": user_data.email,
-            "created_at": datetime.now().isoformat()
-        }
-
-        users_db[user_id] = new_user
-        save_users_db(users_db)
-
-        # Create session
-        session_token = create_session(user_id)
-
-        # Create response with session cookie
-        from fastapi.responses import JSONResponse
-        response_data = {"success": True, "message": "Account created successfully", "redirect_url": "/"}
-        response = JSONResponse(content=response_data)
-        response.set_cookie(
-            key="session_token",
-            value=session_token,
-            httponly=True,
-            secure=False,  # Set to True in production with HTTPS
-            samesite="lax",
-            max_age=24 * 60 * 60  # 24 hours
-        )
-        return response
-    except Exception as e:
-        return {"success": False, "message": f"Signup error: {str(e)}"}
-
 @app.post("/api/logout")
 async def logout(request: Request):
     """Handle logout"""
@@ -1195,9 +1307,10 @@ async def dashboard(request: Request):
 
     api_key = get_api_key()
 
-    # Load clients and campaigns data for dashboard
-    clients = load_clients()
-    campaigns_raw = load_campaigns()
+    # Load clients and campaigns data for dashboard, scoped to this user's client
+    clients = filter_clients_for_user(load_clients(), user)
+    campaigns_raw = filter_campaigns_for_user(load_campaigns(), user)
+    scoped_results_db = filter_campaign_results_for_user(campaign_results_db, user)
 
     # Remove file data from campaigns to make them JSON serializable
     campaigns = []
@@ -1218,7 +1331,7 @@ async def dashboard(request: Request):
 
     # --- THIS IS THE CORRECTED LOGIC ---
     # Aggregate data from all campaign results (including multiple runs)
-    for result_key, campaign_results in campaign_results_db.items():
+    for result_key, campaign_results in scoped_results_db.items():
         if 'results' in campaign_results:
             total_calls += len(campaign_results['results'])
 
@@ -1249,7 +1362,7 @@ async def dashboard(request: Request):
         "metrics": metrics,
         "clients": clients,
         "campaigns": campaigns,
-        "current_user": user
+        "current_user": user_display(user)
     })
 
 
@@ -1265,14 +1378,14 @@ async def upload_page(request: Request):
 
 @app.get("/clients", response_class=HTMLResponse)
 async def clients_page(request: Request):
-    """Clients management page"""
-    user = require_auth(request)
+    """Clients management page (admin only)"""
+    user = require_admin(request)
     api_key = get_api_key()
     return templates.TemplateResponse("clients.html", {
         "request": request,
         "has_api_key": bool(api_key),
         "clients": list(clients_db.values()),
-        "current_user": user
+        "current_user": user_display(user)
     })
 
 # Helper functions to load data (mimicking database interaction)
@@ -1286,10 +1399,19 @@ def load_campaigns():
 @app.get("/campaigns", response_class=HTMLResponse)
 async def campaigns_page(request: Request, client_id: Optional[str] = None, client_name: Optional[str] = None):
     """Display campaigns page"""
+    user = require_auth(request)
+
+    # Non-admins are always confined to their own client, regardless of what
+    # client_id/client_name is passed in the URL (closes the "guess another
+    # client's id" hole).
+    scope = get_scope_client_id(user)
+    if scope is not None:
+        client_id = scope
+        client_name = clients_db.get(scope, {}).get("name")
+
     try:
-        user = require_auth(request)
-        clients = load_clients()
-        campaigns = load_campaigns()
+        clients = filter_clients_for_user(load_clients(), user)
+        campaigns = filter_campaigns_for_user(load_campaigns(), user)
         has_api_key = bool(get_api_key())
 
         # Filter campaigns by client if client_id is provided
@@ -1316,7 +1438,7 @@ async def campaigns_page(request: Request, client_id: Optional[str] = None, clie
             "has_api_key": has_api_key,
             "filtered_client_id": client_id,
             "filtered_client_name": client_name,
-            "current_user": user
+            "current_user": user_display(user)
         })
     except Exception as e:
         print(f"Error in campaigns_page: {str(e)}")
@@ -1370,10 +1492,172 @@ async def delete_client(request: Request, client_id: str):
             del campaign_results_db[result_key]
         save_campaign_results_db(campaign_results_db)
 
+    # Delete all locations associated with this client
+    locations_to_delete = [
+        location_id for location_id, location in client_locations_db.items()
+        if location.get("client_id") == client_id
+    ]
+    for location_id in locations_to_delete:
+        del client_locations_db[location_id]
+    save_client_locations_db(client_locations_db)
+
     return {
         "success": True,
         "message": f"Client '{client_name}' and {len(campaigns_to_delete)} associated campaigns deleted successfully"
     }
+
+
+def get_locations_for_client(client_id: str) -> List[Dict]:
+    """Return all saved locations belonging to a client."""
+    return [loc for loc in client_locations_db.values() if loc.get("client_id") == client_id]
+
+
+def find_client_location(client_id: str, location_key: str) -> Optional[Dict]:
+    """Case-insensitive match of a CSV/manual-entry row's office_location
+    string against a client's saved location_name values. Returns None if
+    no client_id, no location_key, or no match - callers fall back from
+    there to the client's own defaults."""
+    if not client_id or not location_key:
+        return None
+    key_lower = location_key.strip().lower()
+    for loc in client_locations_db.values():
+        if loc.get("client_id") == client_id and loc.get("location_name", "").strip().lower() == key_lower:
+            return loc
+    return None
+
+
+@app.get("/api/clients/{client_id}/locations")
+async def get_client_locations(request: Request, client_id: str):
+    """List all locations for a client (admin only)"""
+    require_admin(request)
+    if client_id not in clients_db:
+        raise HTTPException(status_code=404, detail="Client not found")
+    locations = get_locations_for_client(client_id)
+    return {"success": True, "locations": locations}
+
+
+@app.post("/api/clients/{client_id}/locations")
+async def add_client_location(request: Request, client_id: str, location: ClientLocationCreate):
+    """Add a new location for a client (admin only)"""
+    require_admin(request)
+    if client_id not in clients_db:
+        raise HTTPException(status_code=404, detail="Client not found")
+
+    name_lower = location.location_name.strip().lower()
+    if any(
+        loc.get("client_id") == client_id and loc.get("location_name", "").strip().lower() == name_lower
+        for loc in client_locations_db.values()
+    ):
+        raise HTTPException(status_code=400, detail="A location with this name already exists for this client")
+
+    location_id = str(uuid.uuid4())
+    client_locations_db[location_id] = {
+        "id": location_id,
+        "client_id": client_id,
+        "location_name": location.location_name.strip(),
+        "address": location.address,
+        "phone_number": location.phone_number,
+        "email": location.email,
+    }
+    save_client_locations_db(client_locations_db)
+    return {"success": True, "location_id": location_id, "message": "Location added successfully"}
+
+
+@app.put("/api/clients/{client_id}/locations/{location_id}")
+async def update_client_location(request: Request, client_id: str, location_id: str, location: ClientLocationUpdate):
+    """Update an existing location for a client (admin only)"""
+    require_admin(request)
+    if client_id not in clients_db:
+        raise HTTPException(status_code=404, detail="Client not found")
+    if location_id not in client_locations_db or client_locations_db[location_id].get("client_id") != client_id:
+        raise HTTPException(status_code=404, detail="Location not found")
+
+    name_lower = location.location_name.strip().lower()
+    if any(
+        loc_id != location_id and loc.get("client_id") == client_id
+        and loc.get("location_name", "").strip().lower() == name_lower
+        for loc_id, loc in client_locations_db.items()
+    ):
+        raise HTTPException(status_code=400, detail="A location with this name already exists for this client")
+
+    client_locations_db[location_id].update({
+        "location_name": location.location_name.strip(),
+        "address": location.address,
+        "phone_number": location.phone_number,
+        "email": location.email,
+    })
+    save_client_locations_db(client_locations_db)
+    return {"success": True, "message": "Location updated successfully"}
+
+
+@app.delete("/api/clients/{client_id}/locations/{location_id}")
+async def delete_client_location(request: Request, client_id: str, location_id: str):
+    """Delete a location for a client (admin only)"""
+    require_admin(request)
+    if location_id not in client_locations_db or client_locations_db[location_id].get("client_id") != client_id:
+        raise HTTPException(status_code=404, detail="Location not found")
+
+    del client_locations_db[location_id]
+    save_client_locations_db(client_locations_db)
+    return {"success": True, "message": "Location deleted successfully"}
+
+
+@app.post("/api/clients/{client_id}/locations/bulk")
+async def bulk_add_client_locations(request: Request, client_id: str, file: UploadFile = File(...)):
+    """Bulk-import locations for a client from an uploaded CSV/XLSX
+    (columns: location_name, address, phone_number, email). Skips rows
+    missing location_name or duplicating an existing location's name,
+    reporting counts rather than failing the whole upload (admin only)."""
+    require_admin(request)
+    if client_id not in clients_db:
+        raise HTTPException(status_code=404, detail="Client not found")
+    if not file.filename or not (file.filename.endswith('.csv') or file.filename.endswith('.xlsx')):
+        raise HTTPException(status_code=400, detail="Please upload a CSV or XLSX file.")
+
+    content = await file.read()
+    if file.filename.endswith('.xlsx'):
+        rows = pd.read_excel(io.BytesIO(content)).to_dict('records')
+    else:
+        rows = list(csv.DictReader(io.StringIO(content.decode('utf-8'))))
+
+    existing_names = {
+        loc.get("location_name", "").strip().lower()
+        for loc in client_locations_db.values()
+        if loc.get("client_id") == client_id
+    }
+
+    inserted, skipped_duplicate, skipped_missing_name = 0, 0, 0
+    for row in rows:
+        location_name = str(row.get('location_name', '') or '').strip()
+        if not location_name:
+            skipped_missing_name += 1
+            continue
+        name_lower = location_name.lower()
+        if name_lower in existing_names:
+            skipped_duplicate += 1
+            continue
+
+        location_id = str(uuid.uuid4())
+        client_locations_db[location_id] = {
+            "id": location_id,
+            "client_id": client_id,
+            "location_name": location_name,
+            "address": str(row.get('address', '') or '').strip(),
+            "phone_number": str(row.get('phone_number', '') or '').strip(),
+            "email": str(row.get('email', '') or '').strip(),
+        }
+        existing_names.add(name_lower)  # guards against dupes within the same file
+        inserted += 1
+
+    save_client_locations_db(client_locations_db)
+    return {
+        "success": True,
+        "inserted": inserted,
+        "skipped_duplicate": skipped_duplicate,
+        "skipped_missing_name": skipped_missing_name,
+        "message": f"Added {inserted} location(s), skipped {skipped_duplicate} duplicate(s) and {skipped_missing_name} row(s) missing a location name."
+    }
+
 
 @app.get("/api/users")
 async def get_users(request: Request):
@@ -1387,16 +1671,49 @@ async def get_users(request: Request):
     return {"success": True, "users": users_list}
 
 
+@app.post("/api/users")
+async def create_user(request: Request, user_data: UserCreate):
+    """Create a client-scoped user account (admin only)."""
+    require_admin(request)
+
+    if any(u["username"] == user_data.username for u in users_db.values()):
+        raise HTTPException(status_code=400, detail="Username already exists")
+
+    if user_data.role not in ("user", "admin"):
+        raise HTTPException(status_code=400, detail="Invalid role")
+
+    if user_data.role == "user" and user_data.client_id not in clients_db:
+        raise HTTPException(status_code=400, detail="A valid client_id is required for user accounts")
+
+    user_id = str(uuid.uuid4())
+    users_db[user_id] = {
+        "id": user_id,
+        "username": user_data.username,
+        "password_hash": hash_password(user_data.password),
+        "role": user_data.role,
+        "email": user_data.email,
+        "client_id": user_data.client_id if user_data.role == "user" else None,
+        "created_at": datetime.now().isoformat()
+    }
+    save_users_db(users_db)
+    return {"success": True, "user_id": user_id, "message": "User created successfully"}
+
+
 @app.post("/add_campaign")
 async def add_campaign(
+    request: Request,
     name: str = Form(...),
     client_id: str = Form(...),
     max_attempts: int = Form(...),
     retry_interval: int = Form(...),
     country_code: str = Form(...),
+    language: str = Form(...),
+    call_type: str = Form(...),
+    voice: str = Form(...),
     file: UploadFile = File(...)
 ):
     """Add a new campaign with file"""
+    user = require_auth(request)
     try:
         # Validate required fields
         if not name or not name.strip():
@@ -1404,6 +1721,10 @@ async def add_campaign(
 
         if not client_id or client_id not in clients_db:
             raise HTTPException(status_code=400, detail="Valid client is required.")
+
+        scope = get_scope_client_id(user)
+        if scope is not None and client_id != scope:
+            raise HTTPException(status_code=403, detail="Cannot create a campaign for another client.")
 
         # Validate file type
         if not file.filename or not (file.filename.endswith('.csv') or file.filename.endswith('.xlsx')):
@@ -1429,6 +1750,9 @@ async def add_campaign(
             "max_attempts": max_attempts,
             "retry_interval": retry_interval,
             "country_code": country_code,
+            "language": language,
+            "call_type": call_type,
+            "voice": voice,
             "file_name": file.filename,
             "file_data": file_content
         }
@@ -1447,19 +1771,31 @@ async def add_campaign(
 
 @app.put("/update_campaign/{campaign_id}")
 async def update_campaign(
+    request: Request,
     campaign_id: str,
     name: str = Form(...),
     client_id: str = Form(...),
     max_attempts: int = Form(...),
     retry_interval: int = Form(...),
     country_code: str = Form(...),
+    language: str = Form(...),
+    call_type: str = Form(...),
+    voice: str = Form(...),
     file: UploadFile = File(None)
 ):
     """Update an existing campaign"""
+    user = require_auth(request)
     if campaign_id not in campaigns_db:
         raise HTTPException(status_code=404, detail="Campaign not found")
 
     campaign = campaigns_db[campaign_id]
+
+    scope = get_scope_client_id(user)
+    if scope is not None:
+        if campaign.get("client_id") != scope:
+            raise HTTPException(status_code=404, detail="Campaign not found")
+        if client_id != scope:
+            raise HTTPException(status_code=403, detail="Cannot reassign a campaign to another client.")
 
     # Update basic fields
     campaign.update({
@@ -1467,7 +1803,10 @@ async def update_campaign(
         "client_id": client_id,
         "max_attempts": max_attempts,
         "retry_interval": retry_interval,
-        "country_code": country_code
+        "country_code": country_code,
+        "language": language,
+        "call_type": call_type,
+        "voice": voice
     })
 
     # Update file if provided
@@ -1517,7 +1856,8 @@ async def _store_campaign_run_result(campaign_id: str, campaign_name: str, clien
 
 async def _run_campaign_background(campaign_id: str, campaign: dict, client: dict,
                                    call_requests: list, validation_failures: list,
-                                   api_key: str, client_voice: Optional[str]):
+                                   api_key: str, client_voice: Optional[str],
+                                   stop_event: asyncio.Event):
     """Background task: processes all calls and stores results after the HTTP response has been sent."""
     campaign_name = campaign['name']
     client_name = client['name']
@@ -1539,15 +1879,23 @@ async def _run_campaign_background(campaign_id: str, campaign: dict, client: dic
                 client_voice,
                 clinic_name=client.get('name', 'the clinic'),
                 clinic_email=client.get('email', ''),
-                clinic_website=client.get('website_url', '')
+                clinic_website=client.get('website_url', ''),
+                stop_event=stop_event
             )
+
+        # "Running" should cover the real-world call outcome, not just queueing —
+        # skip this when already stopped mid-queueing so a force-restart's
+        # await on this task stays fast rather than waiting out a run being abandoned.
+        if not stop_event.is_set():
+            await poll_call_outcomes(call_results, api_key, stop_event, campaign_name)
 
         results = validation_failures + call_results
         successful_calls = sum(1 for r in results if r.success)
         failed_calls = len(results) - successful_calls
 
-        await _store_campaign_run_result(campaign_id, campaign_name, client_name, "completed", results)
-        print(f"✅ [BG] Campaign '{campaign_name}' done. Total={len(results)}, Success={successful_calls}, Failed={failed_calls}")
+        run_status = "stopped" if stop_event.is_set() else "completed"
+        await _store_campaign_run_result(campaign_id, campaign_name, client_name, run_status, results)
+        print(f"{'🛑' if run_status == 'stopped' else '✅'} [BG] Campaign '{campaign_name}' {run_status}. Total={len(results)}, Success={successful_calls}, Failed={failed_calls}")
 
     except Exception as e:
         import traceback
@@ -1557,11 +1905,19 @@ async def _run_campaign_background(campaign_id: str, campaign: dict, client: dic
             campaign_id, campaign_name, client_name, "failed",
             validation_failures, error=str(e)
         )
+    finally:
+        if running_campaigns.get(campaign_id, {}).get("task") is asyncio.current_task():
+            running_campaigns.pop(campaign_id, None)
 
 
 @app.post("/start_campaign/{campaign_id}")
-async def start_campaign(campaign_id: str, background_tasks: BackgroundTasks, file: UploadFile = File(None)):
-    """Start a campaign — validates and prepares calls synchronously, then runs them in the background."""
+async def start_campaign(request: Request, campaign_id: str, file: UploadFile = File(None), force: bool = False):
+    """Start a campaign — validates and prepares calls synchronously, then runs them in the background.
+
+    If this campaign already has a run in flight, returns already_running=True instead of
+    double-starting it, unless force=True — in which case the existing run is stopped first.
+    """
+    user = require_auth(request)
     api_key = get_api_key()
 
     if not api_key:
@@ -1575,122 +1931,162 @@ async def start_campaign(campaign_id: str, background_tasks: BackgroundTasks, fi
 
     campaign = campaigns_db[campaign_id]
 
+    scope = get_scope_client_id(user)
+    if scope is not None and campaign.get("client_id") != scope:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
     # Get client details
     client_id = campaign['client_id']
     if client_id not in clients_db:
         raise HTTPException(status_code=404, detail="Client not found")
 
     client = clients_db[client_id]
-    client_voice = client.get("voice")
+    client_voice = campaign.get("voice")
 
-    try:
-        # Use stored file or new upload
-        if file and file.filename:
-            if not (file.filename.endswith('.csv') or file.filename.endswith('.xlsx')):
-                raise HTTPException(status_code=400, detail="Please upload a CSV or XLSX file.")
-            content = await file.read()
-            filename = file.filename
-        else:
-            if not campaign.get('file_data') or not campaign.get('file_name'):
-                raise HTTPException(status_code=400, detail="No file found for this campaign. Please upload a file.")
-            content = campaign['file_data']
-            filename = campaign['file_name']
+    # Holding this lock from the "already running" check through registering the new
+    # task keeps two concurrent force-restarts for the SAME campaign from both passing
+    # the check and both spawning a run. Other campaigns never contend on this lock.
+    async with campaign_start_locks[campaign_id]:
+        existing = running_campaigns.get(campaign_id)
+        if existing and not existing["task"].done():
+            if not force:
+                return {
+                    "success": False,
+                    "already_running": True,
+                    "message": f"Campaign '{campaign['name']}' is already running (started {existing['started_at']}). Stop it and run again?"
+                }
+            # Cooperatively stop the existing run and wait for it to wind down before starting fresh.
+            existing["stop_event"].set()
+            await existing["task"]
 
-        if filename.endswith('.xlsx'):
-            df = await asyncio.to_thread(pd.read_excel, io.BytesIO(content))
-            rows = df.to_dict('records')
-        else:
-            csv_string = content.decode('utf-8')
-            csv_reader = csv.DictReader(io.StringIO(csv_string))
-            rows = list(csv_reader)
+        try:
+            # Use stored file or new upload
+            if file and file.filename:
+                if not (file.filename.endswith('.csv') or file.filename.endswith('.xlsx')):
+                    raise HTTPException(status_code=400, detail="Please upload a CSV or XLSX file.")
+                content = await file.read()
+                filename = file.filename
+            else:
+                if not campaign.get('file_data') or not campaign.get('file_name'):
+                    raise HTTPException(status_code=400, detail="No file found for this campaign. Please upload a file.")
+                content = campaign['file_data']
+                filename = campaign['file_name']
 
-        # Validate and prepare call requests synchronously before returning
-        call_requests = []
-        validation_failures = []
+            if filename.endswith('.xlsx'):
+                df = await asyncio.to_thread(pd.read_excel, io.BytesIO(content))
+                rows = df.to_dict('records')
+            else:
+                csv_string = content.decode('utf-8')
+                csv_reader = csv.DictReader(io.StringIO(csv_string))
+                rows = list(csv_reader)
 
-        def safe_str(value):
-            return str(value).strip() if value is not None else ''
+            # Validate and prepare call requests synchronously before returning
+            call_requests = []
+            validation_failures = []
 
-        for row in rows:
-            required_fields = ['phone_number', 'patient_name', 'date', 'time', 'provider_name', 'office_location']
-            missing_fields = [f for f in required_fields if not str(row.get(f, '')).strip()]
+            def safe_str(value):
+                return str(value).strip() if value is not None else ''
 
-            if missing_fields:
-                validation_failures.append(
-                    CallResult(
-                        success=False,
-                        error=f"Missing required fields: {', '.join(missing_fields)}",
-                        patient_name=row.get('patient_name', 'Unknown'),
-                        phone_number=row.get('phone_number', 'Unknown')))
-                continue
+            for row in rows:
+                required_fields = ['phone_number', 'patient_name', 'date', 'time', 'attending_doctor', 'office_location']
+                missing_fields = [f for f in required_fields if not str(row.get(f, '')).strip()]
 
-            phone_number_raw = row.get('phone_number', '')
-            phone_number_str = str(phone_number_raw).strip() if phone_number_raw is not None else ''
-            campaign_country_code = campaign.get('country_code', '+1') or '+1'
-            formatted_phone = format_phone_number(phone_number_str, campaign_country_code)
+                if missing_fields:
+                    validation_failures.append(
+                        CallResult(
+                            success=False,
+                            error=f"Missing required fields: {', '.join(missing_fields)}",
+                            patient_name=row.get('patient_name', 'Unknown'),
+                            phone_number=row.get('phone_number', 'Unknown')))
+                    continue
 
-            office_location_key = safe_str(row.get('office_location', ''))
-            city_name = extract_city_name(office_location_key)
+                phone_number_raw = row.get('phone_number', '')
+                phone_number_str = str(phone_number_raw).strip() if phone_number_raw is not None else ''
+                campaign_country_code = campaign.get('country_code', '+1') or '+1'
+                formatted_phone = format_phone_number(phone_number_str, campaign_country_code)
 
-            full_address = clinic_manager.find_clinic_address(office_location_key) or office_location_key
-            clinic_phone = clinic_manager.find_clinic_phone(office_location_key) or "2107426555"
+                office_location_key = safe_str(row.get('office_location', ''))
+                city_name = extract_city_name(office_location_key)
 
-            call_requests.append(CallRequest(
-                phone_number=formatted_phone,
-                patient_name=safe_str(row.get('patient_name', '')),
-                provider_name=safe_str(row.get('provider_name', '')),
-                appointment_date=safe_str(row.get('date', '')),
-                appointment_time=safe_str(row.get('time', '')),
-                office_location=city_name,
-                full_address=full_address,
-                office_location_key=office_location_key,
-                clinic_phone=clinic_phone
+                matched_location = find_client_location(client_id, office_location_key)
+
+                full_address = (matched_location.get('address') if matched_location else None) or office_location_key
+                clinic_phone = (
+                    (matched_location.get('phone_number') if matched_location else None)
+                    or client.get('phone_number')
+                    or "2107426555"
+                )
+                row_clinic_email = (
+                    (matched_location.get('email') if matched_location else None)
+                    or client.get('email')
+                    or ""
+                )
+
+                call_requests.append(CallRequest(
+                    phone_number=formatted_phone,
+                    patient_name=safe_str(row.get('patient_name', '')),
+                    provider_name=safe_str(row.get('attending_doctor', '')),
+                    appointment_date=safe_str(row.get('date', '')),
+                    appointment_time=safe_str(row.get('time', '')),
+                    office_location=city_name,
+                    full_address=full_address,
+                    office_location_key=office_location_key,
+                    clinic_phone=clinic_phone,
+                    clinic_email=row_clinic_email
+                ))
+
+            print(f"📊 Validation complete: {len(validation_failures)} failures, {len(call_requests)} valid calls")
+
+            if not call_requests and not validation_failures:
+                raise HTTPException(status_code=400, detail="No valid rows found in the file.")
+
+            # Schedule the calls to run in the background and return immediately.
+            # Pass snapshots so a later edit/delete of the campaign or client while this
+            # run is in flight doesn't change the name/settings the run reports against.
+            new_stop_event = asyncio.Event()
+            task = asyncio.create_task(_run_campaign_background(
+                campaign_id, dict(campaign), dict(client),
+                call_requests, validation_failures,
+                api_key, client_voice, new_stop_event
             ))
+            running_campaigns[campaign_id] = {
+                "task": task,
+                "stop_event": new_stop_event,
+                "started_at": datetime.now().isoformat()
+            }
 
-        print(f"📊 Validation complete: {len(validation_failures)} failures, {len(call_requests)} valid calls")
+            return {
+                "success": True,
+                "status": "started",
+                "campaign_id": campaign_id,
+                "campaign_name": campaign['name'],
+                "total_queued": len(call_requests),
+                "validation_failures": len(validation_failures),
+                "message": f"Campaign started. {len(call_requests)} calls are being processed in the background."
+            }
 
-        if not call_requests and not validation_failures:
-            raise HTTPException(status_code=400, detail="No valid rows found in the file.")
+        except HTTPException:
+            raise
+        except Exception as e:
+            print(f"❌ Error starting campaign {campaign_id}: {str(e)}")
+            import traceback
+            traceback.print_exc()
 
-        # Schedule the calls to run in the background and return immediately.
-        # Pass snapshots so a later edit/delete of the campaign or client while this
-        # run is in flight doesn't change the name/settings the run reports against.
-        background_tasks.add_task(
-            _run_campaign_background,
-            campaign_id, dict(campaign), dict(client),
-            call_requests, validation_failures,
-            api_key, client_voice
-        )
+            # More specific error message
+            error_detail = f"Campaign start failed: {str(e)}"
+            if "Failed to fetch" in str(e):
+                error_detail = "Network connection error - please check your API key and internet connection"
 
-        return {
-            "success": True,
-            "status": "started",
-            "campaign_id": campaign_id,
-            "campaign_name": campaign['name'],
-            "total_queued": len(call_requests),
-            "validation_failures": len(validation_failures),
-            "message": f"Campaign started. {len(call_requests)} calls are being processed in the background."
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        print(f"❌ Error starting campaign {campaign_id}: {str(e)}")
-        import traceback
-        traceback.print_exc()
-
-        # More specific error message
-        error_detail = f"Campaign start failed: {str(e)}"
-        if "Failed to fetch" in str(e):
-            error_detail = "Network connection error - please check your API key and internet connection"
-
-        raise HTTPException(status_code=500, detail=error_detail)
+            raise HTTPException(status_code=500, detail=error_detail)
 
 
 
 async def process_calls_with_retry_and_batching(call_requests, api_key, max_attempts, retry_interval_minutes, campaign_name, campaign_id, client_voice: Optional[str] = None,
-                                                clinic_name: str = "the clinic", clinic_email: str = "", clinic_website: str = ""):
+                                                clinic_name: str = "the clinic", clinic_email: str = "", clinic_website: str = "",
+                                                stop_event: Optional[asyncio.Event] = None):
     """Process calls with index-based traversal and flag-based retry system"""
+    if stop_event is None:
+        stop_event = asyncio.Event()
     print(f"🚀 Starting index-based traversal with flag-based retry system for campaign '{campaign_name}'")
     print(f"📊 Total contacts in sheet: {len(call_requests)} (Index 0 to {len(call_requests)-1})")
 
@@ -1730,97 +2126,119 @@ async def process_calls_with_retry_and_batching(call_requests, api_key, max_atte
     semaphore = asyncio.Semaphore(2)  # Reduced concurrency for international rate limits
 
     attempt_round = 0
+    stopped = False
 
-    while True:
-        attempt_round += 1
+    async def interruptible_wait(seconds, description):
+        """Sleep for `seconds`, but wake immediately and raise if a stop was requested."""
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=seconds)
+            raise CampaignStoppedError()
+        except asyncio.TimeoutError:
+            pass  # normal case: no stop requested during the wait
 
-        # Get all calls that need retry (success = False and haven't exceeded max attempts)
-        calls_to_retry = [
-            call for call in call_tracker
-            if not call['success'] and call['attempts'] < call['max_attempts']
-        ]
+    try:
+        while True:
+            if stop_event.is_set():
+                raise CampaignStoppedError()
 
-        if not calls_to_retry:
-            print(f"🎯 Flag-based retry complete! No more calls need retry.")
-            break
+            attempt_round += 1
 
-        print(f"\n🔄 RETRY ROUND {attempt_round}: Processing {len(calls_to_retry)} calls with success=False")
+            # Get all calls that need retry (success = False and haven't exceeded max attempts)
+            calls_to_retry = [
+                call for call in call_tracker
+                if not call['success'] and call['attempts'] < call['max_attempts']
+            ]
 
-        # Process calls one by one for strict international rate limits
-        batch_size = 1  # Process 1 call at a time for international numbers
+            if not calls_to_retry:
+                print(f"🎯 Flag-based retry complete! No more calls need retry.")
+                break
 
-        # Sort calls by sheet index to maintain traversal order
-        calls_to_retry_sorted = sorted(calls_to_retry, key=lambda x: x['sheet_index'])
+            print(f"\n🔄 RETRY ROUND {attempt_round}: Processing {len(calls_to_retry)} calls with success=False")
 
-        for i in range(0, len(calls_to_retry_sorted), batch_size):
-            batch = calls_to_retry_sorted[i:i + batch_size]
-            batch_start_idx = batch[0]['sheet_index']
-            batch_end_idx = batch[-1]['sheet_index']
+            # Process calls one by one for strict international rate limits
+            batch_size = 1  # Process 1 call at a time for international numbers
 
-            print(f"🔄 Processing call {i + 1} of {len(calls_to_retry_sorted)} (SEQUENTIAL)")
-            print(f"   📍 Sheet traversal: Index [{batch_start_idx:03d}] to [{batch_end_idx:03d}] (1 call at a time)")
+            # Sort calls by sheet index to maintain traversal order
+            calls_to_retry_sorted = sorted(calls_to_retry, key=lambda x: x['sheet_index'])
 
-            # Mark calls as processing
-            for call_data in batch:
-                call_data['processing_status'] = 'processing'
+            for i in range(0, len(calls_to_retry_sorted), batch_size):
+                batch = calls_to_retry_sorted[i:i + batch_size]
+                batch_start_idx = batch[0]['sheet_index']
+                batch_end_idx = batch[-1]['sheet_index']
 
-            # Process calls sequentially instead of concurrently
-            for call_data in batch:
-                await process_single_call_with_flag_indexed(call_data, api_key, semaphore, campaign_id, client_voice,
-                                                             clinic_name=clinic_name, clinic_email=clinic_email, clinic_website=clinic_website)
+                print(f"🔄 Processing call {i + 1} of {len(calls_to_retry_sorted)} (SEQUENTIAL)")
+                print(f"   📍 Sheet traversal: Index [{batch_start_idx:03d}] to [{batch_end_idx:03d}] (1 call at a time)")
 
-                # Mark completed immediately after each call
-                if call_data['success']:
-                    call_data['processing_status'] = 'completed'
-                else:
-                    call_data['processing_status'] = 'retry_needed'
+                # Mark calls as processing
+                for call_data in batch:
+                    call_data['processing_status'] = 'processing'
 
-            # Add a small delay to respect rate limits
-            if i + batch_size < len(calls_to_retry_sorted):
-                print(f"⏰ Waiting 120 seconds before next call for international rate limit protection...")
-                await asyncio.sleep(120)
+                # Process calls sequentially instead of concurrently
+                for call_data in batch:
+                    if stop_event.is_set():
+                        raise CampaignStoppedError()
 
-        # Update status counts after this round
-        for call_data in call_tracker:
-            if call_data['success'] and call_data['call_status']:
-                status = call_data['call_status']
-                if status in status_counts:
-                    # Only count once per successful call
-                    if status not in call_data.get('counted_statuses', set()):
-                        status_counts[status] += 1
-                        call_data.setdefault('counted_statuses', set()).add(status)
+                    await process_single_call_with_flag_indexed(call_data, api_key, semaphore, campaign_id, client_voice,
+                                                                 clinic_name=clinic_name, clinic_email=clinic_email, clinic_website=clinic_website)
 
-        # Check completion status and show flag breakdown
-        successful_calls = sum(1 for call in call_tracker if call['success'])
-        total_calls = len(call_tracker)
-        flag_true_calls = [c for c in call_tracker if c['success']]
-        flag_false_calls = [c for c in call_tracker if not c['success']]
+                    # Mark completed immediately after each call
+                    if call_data['success']:
+                        call_data['processing_status'] = 'completed'
+                    else:
+                        call_data['processing_status'] = 'retry_needed'
 
-        print(f"📊 Round {attempt_round} complete: {successful_calls}/{total_calls} calls successful")
-        print(f"🏁 Flag=True (Completed): {len(flag_true_calls)} calls")
-        print(f"⏳ Flag=False (Need retry): {len(flag_false_calls)} calls")
+                # Add a small delay to respect rate limits
+                if i + batch_size < len(calls_to_retry_sorted):
+                    print(f"⏰ Waiting 120 seconds before next call for international rate limit protection...")
+                    await interruptible_wait(120, "inter-call rate limit")
 
-        # Show status breakdown for Flag=True calls
-        if flag_true_calls:
-            status_breakdown = {}
-            for call in flag_true_calls:
-                status = call.get('call_status', 'unknown')
-                status_breakdown[status] = status_breakdown.get(status, 0) + 1
-            print(f"   ✅ Completed statuses: {dict(status_breakdown)}")
+            # Update status counts after this round
+            for call_data in call_tracker:
+                if call_data['success'] and call_data['call_status']:
+                    status = call_data['call_status']
+                    if status in status_counts:
+                        # Only count once per successful call
+                        if status not in call_data.get('counted_statuses', set()):
+                            status_counts[status] += 1
+                            call_data.setdefault('counted_statuses', set()).add(status)
 
-        # Show remaining retries
-        remaining_retries = [c for c in call_tracker if not c['success'] and c['attempts'] < c['max_attempts']]
-        print(f"🔄 Calls still needing retry: {len(remaining_retries)} calls")
+            # Check completion status and show flag breakdown
+            successful_calls = sum(1 for call in call_tracker if call['success'])
+            total_calls = len(call_tracker)
+            flag_true_calls = [c for c in call_tracker if c['success']]
+            flag_false_calls = [c for c in call_tracker if not c['success']]
 
-        # If there are more calls to retry, wait for retry interval + 2 extra minutes for international protection
-        remaining_retries = [c for c in call_tracker if not c['success'] and c['attempts'] < c['max_attempts']]
-        if remaining_retries:
-            extended_interval = retry_interval_minutes + 2  # Add 2 extra minutes for international rate limits
-            print(f"⏰ Waiting {extended_interval} minutes before next retry round (includes 2-min international protection)...")
-            await asyncio.sleep(extended_interval * 60)
+            print(f"📊 Round {attempt_round} complete: {successful_calls}/{total_calls} calls successful")
+            print(f"🏁 Flag=True (Completed): {len(flag_true_calls)} calls")
+            print(f"⏳ Flag=False (Need retry): {len(flag_false_calls)} calls")
 
-    # Handle calls that exhausted all attempts (send voicemail and change flag)
-    exhausted_calls = [call for call in call_tracker if not call['success'] and call['attempts'] >= call['max_attempts']]
+            # Show status breakdown for Flag=True calls
+            if flag_true_calls:
+                status_breakdown = {}
+                for call in flag_true_calls:
+                    status = call.get('call_status', 'unknown')
+                    status_breakdown[status] = status_breakdown.get(status, 0) + 1
+                print(f"   ✅ Completed statuses: {dict(status_breakdown)}")
+
+            # Show remaining retries
+            remaining_retries = [c for c in call_tracker if not c['success'] and c['attempts'] < c['max_attempts']]
+            print(f"🔄 Calls still needing retry: {len(remaining_retries)} calls")
+
+            # If there are more calls to retry, wait for retry interval + 2 extra minutes for international protection
+            remaining_retries = [c for c in call_tracker if not c['success'] and c['attempts'] < c['max_attempts']]
+            if remaining_retries:
+                extended_interval = retry_interval_minutes + 2  # Add 2 extra minutes for international rate limits
+                print(f"⏰ Waiting {extended_interval} minutes before next retry round (includes 2-min international protection)...")
+                await interruptible_wait(extended_interval * 60, "inter-round retry interval")
+    except CampaignStoppedError:
+        stopped = True
+        print(f"🛑 Campaign '{campaign_name}' stop requested — halting retry loop early (round {attempt_round}).")
+
+    # Handle calls that exhausted all attempts (send voicemail and change flag).
+    # Skipped when stopped: a force-restart means this run is being abandoned, not
+    # naturally winding down, so calls that hadn't exhausted retries yet shouldn't
+    # get a premature "gave up" voicemail.
+    exhausted_calls = [] if stopped else [call for call in call_tracker if not call['success'] and call['attempts'] >= call['max_attempts']]
     if exhausted_calls:
         print(f"📬 Processing {len(exhausted_calls)} calls that exhausted retry attempts...")
         for call_data in exhausted_calls:
@@ -1933,6 +2351,83 @@ async def process_single_call_with_flag_indexed(call_data, api_key, semaphore, c
 
     # Add a small delay to respect rate limits
     await asyncio.sleep(1)
+
+
+async def _poll_single_call_outcome(call_result: CallResult, api_key: str, semaphore: asyncio.Semaphore,
+                                    stop_event: asyncio.Event, max_wait_seconds: int = 300, poll_interval_seconds: int = 15):
+    """Poll Bland for this call's outcome until it resolves, stop is requested, or max_wait_seconds elapses.
+    Leaves call_status='initiated' on give-up/stop — /api/call_history's own live-fetch fallback
+    (fetch_fresh_call) will still resolve it later on demand, so nothing is lost by giving up early.
+
+    Known limitation: a call that fails instantly with no transcript and no duration (bad number
+    rejected mid-ring, immediate hangup) is indistinguishable from "still ringing" under this
+    heuristic, so it will poll for the full max_wait_seconds before giving up."""
+    elapsed = 0
+    async with semaphore:
+        while elapsed < max_wait_seconds:
+            if stop_event.is_set():
+                return
+            try:
+                async with aiohttp.ClientSession() as session:
+                    async with session.get(
+                        f"https://api.bland.ai/v1/calls/{call_result.call_id}",
+                        headers={"Authorization": f"Bearer {api_key}"},
+                        timeout=aiohttp.ClientTimeout(total=10)  # keep short so a force-restart isn't held up by a slow poll
+                    ) as response:
+                        if response.status == 200:
+                            call_data = await response.json()
+                            fresh_transcript = call_data.get('transcript', call_data.get('concatenated_transcript', ''))
+                            call_length = call_data.get("call_length")
+                            corrected_duration = call_data.get("corrected_duration")
+                            has_duration = (call_length not in (None, 0)) or (corrected_duration not in (None, 0)) or bool(call_data.get("duration") or call_data.get("length"))
+                            if (fresh_transcript and fresh_transcript.strip()) or has_duration:
+                                # Same extraction logic as fetch_fresh_call (/api/call_history) — reused, not reinvented.
+                                if call_length not in (None, 0):
+                                    duration = int(float(call_length) * 60)
+                                elif corrected_duration not in (None, 0):
+                                    duration = parse_duration(corrected_duration)
+                                else:
+                                    duration = parse_duration(call_data.get("duration", 0) or call_data.get("length", 0))
+
+                                if fresh_transcript and fresh_transcript.strip():
+                                    extracted_summary = extract_final_summary(fresh_transcript)
+                                    analyzed_status, standardized_summary = analyze_call_status_from_summary(extracted_summary, fresh_transcript)
+                                    call_result.transcript = fresh_transcript
+                                    call_result.call_status = analyzed_status
+                                    call_result.final_summary = standardized_summary
+                                else:
+                                    call_result.call_status = 'busy_voicemail'
+                                    call_result.final_summary = "No transcript available"
+                                call_result.duration = duration
+                                return
+                            # No transcript AND no duration yet - still ringing/in progress, keep polling.
+                        elif response.status == 404:
+                            call_result.call_status = 'busy_voicemail'
+                            call_result.final_summary = "Call not found in API"
+                            return
+            except Exception as e:
+                print(f"⚠️ Outcome poll error for call {call_result.call_id}: {e}")
+
+            if await _interruptible_sleep(stop_event, poll_interval_seconds):
+                return
+            elapsed += poll_interval_seconds
+
+    print(f"⏰ Gave up waiting for outcome of call {call_result.call_id} after {max_wait_seconds}s — call_history's live-fetch fallback will pick it up later.")
+
+
+async def poll_call_outcomes(call_results: list, api_key: str, stop_event: asyncio.Event, campaign_name: str):
+    """Wait for every successfully-queued-but-unconfirmed call in this run to resolve.
+    call_status == 'initiated' is the exact (and only) marker process_single_call_with_flag_indexed
+    sets for this state - exhausted-retry calls get 'busy_voicemail'/'failed' directly and are excluded."""
+    pending = [r for r in call_results if r.success and r.call_id and r.call_status == 'initiated']
+    if not pending:
+        return
+    print(f"⏳ Waiting for {len(pending)} call outcome(s) for campaign '{campaign_name}'...")
+    semaphore = asyncio.Semaphore(10)
+    await asyncio.gather(*(
+        _poll_single_call_outcome(r, api_key, semaphore, stop_event) for r in pending
+    ))
+
 
 # Keep the original function for backward compatibility (in case it's used elsewhere)
 async def process_calls_with_retry(call_requests, api_key, max_attempts, retry_interval_minutes, campaign_name, campaign_id):
@@ -2212,10 +2707,16 @@ async def upload_clinic_data(
 
 
 @app.post("/process_csv")
-async def process_csv(file: UploadFile = File(...),
+async def process_csv(request: Request,
+                      file: UploadFile = File(...),
                       country_code: str = Form("+1"),
                       client_id: Optional[str] = Form(None)):
     """Process CSV or XLSX file and make calls for all rows"""
+    user = require_auth(request)
+    scope = get_scope_client_id(user)
+    if scope is not None:
+        client_id = scope  # non-admins can only upload against their own client
+
     api_key = get_api_key()
 
     client_voice = None
@@ -2267,7 +2768,7 @@ async def process_csv(file: UploadFile = File(...),
             actual_row_number = row_index + 1  # 1-based numbering for user display
 
             # Validate required fields
-            required_fields = ['phone_number', 'patient_name', 'date', 'time', 'provider_name', 'office_location']
+            required_fields = ['phone_number', 'patient_name', 'date', 'time', 'attending_doctor', 'office_location']
             missing_fields = []
 
             for field in required_fields:
@@ -2328,7 +2829,7 @@ async def process_csv(file: UploadFile = File(...),
             call_request = CallRequest(
                 phone_number=formatted_phone,
                 patient_name=safe_str(row.get('patient_name', '')),
-                provider_name=safe_str(row.get('provider_name', '')),
+                provider_name=safe_str(row.get('attending_doctor', '')),
                 appointment_date=safe_str(row.get('date', '')),
                 appointment_time=safe_str(row.get('time', '')),
                 office_location=city_name,  # Pass the CITY NAME to the object
@@ -2389,6 +2890,7 @@ async def process_csv(file: UploadFile = File(...),
         csv_results = {
             "campaign_id": csv_session_id,
             "campaign_name": f"CSV Upload - {datetime.now().strftime('%Y-%m-%d %H:%M')}",
+            "client_id": client_id,
             "client_name": clinic_name if client_id else "Direct Upload",
             "total_calls": len(results),
             "successful_calls": sum(1 for r in results if r.success),
@@ -3089,8 +3591,9 @@ async def send_automatic_voicemail(call_request: CallRequest, api_key: str, clie
 
 
 @app.post("/send_voicemail")
-async def send_voicemail(call_request: CallRequest):
+async def send_voicemail(request: Request, call_request: CallRequest):
     """Send a voicemail message to a patient"""
+    require_auth(request)
     api_key = get_api_key()
 
     if not api_key:
@@ -3173,8 +3676,16 @@ async def send_voicemail(call_request: CallRequest):
 
 
 @app.get("/campaign_analytics/{campaign_id}")
-async def get_campaign_analytics(campaign_id: str):
+async def get_campaign_analytics(request: Request, campaign_id: str):
     """Get campaign analytics including performance metrics and call details"""
+    user = require_auth(request)
+    scope = get_scope_client_id(user)
+    if scope is not None and campaigns_db.get(campaign_id, {}).get("client_id") != scope:
+        return {
+            "success": False,
+            "message": f"Campaign not found. Available campaigns: {len(filter_campaigns_for_user(list(campaigns_db.values()), user))}"
+        }
+
     api_key = get_api_key()
 
     if not api_key:
@@ -3519,6 +4030,9 @@ async def get_campaign_analytics(campaign_id: str):
         # Format total duration
         formatted_duration = format_duration_display(total_duration)
 
+        # Most recent call first
+        calls_with_details.sort(key=lambda c: parse_datetime_for_sorting(c.get('created_at', '')), reverse=True)
+
         analytics = {
             'total_calls': total_calls,
             'total_duration': total_duration,
@@ -3547,8 +4061,9 @@ async def get_campaign_analytics(campaign_id: str):
 
 
 @app.get("/call_details/{call_id}")
-async def get_call_details(call_id: str):
+async def get_call_details(request: Request, call_id: str):
     """Get detailed call information including transcript"""
+    user = require_auth(request)
     api_key = get_api_key()
 
     if not api_key:
@@ -3560,18 +4075,28 @@ async def get_call_details(call_id: str):
     stored_call_data = None
     # --------------------
 
+    # First check if we have stored data in our campaign results (done outside
+    # the try/except below so the ownership check's 404 isn't swallowed by
+    # its broad `except Exception`).
+    owning_result_doc = None
+    for campaign_id, campaign_results in campaign_results_db.items():
+        for result in campaign_results.get("results", []):
+            if result.get("call_id") == call_id:
+                stored_call_data = result
+                owning_result_doc = campaign_results
+                print(f"📊 Found stored data for call {call_id} in campaign {campaign_id}")
+                break
+        if stored_call_data:
+            break
+
+    scope = get_scope_client_id(user)
+    if scope is not None:
+        owning_client_id = result_client_id(owning_result_doc) if owning_result_doc else None
+        if owning_client_id != scope:
+            raise HTTPException(status_code=404, detail="Call not found")
+
     try:
         print(f"🔍 Fetching call details for {call_id}")
-
-        # First check if we have stored data in our campaign results
-        for campaign_id, campaign_results in campaign_results_db.items():
-            for result in campaign_results.get("results", []):
-                if result.get("call_id") == call_id:
-                    stored_call_data = result
-                    print(f"📊 Found stored data for call {call_id} in campaign {campaign_id}")
-                    break
-            if stored_call_data:
-                break
 
         # Try to get fresh data from Bland AI API
         async with aiohttp.ClientSession() as session:
@@ -3689,10 +4214,11 @@ async def get_call_details(call_id: str):
 
 
 @app.get("/api/clients")
-async def get_clients_api():
-    """Get all clients data for API usage"""
+async def get_clients_api(request: Request):
+    """Get all clients data for API usage (scoped to the caller's client)"""
+    user = require_auth(request)
     try:
-        clients = list(clients_db.values())
+        clients = filter_clients_for_user(list(clients_db.values()), user)
         return {
             "success": True,
             "clients": clients
@@ -3704,11 +4230,12 @@ async def get_clients_api():
         }
 
 @app.get("/api/campaigns")
-async def get_campaigns_api():
-    """Get all campaigns data for API usage"""
+async def get_campaigns_api(request: Request):
+    """Get all campaigns data for API usage (scoped to the caller's client)"""
+    user = require_auth(request)
     try:
         campaigns = []
-        for campaign in campaigns_db.values():
+        for campaign in filter_campaigns_for_user(list(campaigns_db.values()), user):
             # Create a copy without file data for API response
             campaign_copy = campaign.copy()
             if 'file_data' in campaign_copy:
@@ -3726,8 +4253,9 @@ async def get_campaigns_api():
         }
 
 @app.get("/debug/campaign_results")
-async def debug_campaign_results():
-    """Debug endpoint to check stored campaign results"""
+async def debug_campaign_results(request: Request):
+    """Debug endpoint to check stored campaign results (admin only)"""
+    require_admin(request)
     try:
         debug_info = {
             "total_campaigns_with_results": len(campaign_results_db),
@@ -3770,8 +4298,9 @@ async def debug_campaign_results():
         }
 
 @app.get("/debug/active_campaigns")
-async def debug_active_campaigns():
-    """Debug endpoint to check if any campaigns are currently running"""
+async def debug_active_campaigns(request: Request):
+    """Debug endpoint to check if any campaigns are currently running (admin only)"""
+    require_admin(request)
     try:
         active_info = {
             "stored_campaigns": len(campaigns_db),
@@ -3802,16 +4331,19 @@ async def debug_active_campaigns():
         }
 
 @app.post("/stop_all_campaigns")
-async def stop_all_campaigns():
-    """Emergency endpoint to stop all active campaigns"""
+async def stop_all_campaigns(request: Request):
+    """Emergency endpoint to stop all active campaigns (admin only)"""
+    require_admin(request)
     try:
-        # This would require implementing campaign state tracking
-        # For now, we can clear any problematic data
         stopped_campaigns = []
+        for campaign_id, entry in list(running_campaigns.items()):
+            if not entry["task"].done():
+                entry["stop_event"].set()
+                stopped_campaigns.append(campaign_id)
 
         return {
             "success": True,
-            "message": "Campaign stop requested",
+            "message": f"Stop requested for {len(stopped_campaigns)} running campaign(s)",
             "stopped_campaigns": stopped_campaigns
         }
     except Exception as e:
@@ -3821,8 +4353,9 @@ async def stop_all_campaigns():
         }
 
 @app.get("/debug/call_data/{call_id}")
-async def debug_call_data(call_id: str):
-    """Debug endpoint to check specific call data storage"""
+async def debug_call_data(request: Request, call_id: str):
+    """Debug endpoint to check specific call data storage (admin only)"""
+    require_admin(request)
     try:
         found_calls = []
 
@@ -3884,12 +4417,13 @@ async def _fetch_call_duration(session: aiohttp.ClientSession, api_key: str, sem
 
 
 @app.get("/api/dashboard_metrics")
-async def get_dashboard_metrics():
-    """Get updated dashboard metrics by aggregating campaign analytics"""
+async def get_dashboard_metrics(request: Request):
+    """Get updated dashboard metrics by aggregating campaign analytics (scoped to the caller's client)"""
+    user = require_auth(request)
     try:
         # Calculate metrics from actual campaign results
-        clients = load_clients()
-        campaigns = load_campaigns()
+        clients = filter_clients_for_user(load_clients(), user)
+        campaigns = filter_campaigns_for_user(load_campaigns(), user)
 
         total_clients = len(clients)
         total_campaigns = len(campaigns)
@@ -3976,14 +4510,18 @@ async def get_dashboard_metrics():
         }
 
 @app.get("/view_results/{campaign_id}")
-async def view_campaign_results(campaign_id: str):
+async def view_campaign_results(request: Request, campaign_id: str):
     """Simple endpoint to view campaign results for debugging"""
+    user = require_auth(request)
+    scope = get_scope_client_id(user)
+    if campaign_id in campaign_results_db and scope is not None and result_client_id(campaign_results_db[campaign_id]) != scope:
+        raise HTTPException(status_code=404, detail="No results found for this campaign")
     try:
         if campaign_id not in campaign_results_db:
             return {
                 "success": False,
                 "message": f"No results found for campaign {campaign_id}",
-                "available_campaigns": list(campaign_results_db.keys())
+                "available_campaigns": list(filter_campaign_results_for_user(campaign_results_db, user).keys())
             }
 
         results = campaign_results_db[campaign_id]
@@ -4095,23 +4633,26 @@ async def call_history_page(request: Request):
     user = require_auth(request)
     return templates.TemplateResponse("call_history.html", {
         "request": request,
-        "current_user": user
+        "current_user": user_display(user)
     })
 
 @app.get("/api/call_history")
-async def get_call_history_api():
-    """Get call history data sorted by most recent first"""
+async def get_call_history_api(request: Request):
+    """Get call history data sorted by most recent first (scoped to the caller's client)"""
+    user = require_auth(request)
     try:
         api_key = get_api_key()
 
         # Load clients and campaigns for lookups
         clients = {client['id']: client for client in load_clients()}
         campaigns = {campaign['id']: campaign for campaign in load_campaigns()}
+        scoped_results_db = filter_campaign_results_for_user(campaign_results_db, user)
 
         all_calls = []
+        pending_fetches = []  # call_records whose status/summary/duration need a live Bland AI lookup
 
         # Process all campaign results
-        for campaign_id, campaign_results in campaign_results_db.items():
+        for campaign_id, campaign_results in scoped_results_db.items():
             campaign_name = campaign_results.get('campaign_name', 'Unknown Campaign')
             client_name = campaign_results.get('client_name', 'Unknown Client')
 
@@ -4128,6 +4669,7 @@ async def get_call_history_api():
                 final_summary = "No summary available"
                 duration = 0
                 transcript = result.get('transcript', '')
+                needs_live_fetch = False
 
                 # Priority 1: Use stored final summary and status from webhook if available and valid
                 if result.get('final_summary') and result.get('final_summary').strip() and result.get('final_summary') not in ['No summary available', 'Call initiated but no response received']:
@@ -4135,25 +4677,70 @@ async def get_call_history_api():
                     call_status, standardized_summary = analyze_call_status_from_summary(stored_summary, transcript)
                     final_summary = standardized_summary
                     duration = result.get('duration', 0) if result.get('duration') else 0
-                    print(f"📊 Call History API: Using stored summary for {result.get('patient_name', 'Unknown')}: {call_status}")
 
                 # Priority 2: Use stored call_status if available and not 'initiated'/'processing'
                 elif result.get('call_status') and result.get('call_status') not in ['initiated', 'processing']:
                     call_status = result.get('call_status')
                     final_summary = get_standardized_summary_for_status(call_status)
                     duration = result.get('duration', 0) if result.get('duration') else 0
-                    print(f"📊 Call History API: Using stored status for {result.get('patient_name', 'Unknown')}: {call_status}")
 
-                # Priority 3: Fetch fresh data from API if call was successful but we don't have good stored data
+                # Priority 3: Fetch fresh data from API if call was successful but we don't have good stored data.
+                # Deferred to a concurrent batch below instead of awaited here, since this loop can hit
+                # dozens of stale/expired call_ids and awaiting them one at a time made the page take
+                # minutes to load.
                 elif result.get('success') and result.get('call_id') and api_key:
-                    try:
-                        print(f"📊 Call History API: Fetching fresh data for {result.get('patient_name', 'Unknown')} call {result.get('call_id')}")
+                    needs_live_fetch = True
 
+                # Priority 4: Analyze transcript if available but no fresh data was fetched
+                elif transcript and transcript.strip():
+                    extracted_summary = extract_final_summary(transcript)
+                    call_status, standardized_summary = analyze_call_status_from_summary(extracted_summary, transcript)
+                    final_summary = standardized_summary
+                    duration = result.get('duration', 0) if result.get('duration') else 0
+
+                # Fallback: Use whatever we have or default
+                else:
+                    call_status = 'busy_voicemail'
+                    final_summary = "No summary available"
+                    duration = result.get('duration', 0) if result.get('duration') else 0
+
+                call_record = {
+                    'call_id': result.get('call_id'),
+                    'patient_name': result.get('patient_name', 'Unknown'),
+                    'phone_number': result.get('phone_number', 'Unknown'),
+                    'campaign_name': campaign_name,
+                    'client_name': client_name,
+                    'status': call_status,
+                    'success': result.get('success', False),
+                    'duration': duration,
+                    'created_at': result.get('created_at') or campaign_results.get('started_at', ''),
+                    'final_summary': final_summary,
+                    'transcript': transcript,
+                    'campaign_id': campaign_id
+                }
+
+                # Convert UTC to IST for display
+                if call_record['created_at']:
+                    call_record['dateTime'] = convert_utc_to_ist(call_record['created_at'])
+                else:
+                    call_record['dateTime'] = 'Unknown'
+
+                all_calls.append(call_record)
+                if needs_live_fetch:
+                    pending_fetches.append(call_record)
+
+        if pending_fetches:
+            print(f"📊 Call History API: Fetching fresh data for {len(pending_fetches)} call(s) concurrently")
+            fetch_semaphore = asyncio.Semaphore(10)
+
+            async def fetch_fresh_call(call_record):
+                async with fetch_semaphore:
+                    try:
                         async with aiohttp.ClientSession() as session:
                             async with session.get(
-                                f"https://api.bland.ai/v1/calls/{result['call_id']}",
+                                f"https://api.bland.ai/v1/calls/{call_record['call_id']}",
                                 headers={"Authorization": f"Bearer {api_key}"},
-                                timeout=aiohttp.ClientTimeout(total=15)
+                                timeout=aiohttp.ClientTimeout(total=10)
                             ) as response:
 
                                 if response.status == 200:
@@ -4178,91 +4765,34 @@ async def get_call_history_api():
 
                                     # Analyze fresh transcript for status
                                     if fresh_transcript and fresh_transcript.strip():
-                                        transcript = fresh_transcript
                                         extracted_summary = extract_final_summary(fresh_transcript)
                                         call_status, standardized_summary = analyze_call_status_from_summary(extracted_summary, fresh_transcript)
-                                        final_summary = standardized_summary
-                                        print(f"📊 Call History API: Using fresh data for {result.get('patient_name', 'Unknown')}: {call_status}, Duration: {duration}s")
+                                        call_record['transcript'] = fresh_transcript
+                                        call_record['status'] = call_status
+                                        call_record['final_summary'] = standardized_summary
+                                        call_record['duration'] = duration
                                     else:
                                         # No transcript available, treat as busy/voicemail
-                                        call_status = 'busy_voicemail'
-                                        final_summary = "No transcript available"
-                                        print(f"📊 Call History API: Fresh data has no transcript for {result.get('patient_name', 'Unknown')}")
+                                        call_record['status'] = 'busy_voicemail'
+                                        call_record['final_summary'] = "No transcript available"
+                                        call_record['duration'] = duration
 
                                 elif response.status == 404:
-                                    print(f"📊 Call History API: Call {result.get('call_id')} not found in API")
-                                    call_status = 'busy_voicemail'
-                                    final_summary = "Call not found in API"
-                                    duration = 0
+                                    call_record['status'] = 'busy_voicemail'
+                                    call_record['final_summary'] = "Call not found in API"
+                                    call_record['duration'] = 0
                                 else:
-                                    print(f"📊 Call History API: API error {response.status} for call {result.get('call_id')}")
-                                    call_status = 'busy_voicemail'
-                                    final_summary = "API error retrieving call data"
-                                    duration = 0
+                                    call_record['status'] = 'busy_voicemail'
+                                    call_record['final_summary'] = "API error retrieving call data"
+                                    call_record['duration'] = 0
 
                     except Exception as e:
-                        print(f"📊 Call History API: Error fetching fresh data for {result.get('call_id')}: {str(e)}")
-                        call_status = 'busy_voicemail'
-                        final_summary = "Error retrieving call data"
-                        duration = 0
+                        print(f"📊 Call History API: Error fetching fresh data for {call_record.get('call_id')}: {str(e)}")
+                        call_record['status'] = 'busy_voicemail'
+                        call_record['final_summary'] = "Error retrieving call data"
+                        call_record['duration'] = 0
 
-                # Priority 4: Analyze transcript if available but no fresh data was fetched
-                elif transcript and transcript.strip():
-                    extracted_summary = extract_final_summary(transcript)
-                    call_status, standardized_summary = analyze_call_status_from_summary(extracted_summary, transcript)
-                    final_summary = standardized_summary
-                    duration = result.get('duration', 0) if result.get('duration') else 0
-                    print(f"📊 Call History API: Using stored transcript analysis for {result.get('patient_name', 'Unknown')}: {call_status}")
-
-                # Fallback: Use whatever we have or default
-                else:
-                    call_status = 'busy_voicemail'
-                    final_summary = "No summary available"
-                    duration = result.get('duration', 0) if result.get('duration') else 0
-                    print(f"📊 Call History API: Using fallback for {result.get('patient_name', 'Unknown')}: {call_status}")
-
-                call_record = {
-                    'call_id': result.get('call_id'),
-                    'patient_name': result.get('patient_name', 'Unknown'),
-                    'phone_number': result.get('phone_number', 'Unknown'),
-                    'campaign_name': campaign_name,
-                    'client_name': client_name,
-                    'status': call_status,
-                    'success': result.get('success', False),
-                    'duration': duration,
-                    'created_at': result.get('created_at') or campaign_results.get('started_at', ''),
-                    'final_summary': final_summary,
-                    'transcript': transcript,
-                    'campaign_id': campaign_id
-                }
-
-                # Convert UTC to IST for display
-                if call_record['created_at']:
-                    call_record['dateTime'] = convert_utc_to_ist(call_record['created_at'])
-                else:
-                    call_record['dateTime'] = 'Unknown'
-
-                all_calls.append(call_record)
-
-        # Sort calls by created_at timestamp in descending order (most recent first)
-        def parse_datetime_for_sorting(datetime_str):
-            """Parse datetime string for sorting purposes"""
-            try:
-                if not datetime_str or datetime_str == 'Unknown':
-                    return datetime.min
-
-                # Try to parse ISO format datetime
-                if 'T' in datetime_str:
-                    # Handle ISO format with or without timezone
-                    clean_datetime = datetime_str.replace('Z', '+00:00')
-                    if '+' not in clean_datetime and '-' not in clean_datetime[-6:]:
-                        clean_datetime += '+00:00'
-                    return datetime.fromisoformat(clean_datetime.replace('Z', '+00:00'))
-                else:
-                    # Try to parse other formats
-                    return datetime.fromisoformat(datetime_str)
-            except:
-                return datetime.min
+            await asyncio.gather(*(fetch_fresh_call(cr) for cr in pending_fetches))
 
         # Sort by created_at timestamp (most recent first)
         all_calls.sort(key=lambda x: parse_datetime_for_sorting(x.get('created_at', '')), reverse=True)

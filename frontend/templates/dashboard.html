@@ -250,7 +250,7 @@
         }
 
         .dashboard-header h1 {
-            font-size: 2.5rem;
+            font-size: 2rem;
             font-weight: 700;
             color: var(--primary-color);
             margin-bottom: 0.5rem;
@@ -886,10 +886,12 @@
                     <i class="fas fa-phone-volume"></i>
                     <span>Overview</span>
                 </a>
+                {% if current_user and current_user.role == 'admin' %}
                 <a href="/clients" class="nav-link">
                     <i class="fas fa-users"></i>
                     <span>Clients</span>
                 </a>
+                {% endif %}
                 <a href="/campaigns" class="nav-link">
                     <i class="fas fa-bullhorn"></i>
                     <span>Campaigns</span>
@@ -927,6 +929,12 @@
 
             {% if current_user %}
             <div class="user-menu">
+                {% if current_user.role != 'admin' and current_user.client_name %}
+                <span class="user-info" style="border-right: 1px solid var(--border-color); padding-right: 0.75rem;">
+                    <i class="fas fa-building"></i>
+                    {{ current_user.client_name }}
+                </span>
+                {% endif %}
                 <span class="user-info">
                     <i class="fas fa-user-circle"></i>
                     {{ current_user.username }} ({{ current_user.role.title() }})
@@ -949,6 +957,7 @@
 
         <h2 class="kpi-section-title"><i class="fas fa-chart-bar"></i> Key Performance Indicators</h2>
         <div class="metrics-grid">
+            {% if current_user.role == 'admin' %}
             <div class="metric-card clients clickable" onclick="toggleClientsList()">
                 <div class="metric-header">
                     <div class="metric-title">Total Clients</div>
@@ -958,6 +967,7 @@
                 </div>
                 <div class="metric-value">{{ metrics.total_clients | number_format }}</div>
             </div>
+            {% endif %}
 
             <div class="metric-card campaigns clickable" onclick="toggleCampaignsList()">
                 <div class="metric-header">
@@ -990,7 +1000,8 @@
             </div>
         </div>
 
-        <!-- Clients List Section -->
+        <!-- Clients List Section (admin only - non-admins have no client list to browse) -->
+        {% if current_user.role == 'admin' %}
         <div id="clientsListSection" style="display: none; margin-bottom: 2rem;">
             <div class="list-section">
                 <div class="list-header">
@@ -1032,6 +1043,7 @@
                 </div>
             </div>
         </div>
+        {% endif %}
 
         <!-- Campaigns List Section -->
         <div id="campaignsListSection" style="display: none; margin-bottom: 2rem;">
@@ -1092,10 +1104,12 @@
         <div class="quick-actions">
             <h2><i class="fas fa-bolt"></i> Quick Actions</h2>
             <div class="actions-grid">
+                {% if current_user.role == 'admin' %}
                 <a href="/clients" class="quick-action-btn primary">
                     <i class="fas fa-users"></i>
                     <span>Add Client</span>
                 </a>
+                {% endif %}
                 <a href="/campaigns" class="quick-action-btn primary">
                     <i class="fas fa-bullhorn"></i>
                     <span>New Campaign</span>
@@ -1170,8 +1184,9 @@
                 if (data.success) {
                     console.log('Dashboard metrics refreshed:', data.metrics);
                     
-                    // Update metric values
-                    document.querySelector('.metric-card.clients .metric-value').textContent = data.metrics.total_clients.toLocaleString();
+                    // Update metric values (the "clients" card doesn't render for non-admins)
+                    const clientsCard = document.querySelector('.metric-card.clients .metric-value');
+                    if (clientsCard) clientsCard.textContent = data.metrics.total_clients.toLocaleString();
                     document.querySelector('.metric-card.campaigns .metric-value').textContent = data.metrics.total_campaigns.toLocaleString();
                     document.querySelector('.metric-card.calls .metric-value').textContent = data.metrics.total_calls.toLocaleString();
                     document.querySelector('.metric-card.duration .metric-value').textContent = data.metrics.total_duration;

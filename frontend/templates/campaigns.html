@@ -10,8 +10,8 @@
     <script src="/static/common.js"></script>
     <style>
         :root {
-            --primary-color: #4f46e5;
-            --primary-hover: #4338ca;
+            --primary-color: #1e3a5f;
+            --primary-hover: #16293f;
             --success-color: #10b981;
             --danger-color: #ef4444;
             --warning-color: #f59e0b;
@@ -68,12 +68,12 @@
         .sidebar {
             position: fixed;
             left: 0;
-            top: 0;
+            top: var(--header-height);
             width: var(--sidebar-width);
-            height: 100vh;
+            height: calc(100vh - var(--header-height));
             background: var(--bg-secondary);
             border-right: 1px solid var(--border-color);
-            z-index: 1000;
+            z-index: 998;
             transform: translateX(-100%);
             transition: var(--transition);
             overflow-y: auto;
@@ -83,59 +83,12 @@
             transform: translateX(0);
         }
 
-        .sidebar-header {
-            padding: 1.5rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .sidebar-logo {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-size: 1.1rem;
-            font-weight: 700;
-            text-decoration: none;
-        }
-
-        .sidebar-logo-icon {
-            width: 42px;
-            height: 42px;
-            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
-        }
-
-        .sidebar-logo-icon i {
-            font-size: 1.25rem;
-            color: white;
-        }
-
-        .sidebar-logo-text {
-            color: white;
-            font-weight: 800;
-            letter-spacing: -0.3px;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-        }
-
         .sidebar-nav {
             padding: 1rem 0;
         }
 
         .nav-section {
-            margin-bottom: 2rem;
-        }
-
-        .nav-section-title {
-            padding: 0.5rem 1.5rem;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-tertiary);
-            margin-bottom: 0.5rem;
+            margin-bottom: 0;
         }
 
         .nav-link {
@@ -163,6 +116,12 @@
         .nav-link i {
             width: 20px;
             text-align: center;
+        }
+
+        .nav-link.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
         }
 
         /* Header */
@@ -203,31 +162,50 @@
             background: var(--bg-secondary);
         }
 
-        .header-title {
-            font-size: 1.25rem;
-            font-weight: 600;
+        .nav-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+        }
+
+        .nav-logo img {
+            width: 32px;
+            height: 32px;
+            object-fit: contain;
+        }
+
+        .nav-brand-text {
+            font-size: 1.35rem;
+            font-weight: 700;
             color: var(--text-primary);
+            letter-spacing: -0.3px;
         }
 
         .header-right {
             display: flex;
             align-items: center;
-            gap: 1rem;
+            gap: 0.75rem;
         }
 
-        .theme-toggle {
-            background: none;
-            border: none;
+        .theme-toggle-pill {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            padding: 0.6rem 1.1rem;
+            font-size: 0.9rem;
+            font-weight: 600;
             color: var(--text-primary);
-            font-size: 1.25rem;
             cursor: pointer;
-            padding: 0.5rem;
-            border-radius: 8px;
             transition: var(--transition);
         }
 
-        .theme-toggle:hover {
-            background: var(--bg-secondary);
+        .theme-toggle-pill:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
         }
 
         .status-badge {
@@ -479,6 +457,121 @@
 
         .file-input-display.has-file i {
             color: var(--success-color);
+        }
+
+        .input-mode-toggle {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .mode-toggle-btn {
+            flex: 1;
+            padding: 0.65rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .mode-toggle-btn:hover {
+            border-color: var(--primary-color);
+        }
+
+        .mode-toggle-btn.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        .manual-patient-row {
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 0.75rem;
+            position: relative;
+        }
+
+        .manual-patient-row .patient-row-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.6rem;
+        }
+
+        .manual-patient-row input {
+            width: 100%;
+            padding: 0.5rem;
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            box-sizing: border-box;
+        }
+
+        .manual-patient-row .remove-row-btn {
+            position: absolute;
+            top: 0.5rem;
+            right: 0.5rem;
+            background: none;
+            border: none;
+            color: var(--text-tertiary);
+            cursor: pointer;
+            font-size: 1rem;
+            padding: 0.25rem;
+        }
+
+        .manual-patient-row .remove-row-btn:hover {
+            color: var(--danger-color);
+        }
+
+        .manual-patient-row .row-number {
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-tertiary);
+            margin-bottom: 0.5rem;
+        }
+
+        .voice-preview {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-top: 0.5rem;
+        }
+
+        .btn-preview {
+            background: var(--success-color);
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: var(--transition);
+        }
+
+        .btn-preview:hover {
+            background: #059669;
+        }
+
+        .btn-preview:disabled {
+            background: var(--text-tertiary);
+            cursor: not-allowed;
+        }
+
+        #campaignVoicePreviewAudio,
+        #editVoicePreviewAudio {
+            margin-top: 0.5rem;
+            width: 100%;
+            height: 40px;
+            border-radius: 6px;
+            background: var(--bg-tertiary);
         }
 
         .btn-submit {
@@ -1139,35 +1232,29 @@
 <body data-theme="light">
     <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <a href="/" class="sidebar-logo">
-                <div class="sidebar-logo-icon">
-                    <i class="fas fa-phone-volume"></i>
-                </div>
-                <span class="sidebar-logo-text">aivoiceagent</span>
-            </a>
-        </div>
         <nav class="sidebar-nav">
             <div class="nav-section">
-                <div class="nav-section-title">Main</div>
                 <a href="/" class="nav-link">
-                    <i class="fas fa-chart-line"></i>
-                    <span>Dashboard</span>
+                    <i class="fas fa-phone-volume"></i>
+                    <span>Overview</span>
                 </a>
+                {% if current_user and current_user.role == 'admin' %}
                 <a href="/clients" class="nav-link">
                     <i class="fas fa-users"></i>
                     <span>Clients</span>
                 </a>
+                {% endif %}
                 <a href="/campaigns" class="nav-link active">
                     <i class="fas fa-bullhorn"></i>
                     <span>Campaigns</span>
                 </a>
-            </div>
-            <div class="nav-section">
-                <div class="nav-section-title">Analytics</div>
                 <a href="/call_history" class="nav-link">
                     <i class="fas fa-history"></i>
                     <span>Call History</span>
+                </a>
+                <a href="#" class="nav-link disabled" title="Coming soon">
+                    <i class="fas fa-cog"></i>
+                    <span>Settings</span>
                 </a>
             </div>
         </nav>
@@ -1182,15 +1269,24 @@
             <button class="sidebar-toggle" id="sidebarToggle">
                 <i class="fas fa-bars"></i>
             </button>
-            <h1 class="header-title">Campaigns</h1>
+            <a href="/" class="nav-logo">
+                <img src="/static/logo.png" alt="EPlanet Soft logo">
+                <span class="nav-brand-text">EPlanet Soft</span>
+            </a>
         </div>
         <div class="header-right">
-            <button id="themeToggle" class="theme-toggle">
-                <i class="fas fa-moon"></i>
+            <button id="themeToggle" class="theme-toggle-pill" type="button">
+                <i class="fas fa-moon"></i> Dark Mode
             </button>
 
             {% if current_user %}
             <div class="user-menu">
+                {% if current_user.role != 'admin' and current_user.client_name %}
+                <span class="user-info" style="border-right: 1px solid var(--border-color); padding-right: 0.75rem;">
+                    <i class="fas fa-building"></i>
+                    {{ current_user.client_name }}
+                </span>
+                {% endif %}
                 <span class="user-info">
                     <i class="fas fa-user-circle"></i>
                     {{ current_user.username }} ({{ current_user.role.title() }})
@@ -1209,11 +1305,13 @@
         <div class="page-header">
             <div>
                 {% if filtered_client_name %}
+                {% if current_user.role == 'admin' %}
                 <div style="margin-bottom: 0.5rem;">
                     <a href="/campaigns" style="color: var(--text-secondary); text-decoration: none; font-size: 0.875rem;">
                         <i class="fas fa-arrow-left"></i> All Campaigns
                     </a>
                 </div>
+                {% endif %}
                 <h1 class="page-title">
                     <i class="fas fa-bullhorn"></i>
                     Campaigns for {{ filtered_client_name }}
@@ -1519,6 +1617,71 @@
                     </div>
 
                     <div class="form-group">
+                        <label for="editCampaignLanguage">Language</label>
+                        <select id="editCampaignLanguage" name="language" required>
+                            <option value="">Select Language</option>
+                            <option value="english">English</option>
+                            <option value="spanish">Spanish</option>
+                            <option value="french">French</option>
+                            <option value="german">German</option>
+                            <option value="italian">Italian</option>
+                            <option value="portuguese">Portuguese</option>
+                            <option value="chinese">Chinese</option>
+                            <option value="japanese">Japanese</option>
+                            <option value="korean">Korean</option>
+                            <option value="arabic">Arabic</option>
+                            <option value="hindi">Hindi</option>
+                            <option value="russian">Russian</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="editCampaignCallType">Call Type</label>
+                        <select id="editCampaignCallType" name="call_type" required>
+                            <option value="">Select Call Type</option>
+                            <option value="appointment_confirmation">Appointment Confirmation</option>
+                            <option value="reminder_call">Reminder Call</option>
+                            <option value="follow_up">Follow-up Call</option>
+                            <option value="survey">Survey Call</option>
+                            <option value="marketing">Marketing Call</option>
+                            <option value="customer_service">Customer Service</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="editVoiceSelect">Voice Agent</label>
+                        <select id="editVoiceSelect" name="voice" required>
+                            <option value="">Select Voice</option>
+                            <option value="Ryan">Ryan (Male Professional)</option>
+                            <option value="Paige">Paige (Female Professional)</option>
+                            <option value="Maya">Maya (Female Warm)</option>
+                            <option value="Adriana">Adriana (Female Clear)</option>
+                            <option value="Destiny">Destiny (Female Friendly)</option>
+                            <option value="Mason">Mason (Male Warm)</option>
+                            <option value="Sal">Sal (Male Clear)</option>
+                        </select>
+                        <div class="voice-preview">
+                            <button type="button" class="btn-preview" onclick="previewVoice('editVoiceSelect', 'editVoicePreviewAudio', this)">
+                                <i class="fas fa-play"></i>
+                                Preview Voice
+                            </button>
+                            <audio id="editVoicePreviewAudio" controls style="display: none;"></audio>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Patient List (leave both empty to keep existing)</label>
+                        <div class="input-mode-toggle">
+                            <button type="button" class="mode-toggle-btn active" id="editUploadModeBtn" onclick="setCampaignInputMode('upload', EDIT_CAMPAIGN_IDS)">
+                                <i class="fas fa-file-upload"></i> Upload File
+                            </button>
+                            <button type="button" class="mode-toggle-btn" id="editManualModeBtn" onclick="setCampaignInputMode('manual', EDIT_CAMPAIGN_IDS)">
+                                <i class="fas fa-keyboard"></i> Enter Manually
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-group" id="editUploadModeSection">
                         <label for="editCsvFile">Upload New CSV/Excel File (Optional)</label>
                         <div class="file-input-wrapper">
                             <input type="file" id="editCsvFile" name="file" accept=".csv,.xlsx">
@@ -1530,6 +1693,17 @@
                                 </div>
                             </div>
                         </div>
+                        <a href="#" onclick="downloadSampleCsv(); return false;" style="display: inline-flex; align-items: center; gap: 6px; margin-top: 0.5rem; color: var(--primary-color); text-decoration: underline; font-size: 0.875rem;">
+                            <i class="fas fa-download"></i> Download sample CSV
+                        </a>
+                    </div>
+
+                    <div class="form-group" id="editManualModeSection" style="display: none;">
+                        <label>Patients (replaces the current patient list)</label>
+                        <div id="editManualPatientRows"></div>
+                        <button type="button" class="btn-secondary" onclick="addManualPatientRow('editManualPatientRows')" style="margin-top: 0.5rem;">
+                            <i class="fas fa-plus"></i> Add Another Patient
+                        </button>
                     </div>
 
                     <button type="submit" class="btn-submit">
@@ -1621,6 +1795,71 @@
                     </div>
 
                     <div class="form-group">
+                        <label for="campaignLanguage">Language</label>
+                        <select id="campaignLanguage" name="language" required>
+                            <option value="">Select Language</option>
+                            <option value="english">English</option>
+                            <option value="spanish">Spanish</option>
+                            <option value="french">French</option>
+                            <option value="german">German</option>
+                            <option value="italian">Italian</option>
+                            <option value="portuguese">Portuguese</option>
+                            <option value="chinese">Chinese</option>
+                            <option value="japanese">Japanese</option>
+                            <option value="korean">Korean</option>
+                            <option value="arabic">Arabic</option>
+                            <option value="hindi">Hindi</option>
+                            <option value="russian">Russian</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="campaignCallType">Call Type</label>
+                        <select id="campaignCallType" name="call_type" required>
+                            <option value="">Select Call Type</option>
+                            <option value="appointment_confirmation">Appointment Confirmation</option>
+                            <option value="reminder_call">Reminder Call</option>
+                            <option value="follow_up">Follow-up Call</option>
+                            <option value="survey">Survey Call</option>
+                            <option value="marketing">Marketing Call</option>
+                            <option value="customer_service">Customer Service</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="campaignVoiceSelect">Voice Agent</label>
+                        <select id="campaignVoiceSelect" name="voice" required>
+                            <option value="">Select Voice</option>
+                            <option value="Ryan">Ryan (Male Professional)</option>
+                            <option value="Paige">Paige (Female Professional)</option>
+                            <option value="Maya">Maya (Female Warm)</option>
+                            <option value="Adriana">Adriana (Female Clear)</option>
+                            <option value="Destiny">Destiny (Female Friendly)</option>
+                            <option value="Mason">Mason (Male Warm)</option>
+                            <option value="Sal">Sal (Male Clear)</option>
+                        </select>
+                        <div class="voice-preview">
+                            <button type="button" class="btn-preview" onclick="previewVoice('campaignVoiceSelect', 'campaignVoicePreviewAudio', this)">
+                                <i class="fas fa-play"></i>
+                                Preview Voice
+                            </button>
+                            <audio id="campaignVoicePreviewAudio" controls style="display: none;"></audio>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Patient List</label>
+                        <div class="input-mode-toggle">
+                            <button type="button" class="mode-toggle-btn active" id="uploadModeBtn" onclick="setCampaignInputMode('upload', CREATE_CAMPAIGN_IDS)">
+                                <i class="fas fa-file-upload"></i> Upload File
+                            </button>
+                            <button type="button" class="mode-toggle-btn" id="manualModeBtn" onclick="setCampaignInputMode('manual', CREATE_CAMPAIGN_IDS)">
+                                <i class="fas fa-keyboard"></i> Enter Manually
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-group" id="uploadModeSection">
                         <label for="csvFile">Upload CSV/Excel File</label>
                         <div class="file-input-wrapper">
                             <input type="file" id="csvFile" name="file" accept=".csv,.xlsx" required>
@@ -1632,6 +1871,17 @@
                                 </div>
                             </div>
                         </div>
+                        <a href="#" onclick="downloadSampleCsv(); return false;" style="display: inline-flex; align-items: center; gap: 6px; margin-top: 0.5rem; color: var(--primary-color); text-decoration: underline; font-size: 0.875rem;">
+                            <i class="fas fa-download"></i> Download sample CSV
+                        </a>
+                    </div>
+
+                    <div class="form-group" id="manualModeSection" style="display: none;">
+                        <label>Patients</label>
+                        <div id="manualPatientRows"></div>
+                        <button type="button" class="btn-secondary" onclick="addManualPatientRow('manualPatientRows')" style="margin-top: 0.5rem;">
+                            <i class="fas fa-plus"></i> Add Another Patient
+                        </button>
                     </div>
 
                     <button type="submit" class="btn-submit">
@@ -1706,7 +1956,7 @@
                         <input type="text" id="vmAppointmentTime" name="appointment_time" required>
                     </div>
                     <div class="form-group">
-                        <label for="vmProviderName">Provider Name:</label>
+                        <label for="vmProviderName">Attending Doctor:</label>
                         <input type="text" id="vmProviderName" name="provider_name" required>
                     </div>
                     <div class="form-group">
@@ -1739,6 +1989,192 @@
         function closeCreateCampaignModal() {
             document.getElementById('createCampaignModal').style.display = 'none';
             document.getElementById('createCampaignForm').reset();
+            document.getElementById('manualPatientRows').innerHTML = '';
+            setCampaignInputMode('upload', CREATE_CAMPAIGN_IDS);
+        }
+
+        // Manual patient entry (alternative to CSV/Excel upload) - shared between
+        // the Create and Edit campaign modals via an `ids` config per modal.
+        const MANUAL_PATIENT_FIELDS = [
+            { key: 'patient_name', label: 'Patient Name', type: 'text' },
+            { key: 'phone_number', label: 'Phone Number', type: 'tel' },
+            { key: 'attending_doctor', label: 'Attending Doctor', type: 'text' },
+            { key: 'office_location', label: 'Office Location', type: 'text' },
+            { key: 'date', label: 'Appointment Date', type: 'date' },
+            { key: 'time', label: 'Appointment Time', type: 'time' }
+        ];
+        const CREATE_CAMPAIGN_IDS = {
+            uploadSection: 'uploadModeSection', manualSection: 'manualModeSection',
+            uploadBtn: 'uploadModeBtn', manualBtn: 'manualModeBtn',
+            fileInput: 'csvFile', rowsContainer: 'manualPatientRows'
+        };
+        const EDIT_CAMPAIGN_IDS = {
+            uploadSection: 'editUploadModeSection', manualSection: 'editManualModeSection',
+            uploadBtn: 'editUploadModeBtn', manualBtn: 'editManualModeBtn',
+            fileInput: 'editCsvFile', rowsContainer: 'editManualPatientRows'
+        };
+        let manualRowCounter = 0;
+
+        function setCampaignInputMode(mode, ids) {
+            const isManual = mode === 'manual';
+            document.getElementById(ids.uploadSection).style.display = isManual ? 'none' : 'block';
+            document.getElementById(ids.manualSection).style.display = isManual ? 'block' : 'none';
+            document.getElementById(ids.uploadBtn).classList.toggle('active', !isManual);
+            document.getElementById(ids.manualBtn).classList.toggle('active', isManual);
+            document.getElementById(ids.fileInput).required = !isManual && ids === CREATE_CAMPAIGN_IDS;
+
+            if (isManual && document.getElementById(ids.rowsContainer).children.length === 0) {
+                addManualPatientRow(ids.rowsContainer);
+            }
+        }
+
+        function addManualPatientRow(rowsContainerId) {
+            const rowId = `manualRow${++manualRowCounter}`;
+            const row = document.createElement('div');
+            row.className = 'manual-patient-row';
+            row.id = rowId;
+
+            const fieldsHtml = MANUAL_PATIENT_FIELDS.map(f => `
+                <div>
+                    <label style="font-size: 0.75rem; color: var(--text-secondary);">${f.label}</label>
+                    <input type="${f.type}" data-field="${f.key}" placeholder="${f.label}">
+                </div>
+            `).join('');
+
+            row.innerHTML = `
+                <button type="button" class="remove-row-btn" onclick="removeManualPatientRow('${rowId}', '${rowsContainerId}')" title="Remove patient">
+                    <i class="fas fa-times"></i>
+                </button>
+                <div class="row-number">Patient</div>
+                <div class="patient-row-grid">${fieldsHtml}</div>
+            `;
+            document.getElementById(rowsContainerId).appendChild(row);
+        }
+
+        function removeManualPatientRow(rowId, rowsContainerId) {
+            const row = document.getElementById(rowId);
+            if (row) row.remove();
+            if (document.getElementById(rowsContainerId).children.length === 0) {
+                addManualPatientRow(rowsContainerId);
+            }
+        }
+
+        function csvEscapeField(value) {
+            const str = String(value ?? '');
+            if (/[",\n]/.test(str)) {
+                return `"${str.replace(/"/g, '""')}"`;
+            }
+            return str;
+        }
+
+        // Reads all manual patient rows in the given container and builds a CSV
+        // file identical in shape to what /add_campaign and /update_campaign
+        // expect from an uploaded CSV - manual entry just becomes a synthesized
+        // upload, no backend changes needed.
+        function buildManualPatientsCsvFile(rowsContainerId) {
+            const rows = Array.from(document.querySelectorAll(`#${rowsContainerId} .manual-patient-row`));
+            const fieldKeys = MANUAL_PATIENT_FIELDS.map(f => f.key);
+            const dataRows = [];
+
+            for (const row of rows) {
+                const values = {};
+                let filledCount = 0;
+                for (const key of fieldKeys) {
+                    const val = row.querySelector(`[data-field="${key}"]`).value.trim();
+                    values[key] = val;
+                    if (val) filledCount++;
+                }
+                if (filledCount === 0) continue; // skip fully blank rows
+                if (filledCount < fieldKeys.length) {
+                    const missing = fieldKeys.filter(k => !values[k]);
+                    throw new Error(`Please fill in all fields for each patient (missing: ${missing.join(', ')}).`);
+                }
+                dataRows.push(values);
+            }
+
+            if (dataRows.length === 0) {
+                throw new Error('Please enter at least one patient.');
+            }
+
+            const lines = [fieldKeys.join(',')];
+            for (const values of dataRows) {
+                lines.push(fieldKeys.map(k => csvEscapeField(values[k])).join(','));
+            }
+            const csvText = lines.join('\n');
+            return new File([csvText], 'manual_patients.csv', { type: 'text/csv' });
+        }
+
+        // Downloadable sample CSV for the "Upload File" mode - same columns
+        // start_campaign requires (see required_fields in main.py).
+        function downloadSampleCsv() {
+            const csvText = [
+                'patient_name,phone_number,date,time,attending_doctor,office_location',
+                'Jane Doe,2105551234,2026-08-01,14:30,Dr. Smith,Live Oak Office',
+                'John Roe,2105555678,2026-08-02,09:00,Dr. Lee,Downtown Office'
+            ].join('\n');
+            const blob = new Blob([csvText], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'sample_patients.csv';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        // Voice preview - shared between the Create and Edit campaign modals
+        // via explicit select/audio element-id params (same pattern as
+        // setCampaignInputMode's `ids` and addManualPatientRow's
+        // `rowsContainerId`). The clicked button is passed in directly via
+        // `this` rather than relying on a global `event`, since this page
+        // has two independent .btn-preview instances.
+        async function previewVoice(selectId, audioId, buttonEl) {
+            const selectedVoice = document.getElementById(selectId).value;
+            const audioElement = document.getElementById(audioId);
+
+            if (!selectedVoice) {
+                alert('Please select a voice first');
+                return;
+            }
+
+            const originalText = buttonEl.innerHTML;
+            buttonEl.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
+            buttonEl.disabled = true;
+
+            try {
+                const response = await fetch(`/voice_preview/${selectedVoice}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    if (data.preview_url) {
+                        audioElement.src = data.preview_url;
+                        audioElement.style.display = 'block';
+                        audioElement.currentTime = 0;
+                        try {
+                            await audioElement.play();
+                            alert(`🎤 Playing voice sample for ${selectedVoice}. Use the audio controls to replay.`);
+                        } catch (playError) {
+                            console.log('Autoplay blocked, showing audio controls');
+                            alert(`🎤 Voice sample loaded for ${selectedVoice}. Click the play button below to hear it.`);
+                        }
+                    } else if (data.audio_data) {
+                        alert(`🎤 Voice sample generated for ${selectedVoice}, but playback format not supported in browser.`);
+                    } else {
+                        alert('❌ Voice sample generated but no playable audio received.');
+                    }
+                } else {
+                    const errorMsg = data.error || 'Voice preview not available';
+                    alert(`❌ ${errorMsg}`);
+                    console.error('Voice preview error:', data.error);
+                }
+            } catch (error) {
+                console.error('Error loading voice preview:', error);
+                alert('❌ Network error loading voice preview. Please check your connection and try again.');
+            } finally {
+                buttonEl.innerHTML = originalText;
+                buttonEl.disabled = false;
+            }
         }
 
         // File upload handling
@@ -1790,6 +2226,19 @@
             e.preventDefault();
 
             const formData = new FormData(e.target);
+            const isManualMode = document.getElementById('manualModeSection').style.display !== 'none';
+
+            if (isManualMode) {
+                let manualFile;
+                try {
+                    manualFile = buildManualPatientsCsvFile('manualPatientRows');
+                } catch (validationError) {
+                    alert(validationError.message);
+                    return;
+                }
+                formData.delete('file');
+                formData.append('file', manualFile);
+            }
 
             try {
                 const response = await fetch('/add_campaign', {
@@ -2147,10 +2596,8 @@
                     </button>
                 </div>
                 <div style="padding: 2rem; max-height: 60vh; overflow-y: auto;">
-                    <div style="background: var(--bg-secondary); padding: 1.5rem; border-radius: 12px; border-left: 4px solid var(--primary-color);">
-                        <div style="white-space: pre-wrap; line-height: 1.7; color: var(--text-primary); font-size: 1rem; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;">
-                            ${transcript}
-                        </div>
+                    <div style="background: var(--bg-secondary); padding: 1.5rem 1.5rem 0.5rem; border-radius: 12px; border: 1px solid var(--border-color);">
+                        ${renderTranscriptHtml(transcript)}
                     </div>
                     <div style="margin-top: 1rem; padding: 1rem; background: rgba(79, 70, 229, 0.1); border-radius: 8px; font-size: 0.875rem; color: var(--text-secondary); text-align: center;">
                         <i class="fas fa-info-circle" style="color: var(--primary-color); margin-right: 0.5rem;"></i>
@@ -2340,6 +2787,8 @@
                 document.getElementById('editRetryInterval').value = campaign.retry_interval;
                 document.getElementById('editCountryCode').value = campaign.country_code;
 
+                document.getElementById('editManualPatientRows').innerHTML = '';
+                setCampaignInputMode('upload', EDIT_CAMPAIGN_IDS);
                 document.getElementById('editCampaignModal').style.display = 'block';
             }
         }
@@ -2347,6 +2796,8 @@
         function closeEditCampaignModal() {
             document.getElementById('editCampaignModal').style.display = 'none';
             document.getElementById('editCampaignForm').reset();
+            document.getElementById('editManualPatientRows').innerHTML = '';
+            setCampaignInputMode('upload', EDIT_CAMPAIGN_IDS);
         }
 
         // Edit campaign file upload handling
@@ -2378,6 +2829,19 @@
 
             const formData = new FormData(e.target);
             const campaignId = formData.get('campaign_id');
+            const isManualMode = document.getElementById('editManualModeSection').style.display !== 'none';
+
+            if (isManualMode) {
+                let manualFile;
+                try {
+                    manualFile = buildManualPatientsCsvFile('editManualPatientRows');
+                } catch (validationError) {
+                    alert(validationError.message);
+                    return;
+                }
+                formData.delete('file');
+                formData.append('file', manualFile);
+            }
 
             try {
                 const response = await fetch(`/update_campaign/${campaignId}`, {
@@ -2400,6 +2864,21 @@
         }
 
         // Start campaign form submission
+        async function submitStartCampaign(campaignId, formData, force) {
+            const url = `/start_campaign/${campaignId}${force ? '?force=true' : ''}`;
+            const response = await fetch(url, {
+                method: 'POST',
+                body: formData
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`HTTP ${response.status}: ${errorText}`);
+            }
+
+            return response.json();
+        }
+
         const startForm = document.getElementById('startCampaignForm');
         if (startForm) {
             startForm.addEventListener('submit', async function(e) {
@@ -2409,17 +2888,13 @@
             const campaignId = formData.get('campaign_id');
 
             try {
-                const response = await fetch(`/start_campaign/${campaignId}`, {
-                    method: 'POST',
-                    body: formData
-                });
+                let result = await submitStartCampaign(campaignId, formData, false);
 
-                if (!response.ok) {
-                    const errorText = await response.text();
-                    throw new Error(`HTTP ${response.status}: ${errorText}`);
+                if (!result.success && result.already_running) {
+                    const confirmed = confirm(result.message);
+                    if (!confirmed) return;
+                    result = await submitStartCampaign(campaignId, formData, true);
                 }
-
-                const result = await response.json();
 
                 if (result.success) {
                     const queued = result.total_queued || 0;

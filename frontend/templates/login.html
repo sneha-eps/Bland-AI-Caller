@@ -69,29 +69,6 @@
             box-shadow: var(--shadow-md);
         }
 
-        .nav-auth-btn {
-            border-radius: 999px;
-            padding: 0.6rem 1.4rem;
-            font-size: 0.9rem;
-            font-weight: 700;
-            cursor: pointer;
-            border: 1px solid var(--border-color);
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            transition: var(--transition);
-        }
-
-        .nav-auth-btn.active {
-            background: var(--primary-color);
-            color: white;
-            border-color: transparent;
-            box-shadow: 0 6px 18px rgba(30, 58, 95, 0.25);
-        }
-
-        .nav-auth-btn:hover {
-            transform: translateY(-1px);
-        }
-
         .auth-page-wrap {
             flex: 1;
             display: flex;
@@ -206,8 +183,6 @@
             <button id="themeToggle" class="theme-toggle-pill" type="button">
                 <i class="fas fa-moon"></i> Dark Mode
             </button>
-            <button id="navLoginBtn" class="nav-auth-btn active" type="button">Login</button>
-            <button id="navRegisterBtn" class="nav-auth-btn" type="button">Register</button>
         </div>
     </nav>
 
@@ -226,38 +201,20 @@
                 <input type="text" id="username" name="username" required>
             </div>
 
-            <div class="form-group" id="emailGroup" style="display: none;">
-                <label for="email">Email</label>
-                <input type="email" id="email" name="email">
-            </div>
-
-            <div class="form-group" id="roleGroup" style="display: none;">
-                <label for="role">Role</label>
-                <select id="role" name="role">
-                    <option value="user">User</option>
-                    <option value="admin">Admin</option>
-                </select>
-            </div>
-
             <div class="form-group">
                 <label for="password">Password</label>
                 <input type="password" id="password" name="password" required>
             </div>
 
             <button type="submit" class="auth-btn" id="authButton" style="background: var(--primary-color); color: white; border: none; padding: 0.75rem; border-radius: 6px; font-size: 1rem; font-weight: 600; cursor: pointer; width: 100%; margin-bottom: 1rem;">Login</button>
-            
+
             <div id="message" style="display: none;"></div>
-            
+
             <div class="loading" id="loading">
                 <div class="spinner"></div>
                 Processing...
             </div>
         </form>
-
-        <div class="auth-switch">
-            <span id="switchText">Don't have an account?</span>
-            <a href="#" id="switchLink">Sign up</a>
-        </div>
 
         <div class="user-types">
             <h3>Demo Accounts:</h3>
@@ -272,65 +229,10 @@
     </div>
 
     <script>
-        let isLoginMode = true;
-
-        const navLoginBtn = document.getElementById('navLoginBtn');
-        const navRegisterBtn = document.getElementById('navRegisterBtn');
         const authForm = document.getElementById('authForm');
-        const authTitle = document.getElementById('authTitle');
         const authButton = document.getElementById('authButton');
-        const switchText = document.getElementById('switchText');
-        const switchLink = document.getElementById('switchLink');
-        const emailGroup = document.getElementById('emailGroup');
-        const roleGroup = document.getElementById('roleGroup');
         const messageDiv = document.getElementById('message');
         const loadingDiv = document.getElementById('loading');
-
-        const welcomeText = document.getElementById('welcomeText');
-
-        // Switch between login and signup
-        function setMode(loginMode) {
-            isLoginMode = loginMode;
-
-            if (isLoginMode) {
-                welcomeText.textContent = 'Welcome Back';
-                authTitle.textContent = 'Sign in to manage your campaigns';
-                authButton.textContent = 'Login';
-                switchText.textContent = "Don't have an account?";
-                switchLink.textContent = 'Sign up';
-                emailGroup.style.display = 'none';
-                roleGroup.style.display = 'none';
-                document.getElementById('email').required = false;
-            } else {
-                welcomeText.textContent = 'Get Started';
-                authTitle.textContent = 'Create your account to begin';
-                authButton.textContent = 'Sign Up';
-                switchText.textContent = 'Already have an account?';
-                switchLink.textContent = 'Login';
-                emailGroup.style.display = 'block';
-                roleGroup.style.display = 'block';
-                document.getElementById('email').required = true;
-            }
-
-            navLoginBtn.classList.toggle('active', isLoginMode);
-            navRegisterBtn.classList.toggle('active', !isLoginMode);
-
-            // Clear any messages
-            showMessage('', '');
-        }
-
-        switchLink.addEventListener('click', function(e) {
-            e.preventDefault();
-            setMode(!isLoginMode);
-        });
-
-        navLoginBtn.addEventListener('click', function() {
-            setMode(true);
-        });
-
-        navRegisterBtn.addEventListener('click', function() {
-            setMode(false);
-        });
 
         function showMessage(message, type) {
             if (message) {
@@ -349,47 +251,29 @@
 
         authForm.addEventListener('submit', async function(e) {
             e.preventDefault();
-            
+
             const username = document.getElementById('username').value;
             const password = document.getElementById('password').value;
-            const email = document.getElementById('email').value;
-            const role = document.getElementById('role').value;
-            
+
             showLoading(true);
             showMessage('', '');
-            
-            try {
-                const endpoint = isLoginMode ? '/api/login' : '/api/signup';
-                const payload = isLoginMode 
-                    ? { username, password }
-                    : { username, password, email, role };
 
-                const response = await fetch(endpoint, {
+            try {
+                const response = await fetch('/api/login', {
                     method: 'POST',
                     headers: {
-                        'Content-Type': isLoginMode ? 'application/x-www-form-urlencoded' : 'application/json'
+                        'Content-Type': 'application/x-www-form-urlencoded'
                     },
-                    body: isLoginMode 
-                        ? new URLSearchParams(payload)
-                        : JSON.stringify(payload)
+                    body: new URLSearchParams({ username, password })
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (data.success) {
                     showMessage(data.message, 'success');
-                    
-                    if (isLoginMode) {
-                        // Redirect to dashboard after successful login
-                        setTimeout(() => {
-                            window.location.href = data.redirect_url || '/';
-                        }, 1000);
-                    } else {
-                        // Redirect to dashboard after successful signup
-                        setTimeout(() => {
-                            window.location.href = data.redirect_url || '/';
-                        }, 1000);
-                    }
+                    setTimeout(() => {
+                        window.location.href = data.redirect_url || '/';
+                    }, 1000);
                 } else {
                     showMessage(data.message, 'error');
                 }

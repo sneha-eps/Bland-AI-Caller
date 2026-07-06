@@ -10,8 +10,8 @@
     <script src="/static/common.js"></script>
     <style>
         :root {
-            --primary-color: #4f46e5;
-            --primary-hover: #4338ca;
+            --primary-color: #1e3a5f;
+            --primary-hover: #16293f;
             --success-color: #10b981;
             --danger-color: #ef4444;
             --warning-color: #f59e0b;
@@ -68,12 +68,12 @@
         .sidebar {
             position: fixed;
             left: 0;
-            top: 0;
+            top: var(--header-height);
             width: var(--sidebar-width);
-            height: 100vh;
+            height: calc(100vh - var(--header-height));
             background: var(--bg-secondary);
             border-right: 1px solid var(--border-color);
-            z-index: 1000;
+            z-index: 998;
             transform: translateX(-100%);
             transition: var(--transition);
             overflow-y: auto;
@@ -83,59 +83,12 @@
             transform: translateX(0);
         }
 
-        .sidebar-header {
-            padding: 1.5rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .sidebar-logo {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-size: 1.1rem;
-            font-weight: 700;
-            text-decoration: none;
-        }
-
-        .sidebar-logo-icon {
-            width: 42px;
-            height: 42px;
-            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
-        }
-
-        .sidebar-logo-icon i {
-            font-size: 1.25rem;
-            color: white;
-        }
-
-        .sidebar-logo-text {
-            color: white;
-            font-weight: 800;
-            letter-spacing: -0.3px;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-        }
-
         .sidebar-nav {
             padding: 1rem 0;
         }
 
         .nav-section {
-            margin-bottom: 2rem;
-        }
-
-        .nav-section-title {
-            padding: 0.5rem 1.5rem;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-tertiary);
-            margin-bottom: 0.5rem;
+            margin-bottom: 0;
         }
 
         .nav-link {
@@ -163,6 +116,12 @@
         .nav-link i {
             width: 20px;
             text-align: center;
+        }
+
+        .nav-link.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
         }
 
         /* Header */
@@ -203,31 +162,50 @@
             background: var(--bg-secondary);
         }
 
-        .header-title {
-            font-size: 1.25rem;
-            font-weight: 600;
+        .nav-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+        }
+
+        .nav-logo img {
+            width: 32px;
+            height: 32px;
+            object-fit: contain;
+        }
+
+        .nav-brand-text {
+            font-size: 1.35rem;
+            font-weight: 700;
             color: var(--text-primary);
+            letter-spacing: -0.3px;
         }
 
         .header-right {
             display: flex;
             align-items: center;
-            gap: 1rem;
+            gap: 0.75rem;
         }
 
-        .theme-toggle {
-            background: none;
-            border: none;
+        .theme-toggle-pill {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            padding: 0.6rem 1.1rem;
+            font-size: 0.9rem;
+            font-weight: 600;
             color: var(--text-primary);
-            font-size: 1.25rem;
             cursor: pointer;
-            padding: 0.5rem;
-            border-radius: 8px;
             transition: var(--transition);
         }
 
-        .theme-toggle:hover {
-            background: var(--bg-secondary);
+        .theme-toggle-pill:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
         }
 
         .status-badge {
@@ -621,11 +599,8 @@
         }
 
         .transcript-content {
-            white-space: pre-wrap;
-            line-height: 1.6;
-            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
             background: var(--bg-secondary);
-            padding: 1rem;
+            padding: 1rem 1rem 0.25rem;
             border-radius: 8px;
             border: 1px solid var(--border-color);
         }
@@ -675,35 +650,29 @@
 <body data-theme="light">
     <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <a href="/" class="sidebar-logo">
-                <div class="sidebar-logo-icon">
-                    <i class="fas fa-phone-volume"></i>
-                </div>
-                <span class="sidebar-logo-text">aivoiceagent</span>
-            </a>
-        </div>
         <nav class="sidebar-nav">
             <div class="nav-section">
-                <div class="nav-section-title">Main</div>
                 <a href="/" class="nav-link">
-                    <i class="fas fa-chart-line"></i>
-                    <span>Dashboard</span>
+                    <i class="fas fa-phone-volume"></i>
+                    <span>Overview</span>
                 </a>
+                {% if current_user and current_user.role == 'admin' %}
                 <a href="/clients" class="nav-link">
                     <i class="fas fa-users"></i>
                     <span>Clients</span>
                 </a>
+                {% endif %}
                 <a href="/campaigns" class="nav-link">
                     <i class="fas fa-bullhorn"></i>
                     <span>Campaigns</span>
                 </a>
-            </div>
-            <div class="nav-section">
-                <div class="nav-section-title">Analytics</div>
                 <a href="/call_history" class="nav-link active">
                     <i class="fas fa-history"></i>
                     <span>Call History</span>
+                </a>
+                <a href="#" class="nav-link disabled" title="Coming soon">
+                    <i class="fas fa-cog"></i>
+                    <span>Settings</span>
                 </a>
             </div>
         </nav>
@@ -718,14 +687,24 @@
             <button class="sidebar-toggle" id="sidebarToggle">
                 <i class="fas fa-bars"></i>
             </button>
-            <h1 class="header-title">Call History</h1>
+            <a href="/" class="nav-logo">
+                <img src="/static/logo.png" alt="EPlanet Soft logo">
+                <span class="nav-brand-text">EPlanet Soft</span>
+            </a>
         </div>
         <div class="header-right">
-            <button id="themeToggle" class="theme-toggle">
-                <i class="fas fa-moon"></i>
+            <button id="themeToggle" class="theme-toggle-pill" type="button">
+                <i class="fas fa-moon"></i> Dark Mode
             </button>
+
             {% if current_user %}
             <div class="user-menu">
+                {% if current_user.role != 'admin' and current_user.client_name %}
+                <span class="user-info" style="border-right: 1px solid var(--border-color); padding-right: 0.75rem;">
+                    <i class="fas fa-building"></i>
+                    {{ current_user.client_name }}
+                </span>
+                {% endif %}
                 <span class="user-info">
                     <i class="fas fa-user-circle"></i>
                     {{ current_user.username }} ({{ current_user.role.title() }})
@@ -839,7 +818,6 @@
                             <th>Status</th>
                             <th>Duration</th>
                             <th>Date/Time</th>
-                            <th>Final Summary</th>
                             <th>Transcript</th>
                         </tr>
                     </thead>
@@ -847,6 +825,16 @@
                         <!-- Call history rows will be populated here -->
                     </tbody>
                 </table>
+
+                <div id="paginationControls" style="display: flex; align-items: center; justify-content: center; gap: 1rem; padding: 1.25rem 0;">
+                    <button type="button" class="btn-secondary" id="prevPageBtn" onclick="goToPage(currentPage - 1)">
+                        <i class="fas fa-chevron-left"></i> Previous
+                    </button>
+                    <span id="pageIndicator" style="color: var(--text-secondary); font-size: 0.9rem;"></span>
+                    <button type="button" class="btn-secondary" id="nextPageBtn" onclick="goToPage(currentPage + 1)">
+                        Next <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -876,6 +864,8 @@
         let filteredCallHistory = [];
         let allClients = {};
         let allCampaigns = {};
+        let currentPage = 1;
+        const PAGE_SIZE = 5;
 
         // Load call history on page load
         document.addEventListener('DOMContentLoaded', function() {
@@ -904,7 +894,6 @@
                     status: call.status,
                     duration: call.duration,
                     dateTime: call.dateTime, // Already converted to IST by backend
-                    finalSummary: call.final_summary,
                     transcript: call.transcript ? 'View Transcript' : 'No transcript',
                     callId: call.call_id,
                     success: call.success,
@@ -1019,6 +1008,14 @@
                 return matchesClient && matchesCampaign && matchesStatus && matchesSearch && matchesDateRange;
             });
 
+            currentPage = 1;
+            displayCallHistory();
+        }
+
+        function goToPage(page) {
+            const totalPages = Math.max(1, Math.ceil(filteredCallHistory.length / PAGE_SIZE));
+            if (page < 1 || page > totalPages) return;
+            currentPage = page;
             displayCallHistory();
         }
 
@@ -1042,24 +1039,27 @@
                 showEmptyState();
                 hideTable();
                 resultsCount.textContent = '0 calls found';
+                document.getElementById('paginationControls').style.display = 'none';
                 return;
             }
 
             showTable();
             hideEmptyState();
+            document.getElementById('paginationControls').style.display = 'flex';
 
             resultsCount.textContent = `${filteredCallHistory.length} call${filteredCallHistory.length !== 1 ? 's' : ''} found`;
 
-            // Data is already sorted by backend API (most recent first)
-            // Just use the filtered data directly
-            console.log('Using pre-sorted data - first 3 calls:', filteredCallHistory.slice(0, 3).map(call => ({
-                patient: call.patientName, 
-                dateTime: call.dateTime,
-                campaign: call.campaignName
-            })));
+            const totalPages = Math.max(1, Math.ceil(filteredCallHistory.length / PAGE_SIZE));
+            if (currentPage > totalPages) currentPage = totalPages;
+            const startIndex = (currentPage - 1) * PAGE_SIZE;
+            const pageCallHistory = filteredCallHistory.slice(startIndex, startIndex + PAGE_SIZE);
+
+            document.getElementById('pageIndicator').textContent = `Page ${currentPage} of ${totalPages}`;
+            document.getElementById('prevPageBtn').disabled = currentPage <= 1;
+            document.getElementById('nextPageBtn').disabled = currentPage >= totalPages;
 
             let html = '';
-            filteredCallHistory.forEach(call => {
+            pageCallHistory.forEach(call => {
                 // Determine status display and class - prioritize enhanced analytics data
                 let status = 'busy_voicemail'; // Default fallback
 
@@ -1090,13 +1090,6 @@
                     }
                 }
 
-                // Format final summary with truncation
-                let summaryDisplay = call.finalSummary || 'No summary available';
-                const maxSummaryLength = 80;
-                if (summaryDisplay.length > maxSummaryLength) {
-                    summaryDisplay = summaryDisplay.substring(0, maxSummaryLength) + '...';
-                }
-
                 // Enhanced transcript link
                 let transcriptCell;
                 if (call.callId && call.transcript && call.transcript !== 'No transcript') {
@@ -1116,7 +1109,6 @@
                         <td><span class="status-badge-small ${statusClass}">${formatStatus(status)}</span></td>
                         <td><strong>${durationDisplay}</strong></td>
                         <td>${formattedDateTime}</td>
-                        <td class="transcript-preview" title="${call.finalSummary || 'No summary'}">${summaryDisplay}</td>
                         <td>${transcriptCell}</td>
                     </tr>
                 `;
@@ -1264,8 +1256,8 @@
                 const data = await response.json();
 
                 if (data.transcript) {
-                    document.getElementById('transcriptContent').textContent = data.transcript;
-                    document.querySelector('#transcriptModal .modal-header h3').innerHTML = 
+                    document.getElementById('transcriptContent').innerHTML = renderTranscriptHtml(data.transcript);
+                    document.querySelector('#transcriptModal .modal-header h3').innerHTML =
                         `<i class="fas fa-file-alt"></i> Call Transcript - ${patientName}`;
                     document.getElementById('transcriptModal').style.display = 'block';
                 } else {

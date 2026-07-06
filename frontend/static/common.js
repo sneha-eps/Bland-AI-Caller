@@ -263,6 +263,67 @@ function formatDateTime(dateTimeStr) {
     }
 }
 
+// Call transcript rendering
+const TRANSCRIPT_ROLE_STYLES = {
+    assistant: { label: 'AI Agent', icon: 'fa-robot', color: 'var(--primary-color)' },
+    user: { label: 'Patient', icon: 'fa-user', color: 'var(--success-color)' },
+    'agent-action': { label: 'System', icon: 'fa-cog', color: 'var(--text-tertiary)' }
+};
+
+function escapeHtmlText(str) {
+    const div = document.createElement('div');
+    div.textContent = str;
+    return div.innerHTML;
+}
+
+// Turns a raw "role: message" per-line transcript into a scannable, labeled
+// layout instead of one undifferentiated block of text. Lines that don't
+// start with a recognized role are treated as a continuation of the
+// previous turn (handles transcripts with soft-wrapped messages).
+function renderTranscriptHtml(transcript) {
+    if (!transcript || !transcript.trim()) {
+        return '<div style="text-align:center; color:var(--text-tertiary); padding:2rem;">No transcript available.</div>';
+    }
+
+    const rolePattern = /^(assistant|user|agent-action)\s*:\s*(.*)$/i;
+    const turns = [];
+
+    transcript.split('\n').map(l => l.trim()).filter(Boolean).forEach(line => {
+        const match = line.match(rolePattern);
+        if (match) {
+            turns.push({ role: match[1].toLowerCase(), text: match[2] });
+        } else if (turns.length > 0) {
+            turns[turns.length - 1].text += ' ' + line;
+        } else {
+            turns.push({ role: 'unknown', text: line });
+        }
+    });
+
+    return turns.map(turn => {
+        const style = TRANSCRIPT_ROLE_STYLES[turn.role] || { label: turn.role, icon: 'fa-comment', color: 'var(--text-secondary)' };
+        const text = escapeHtmlText(turn.text);
+
+        if (turn.role === 'agent-action') {
+            return `
+                <div style="text-align:center; margin: 0.5rem 0;">
+                    <span style="display:inline-flex; align-items:center; gap:0.4rem; font-size:0.75rem; font-weight:600; text-transform:uppercase; letter-spacing:0.03em; color:${style.color}; background:var(--bg-tertiary); padding:0.3rem 0.75rem; border-radius:999px;">
+                        <i class="fas ${style.icon}"></i> ${text}
+                    </span>
+                </div>
+            `;
+        }
+
+        return `
+            <div style="display:flex; gap:0.75rem; padding:0.6rem 0; border-bottom:1px solid var(--border-color);">
+                <div style="flex-shrink:0; width:100px; display:flex; align-items:flex-start; gap:0.4rem; font-weight:700; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.03em; color:${style.color}; padding-top:0.1rem;">
+                    <i class="fas ${style.icon}"></i> ${style.label}
+                </div>
+                <div style="flex:1; color:var(--text-primary); line-height:1.6;">${text}</div>
+            </div>
+        `;
+    }).join('');
+}
+
 // Initialize everything when the DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     initializeTheme();
@@ -275,3 +336,4 @@ document.addEventListener('DOMContentLoaded', function() {
 // Expose utility functions globally
 window.formatDuration = formatDuration;
 window.formatDateTime = formatDateTime;
+window.renderTranscriptHtml = renderTranscriptHtml;

@@ -10,8 +10,8 @@
     <script src="/static/common.js"></script>
     <style>
         :root {
-            --primary-color: #4f46e5;
-            --primary-hover: #4338ca;
+            --primary-color: #1e3a5f;
+            --primary-hover: #16293f;
             --success-color: #10b981;
             --danger-color: #ef4444;
             --warning-color: #f59e0b;
@@ -68,12 +68,12 @@
         .sidebar {
             position: fixed;
             left: 0;
-            top: 0;
+            top: var(--header-height);
             width: var(--sidebar-width);
-            height: 100vh;
+            height: calc(100vh - var(--header-height));
             background: var(--bg-secondary);
             border-right: 1px solid var(--border-color);
-            z-index: 1000;
+            z-index: 998;
             transform: translateX(-100%);
             transition: var(--transition);
             overflow-y: auto;
@@ -83,59 +83,12 @@
             transform: translateX(0);
         }
 
-        .sidebar-header {
-            padding: 1.5rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .sidebar-logo {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            font-size: 1.1rem;
-            font-weight: 700;
-            text-decoration: none;
-        }
-
-        .sidebar-logo-icon {
-            width: 42px;
-            height: 42px;
-            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 50%, #a855f7 100%);
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
-        }
-
-        .sidebar-logo-icon i {
-            font-size: 1.25rem;
-            color: white;
-        }
-
-        .sidebar-logo-text {
-            color: white;
-            font-weight: 800;
-            letter-spacing: -0.3px;
-            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-        }
-
         .sidebar-nav {
             padding: 1rem 0;
         }
 
         .nav-section {
-            margin-bottom: 2rem;
-        }
-
-        .nav-section-title {
-            padding: 0.5rem 1.5rem;
-            font-size: 0.75rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: var(--text-tertiary);
-            margin-bottom: 0.5rem;
+            margin-bottom: 0;
         }
 
         .nav-link {
@@ -163,6 +116,12 @@
         .nav-link i {
             width: 20px;
             text-align: center;
+        }
+
+        .nav-link.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            pointer-events: none;
         }
 
         /* Header */
@@ -203,31 +162,50 @@
             background: var(--bg-secondary);
         }
 
-        .header-title {
-            font-size: 1.25rem;
-            font-weight: 600;
+        .nav-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            text-decoration: none;
+        }
+
+        .nav-logo img {
+            width: 32px;
+            height: 32px;
+            object-fit: contain;
+        }
+
+        .nav-brand-text {
+            font-size: 1.35rem;
+            font-weight: 700;
             color: var(--text-primary);
+            letter-spacing: -0.3px;
         }
 
         .header-right {
             display: flex;
             align-items: center;
-            gap: 1rem;
+            gap: 0.75rem;
         }
 
-        .theme-toggle {
-            background: none;
-            border: none;
+        .theme-toggle-pill {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 999px;
+            padding: 0.6rem 1.1rem;
+            font-size: 0.9rem;
+            font-weight: 600;
             color: var(--text-primary);
-            font-size: 1.25rem;
             cursor: pointer;
-            padding: 0.5rem;
-            border-radius: 8px;
             transition: var(--transition);
         }
 
-        .theme-toggle:hover {
-            background: var(--bg-secondary);
+        .theme-toggle-pill:hover {
+            transform: translateY(-1px);
+            box-shadow: var(--shadow-md);
         }
 
         .status-badge {
@@ -438,43 +416,44 @@
             box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1);
         }
 
-        .voice-preview {
+        .input-mode-toggle {
             display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-top: 0.5rem;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
         }
 
-        .btn-preview {
-            background: var(--success-color);
-            color: white;
-            border: none;
-            padding: 0.5rem 1rem;
-            border-radius: 6px;
-            font-size: 0.875rem;
+        .mode-toggle-btn {
+            flex: 1;
+            padding: 0.65rem 1rem;
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            background: var(--bg-primary);
+            color: var(--text-secondary);
+            font-weight: 600;
+            font-size: 0.9rem;
             cursor: pointer;
             transition: var(--transition);
         }
 
-        .btn-preview:hover {
-            background: #059669;
+        .mode-toggle-btn:hover {
+            border-color: var(--primary-color);
         }
 
-        #voicePreviewAudio {
-            margin-top: 0.5rem;
-            width: 100%;
-            height: 40px;
-            border-radius: 6px;
-            background: var(--bg-tertiary);
+        .mode-toggle-btn.active {
+            background: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
         }
 
-        .voice-preview {
-            margin-top: 0.5rem;
-        }
-
-        .btn-preview:disabled {
-            background: var(--text-tertiary);
-            cursor: not-allowed;
+        .collapsible-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+            font-weight: 700;
+            color: var(--text-primary);
+            padding: 0.5rem 0;
+            user-select: none;
         }
 
         .btn-submit {
@@ -606,20 +585,11 @@
 <body data-theme="light">
     <!-- Sidebar -->
     <div class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-            <a href="/" class="sidebar-logo">
-                <div class="sidebar-logo-icon">
-                    <i class="fas fa-phone-volume"></i>
-                </div>
-                <span class="sidebar-logo-text">aivoiceagent</span>
-            </a>
-        </div>
         <nav class="sidebar-nav">
             <div class="nav-section">
-                <div class="nav-section-title">Main</div>
                 <a href="/" class="nav-link">
-                    <i class="fas fa-chart-line"></i>
-                    <span>Dashboard</span>
+                    <i class="fas fa-phone-volume"></i>
+                    <span>Overview</span>
                 </a>
                 <a href="/clients" class="nav-link active">
                     <i class="fas fa-users"></i>
@@ -629,12 +599,13 @@
                     <i class="fas fa-bullhorn"></i>
                     <span>Campaigns</span>
                 </a>
-            </div>
-            <div class="nav-section">
-                <div class="nav-section-title">Analytics</div>
                 <a href="/call_history" class="nav-link">
                     <i class="fas fa-history"></i>
                     <span>Call History</span>
+                </a>
+                <a href="#" class="nav-link disabled" title="Coming soon">
+                    <i class="fas fa-cog"></i>
+                    <span>Settings</span>
                 </a>
             </div>
         </nav>
@@ -649,11 +620,14 @@
             <button class="sidebar-toggle" id="sidebarToggle">
                 <i class="fas fa-bars"></i>
             </button>
-            <h1 class="header-title">Clients</h1>
+            <a href="/" class="nav-logo">
+                <img src="/static/logo.png" alt="EPlanet Soft logo">
+                <span class="nav-brand-text">EPlanet Soft</span>
+            </a>
         </div>
         <div class="header-right">
-            <button id="themeToggle" class="theme-toggle">
-                <i class="fas fa-moon"></i>
+            <button id="themeToggle" class="theme-toggle-pill" type="button">
+                <i class="fas fa-moon"></i> Dark Mode
             </button>
 
             {% if current_user %}
@@ -691,6 +665,12 @@
                 <div class="client-header">
                     <div class="client-name">{{ client.name }}</div>
                     <div class="client-actions">
+                        <button class="btn-delete" style="background: var(--primary-color);" onclick="event.stopPropagation(); openAddUserModal('{{ client.id }}', '{{ client.name }}')" title="Add User">
+                            <i class="fas fa-user-plus"></i>
+                        </button>
+                        <button class="btn-delete" style="background: var(--primary-color);" onclick="event.stopPropagation(); openManageLocationsModal('{{ client.id }}', '{{ client.name }}')" title="Manage Locations">
+                            <i class="fas fa-map-marker-alt"></i>
+                        </button>
                         <button class="btn-delete" onclick="event.stopPropagation(); openDeleteClientModal('{{ client.id }}', '{{ client.name }}')" title="Delete Client">
                             <i class="fas fa-trash"></i>
                         </button>
@@ -708,14 +688,6 @@
                     <div class="info-item">
                         <i class="fas fa-globe"></i>
                         <span>{{ client.website_url }}</span>
-                    </div>
-                    <div class="info-item">
-                        <i class="fas fa-language"></i>
-                        <span>{{ client.language }}</span>
-                    </div>
-                    <div class="info-item">
-                        <i class="fas fa-microphone"></i>
-                        <span>{{ client.voice }}</span>
                     </div>
                 </div>
             </div>
@@ -795,56 +767,23 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="clientLanguage">Language</label>
-                        <select id="clientLanguage" name="language" required>
-                            <option value="">Select Language</option>
-                            <option value="english">English</option>
-                            <option value="spanish">Spanish</option>
-                            <option value="french">French</option>
-                            <option value="german">German</option>
-                            <option value="italian">Italian</option>
-                            <option value="portuguese">Portuguese</option>
-                            <option value="chinese">Chinese</option>
-                            <option value="japanese">Japanese</option>
-                            <option value="korean">Korean</option>
-                            <option value="arabic">Arabic</option>
-                            <option value="hindi">Hindi</option>
-                            <option value="russian">Russian</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="callType">Call Type</label>
-                        <select id="callType" name="call_type" required>
-                            <option value="">Select Call Type</option>
-                            <option value="appointment_confirmation">Appointment Confirmation</option>
-                            <option value="reminder_call">Reminder Call</option>
-                            <option value="follow_up">Follow-up Call</option>
-                            <option value="survey">Survey Call</option>
-                            <option value="marketing">Marketing Call</option>
-                            <option value="customer_service">Customer Service</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="voiceSelect">Voice Agent</label>
-                        <select id="voiceSelect" name="voice" required>
-                            <option value="">Select Voice</option>
-                            <option value="Ryan">Ryan (Male Professional)</option>
-                            <option value="Paige">Paige (Female Professional)</option>
-                            <option value="Maya">Maya (Female Warm)</option>
-                            <option value="Adriana">Adriana (Female Clear)</option>
-                            <option value="Destiny">Destiny (Female Friendly)</option>
-                            <option value="Mason">Mason (Male Warm)</option>
-                            <option value="Sal">Sal (Male Clear)</option>
-                        </select>
-                        <div class="voice-preview">
-                            <button type="button" class="btn-preview" onclick="previewVoice()">
-                                <i class="fas fa-play"></i>
-                                Preview Voice
-                            </button>
-                            <audio id="voicePreviewAudio" controls style="display: none;"></audio>
+                        <label for="clientLocationsFile">Locations (optional)</label>
+                        <div class="file-input-wrapper">
+                            <input type="file" id="clientLocationsFile" name="locations_file" accept=".csv,.xlsx">
+                            <div class="file-input-display" id="clientLocationsFileDisplay">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                                <div>
+                                    <strong>Click to select CSV or Excel file</strong><br>
+                                    <span>or drag and drop your file here</span>
+                                </div>
+                            </div>
                         </div>
+                        <a href="#" onclick="downloadSampleLocationsCsv(); return false;" style="display: inline-flex; align-items: center; gap: 6px; margin-top: 0.5rem; color: var(--primary-color); text-decoration: underline; font-size: 0.875rem;">
+                            <i class="fas fa-download"></i> Download sample CSV
+                        </a>
+                        <p style="color: var(--text-secondary); font-size: 0.8rem; margin-top: 0.5rem;">
+                            Optional — upload all of this client's locations now, or add/edit them later from "Manage Locations".
+                        </p>
                     </div>
 
                     <button type="submit" class="btn-submit">
@@ -852,6 +791,123 @@
                         Add Client
                     </button>
                 </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add User Modal -->
+    <div id="addUserModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3><i class="fas fa-user-plus"></i> Add User for <span id="addUserClientName"></span></h3>
+                <button class="modal-close" onclick="closeAddUserModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="addUserForm">
+                    <div class="form-group">
+                        <label for="newUserUsername">Username</label>
+                        <input type="text" id="newUserUsername" name="username" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="newUserEmail">Email Address</label>
+                        <input type="email" id="newUserEmail" name="email" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="newUserPassword">Password</label>
+                        <input type="password" id="newUserPassword" name="password" required>
+                    </div>
+
+                    <button type="submit" class="btn-submit">
+                        <i class="fas fa-save"></i>
+                        Add User
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manage Locations Modal -->
+    <div id="manageLocationsModal" class="modal">
+        <div class="modal-content" style="max-width: 600px;">
+            <div class="modal-header">
+                <h3><i class="fas fa-map-marker-alt"></i> Locations for <span id="manageLocationsClientName"></span></h3>
+                <button class="modal-close" onclick="closeManageLocationsModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <h4 style="margin-bottom: 1rem; color: var(--text-primary);">Add Location</h4>
+
+                <div class="input-mode-toggle">
+                    <button type="button" class="mode-toggle-btn active" id="locationManualModeBtn" onclick="setLocationInputMode('manual')">
+                        <i class="fas fa-keyboard"></i> Add Manually
+                    </button>
+                    <button type="button" class="mode-toggle-btn" id="locationUploadModeBtn" onclick="setLocationInputMode('upload')">
+                        <i class="fas fa-file-upload"></i> Upload File
+                    </button>
+                </div>
+
+                <div id="locationManualModeSection">
+                    <form id="addLocationForm">
+                        <div class="form-group">
+                            <label for="newLocationName">Location Name</label>
+                            <input type="text" id="newLocationName" name="location_name" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="newLocationAddress">Address</label>
+                            <input type="text" id="newLocationAddress" name="address" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="newLocationPhone">Phone Number</label>
+                            <input type="tel" id="newLocationPhone" name="phone_number">
+                        </div>
+                        <div class="form-group">
+                            <label for="newLocationEmail">Email Address</label>
+                            <input type="email" id="newLocationEmail" name="email">
+                        </div>
+                        <button type="submit" class="btn-submit">
+                            <i class="fas fa-plus"></i>
+                            Add Location
+                        </button>
+                    </form>
+                </div>
+
+                <div id="locationUploadModeSection" style="display: none;">
+                    <form id="bulkUploadLocationsForm">
+                        <div class="form-group">
+                            <label for="locationsCsvFile">Upload CSV/Excel File</label>
+                            <div class="file-input-wrapper">
+                                <input type="file" id="locationsCsvFile" name="file" accept=".csv,.xlsx" required>
+                                <div class="file-input-display" id="locationsFileDisplay">
+                                    <i class="fas fa-cloud-upload-alt"></i>
+                                    <div>
+                                        <strong>Click to select CSV or Excel file</strong><br>
+                                        <span>or drag and drop your file here</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <a href="#" onclick="downloadSampleLocationsCsv(); return false;" style="display: inline-flex; align-items: center; gap: 6px; margin-top: 0.5rem; color: var(--primary-color); text-decoration: underline; font-size: 0.875rem;">
+                                <i class="fas fa-download"></i> Download sample CSV
+                            </a>
+                        </div>
+                        <button type="submit" class="btn-submit">
+                            <i class="fas fa-upload"></i>
+                            Upload Locations
+                        </button>
+                    </form>
+                </div>
+
+                <div class="collapsible-header" onclick="toggleLocationsList()" style="margin-top: 1.5rem; border-top: 1px solid var(--border-color); padding-top: 1rem;">
+                    <i class="fas fa-chevron-right" id="locationsListChevron"></i>
+                    <span id="locationsListHeaderText">Existing Locations (0)</span>
+                </div>
+                <div id="locationsList" style="display: none; margin-top: 1rem;">
+                    <p style="color: var(--text-secondary);">Loading locations...</p>
+                </div>
             </div>
         </div>
     </div>
@@ -867,74 +923,28 @@
         function closeAddClientModal() {
             document.getElementById('addClientModal').style.display = 'none';
             document.getElementById('addClientForm').reset();
-        }
-
-        // Voice preview
-        async function previewVoice() {
-            const voiceSelect = document.getElementById('voiceSelect');
-            const selectedVoice = voiceSelect.value;
-            const audioElement = document.getElementById('voicePreviewAudio');
-            const previewButton = document.querySelector('.btn-preview');
-
-            if (!selectedVoice) {
-                alert('Please select a voice first');
-                return;
-            }
-
-            // Show loading state
-            const originalText = previewButton.innerHTML;
-            previewButton.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating...';
-            previewButton.disabled = true;
-
-            try {
-                // Fetch the voice preview from the server using Bland AI
-                const response = await fetch(`/voice_preview/${selectedVoice}`);
-                const data = await response.json();
-
-                if (data.success) {
-                    if (data.preview_url) {
-                        // Set the audio source and show the audio element
-                        audioElement.src = data.preview_url;
-                        audioElement.style.display = 'block';
-
-                        // Play the audio
-                        audioElement.currentTime = 0;
-                        try {
-                            await audioElement.play();
-                            alert(`🎤 Playing voice sample for ${selectedVoice}. Use the audio controls to replay.`);
-                        } catch (playError) {
-                            // If autoplay is blocked, just show the controls so user can click play
-                            console.log('Autoplay blocked, showing audio controls');
-                            alert(`🎤 Voice sample loaded for ${selectedVoice}. Click the play button below to hear it.`);
-                        }
-                    } else if (data.audio_data) {
-                        // Handle direct audio data if URL not provided
-                        alert(`🎤 Voice sample generated for ${selectedVoice}, but playback format not supported in browser.`);
-                    } else {
-                        alert('❌ Voice sample generated but no playable audio received.');
-                    }
-                } else {
-                    // Show specific error message
-                    const errorMsg = data.error || 'Voice preview not available';
-                    alert(`❌ ${errorMsg}`);
-                    console.error('Voice preview error:', data.error);
-                }
-            } catch (error) {
-                console.error('Error loading voice preview:', error);
-                alert('❌ Network error loading voice preview. Please check your connection and try again.');
-            } finally {
-                // Restore button state
-                previewButton.innerHTML = originalText;
-                previewButton.disabled = false;
-            }
+            const fileDisplay = document.getElementById('clientLocationsFileDisplay');
+            fileDisplay.classList.remove('has-file');
+            fileDisplay.innerHTML = `
+                <i class="fas fa-cloud-upload-alt"></i>
+                <div>
+                    <strong>Click to select CSV or Excel file</strong><br>
+                    <span>or drag and drop your file here</span>
+                </div>
+            `;
         }
 
         // Form submission
         document.getElementById('addClientForm').addEventListener('submit', async function(e) {
             e.preventDefault();
 
-            const formData = new FormData(e.target);
-            const clientData = Object.fromEntries(formData.entries());
+            const clientData = {
+                name: document.getElementById('clientName').value,
+                phone_number: document.getElementById('clientPhone').value,
+                email: document.getElementById('clientEmail').value,
+                website_url: document.getElementById('clientWebsite').value,
+            };
+            const locationsFile = document.getElementById('clientLocationsFile').files[0];
 
             try {
                 const response = await fetch('/add_client', {
@@ -947,14 +957,302 @@
 
                 const result = await response.json();
 
-                if (result.success) {
-                    alert('Client added successfully!');
-                    window.location.reload();
-                } else {
+                if (!result.success) {
                     alert('Error adding client: ' + (result.detail || 'Unknown error'));
+                    return;
                 }
+
+                let message = 'Client added successfully!';
+                if (locationsFile) {
+                    const bulkFormData = new FormData();
+                    bulkFormData.append('file', locationsFile);
+                    try {
+                        const bulkResponse = await fetch(`/api/clients/${result.client_id}/locations/bulk`, {
+                            method: 'POST',
+                            body: bulkFormData
+                        });
+                        const bulkResult = await bulkResponse.json();
+                        message += bulkResult.message ? '\n' + bulkResult.message : '';
+                    } catch (bulkError) {
+                        message += '\nLocations upload failed: ' + bulkError.message;
+                    }
+                }
+
+                alert(message);
+                window.location.reload();
             } catch (error) {
                 alert('Error adding client: ' + error.message);
+            }
+        });
+
+        // Add User modal
+        let addUserClientId = null;
+
+        function openAddUserModal(clientId, clientName) {
+            addUserClientId = clientId;
+            document.getElementById('addUserClientName').textContent = clientName;
+            document.getElementById('addUserModal').style.display = 'block';
+        }
+
+        function closeAddUserModal() {
+            document.getElementById('addUserModal').style.display = 'none';
+            document.getElementById('addUserForm').reset();
+            addUserClientId = null;
+        }
+
+        document.getElementById('addUserForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const formData = new FormData(e.target);
+            const userData = Object.fromEntries(formData.entries());
+            userData.role = 'user';
+            userData.client_id = addUserClientId;
+
+            try {
+                const response = await fetch('/api/users', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(userData)
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    alert('User added successfully!');
+                    closeAddUserModal();
+                } else {
+                    alert('Error adding user: ' + (result.detail || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error adding user: ' + error.message);
+            }
+        });
+
+        // Manage Locations modal
+        let manageLocationsClientId = null;
+        let currentLocations = [];
+
+        function openManageLocationsModal(clientId, clientName) {
+            manageLocationsClientId = clientId;
+            document.getElementById('manageLocationsClientName').textContent = clientName;
+            document.getElementById('manageLocationsModal').style.display = 'block';
+            setLocationInputMode('manual');
+            collapseLocationsList();
+            loadLocations();
+        }
+
+        function closeManageLocationsModal() {
+            document.getElementById('manageLocationsModal').style.display = 'none';
+            document.getElementById('addLocationForm').reset();
+            document.getElementById('bulkUploadLocationsForm').reset();
+            manageLocationsClientId = null;
+            currentLocations = [];
+        }
+
+        function setLocationInputMode(mode) {
+            const isManual = mode === 'manual';
+            document.getElementById('locationManualModeSection').style.display = isManual ? 'block' : 'none';
+            document.getElementById('locationUploadModeSection').style.display = isManual ? 'none' : 'block';
+            document.getElementById('locationManualModeBtn').classList.toggle('active', isManual);
+            document.getElementById('locationUploadModeBtn').classList.toggle('active', !isManual);
+        }
+
+        function collapseLocationsList() {
+            document.getElementById('locationsList').style.display = 'none';
+            document.getElementById('locationsListChevron').classList.remove('fa-chevron-down');
+            document.getElementById('locationsListChevron').classList.add('fa-chevron-right');
+        }
+
+        function toggleLocationsList() {
+            const listEl = document.getElementById('locationsList');
+            const chevron = document.getElementById('locationsListChevron');
+            const isHidden = listEl.style.display === 'none';
+            listEl.style.display = isHidden ? 'block' : 'none';
+            chevron.classList.toggle('fa-chevron-right', !isHidden);
+            chevron.classList.toggle('fa-chevron-down', isHidden);
+        }
+
+        function downloadSampleLocationsCsv() {
+            const csvText = [
+                'location_name,address,phone_number,email',
+                'Downtown Office,123 Main St,2105551234,downtown@example.com',
+                'Uptown Office,456 Oak Ave,2105555678,uptown@example.com'
+            ].join('\n');
+            const blob = new Blob([csvText], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = 'sample_locations.csv';
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            URL.revokeObjectURL(url);
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str || '';
+            return div.innerHTML;
+        }
+
+        async function loadLocations() {
+            const listEl = document.getElementById('locationsList');
+            listEl.innerHTML = '<p style="color: var(--text-secondary);">Loading locations...</p>';
+            try {
+                const response = await fetch(`/api/clients/${manageLocationsClientId}/locations`);
+                const result = await response.json();
+                currentLocations = result.locations || [];
+                renderLocations();
+            } catch (error) {
+                listEl.innerHTML = '<p style="color: var(--danger-color);">Error loading locations.</p>';
+            }
+        }
+
+        function renderLocations() {
+            const listEl = document.getElementById('locationsList');
+            document.getElementById('locationsListHeaderText').textContent = `Existing Locations (${currentLocations.length})`;
+
+            if (currentLocations.length === 0) {
+                listEl.innerHTML = '<p style="color: var(--text-secondary);">No locations yet.</p>';
+                return;
+            }
+            listEl.innerHTML = currentLocations.map(loc => `
+                <div class="info-item" data-location-id="${loc.id}" style="justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem;">
+                    <div class="location-display">
+                        <strong>${escapeHtml(loc.location_name)}</strong><br>
+                        <span>${escapeHtml(loc.address)}</span><br>
+                        <span>${escapeHtml(loc.phone_number)}</span>&nbsp; <span>${escapeHtml(loc.email)}</span>
+                    </div>
+                    <div>
+                        <button type="button" class="btn-delete" style="background: var(--primary-color);" onclick="editLocation('${loc.id}')" title="Edit">
+                            <i class="fas fa-edit" style="color: white;"></i>
+                        </button>
+                        <button type="button" class="btn-delete" onclick="deleteLocation('${loc.id}')" title="Delete">
+                            <i class="fas fa-trash" style="color: white;"></i>
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function editLocation(locationId) {
+            const loc = currentLocations.find(l => l.id === locationId);
+            if (!loc) return;
+            const row = document.querySelector(`[data-location-id="${locationId}"]`);
+            row.querySelector('.location-display').outerHTML = `
+                <div class="location-display">
+                    <input type="text" class="edit-location_name" value="${escapeHtml(loc.location_name)}" placeholder="Location Name" style="width: 100%; margin-bottom: 0.5rem;">
+                    <input type="text" class="edit-address" value="${escapeHtml(loc.address)}" placeholder="Address" style="width: 100%; margin-bottom: 0.5rem;">
+                    <input type="tel" class="edit-phone_number" value="${escapeHtml(loc.phone_number)}" placeholder="Phone Number" style="width: 100%; margin-bottom: 0.5rem;">
+                    <input type="email" class="edit-email" value="${escapeHtml(loc.email)}" placeholder="Email Address" style="width: 100%;">
+                </div>
+            `;
+            row.querySelector('div:last-child').innerHTML = `
+                <button type="button" class="btn-submit" onclick="saveLocation('${locationId}')" title="Save">
+                    <i class="fas fa-check" style="color: white;"></i>
+                </button>
+                <button type="button" class="btn-secondary" onclick="renderLocations()" title="Cancel">
+                    <i class="fas fa-times" style="color: var(--text-primary);"></i>
+                </button>
+            `;
+        }
+
+        async function saveLocation(locationId) {
+            const row = document.querySelector(`[data-location-id="${locationId}"]`);
+            const payload = {
+                location_name: row.querySelector('.edit-location_name').value,
+                address: row.querySelector('.edit-address').value,
+                phone_number: row.querySelector('.edit-phone_number').value,
+                email: row.querySelector('.edit-email').value,
+            };
+            try {
+                const response = await fetch(`/api/clients/${manageLocationsClientId}/locations/${locationId}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    await loadLocations();
+                } else {
+                    alert('Error updating location: ' + (result.detail || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error updating location: ' + error.message);
+            }
+        }
+
+        async function deleteLocation(locationId) {
+            if (!confirm('Delete this location?')) return;
+            try {
+                const response = await fetch(`/api/clients/${manageLocationsClientId}/locations/${locationId}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+                if (result.success) {
+                    await loadLocations();
+                } else {
+                    alert('Error deleting location: ' + (result.detail || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error deleting location: ' + error.message);
+            }
+        }
+
+        document.getElementById('addLocationForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const locationData = Object.fromEntries(formData.entries());
+
+            try {
+                const response = await fetch(`/api/clients/${manageLocationsClientId}/locations`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(locationData)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    document.getElementById('addLocationForm').reset();
+                    await loadLocations();
+                } else {
+                    alert('Error adding location: ' + (result.detail || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error adding location: ' + error.message);
+            }
+        });
+
+        document.getElementById('bulkUploadLocationsForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+
+            try {
+                const response = await fetch(`/api/clients/${manageLocationsClientId}/locations/bulk`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+                if (result.success) {
+                    alert(result.message);
+                    document.getElementById('bulkUploadLocationsForm').reset();
+                    const fileDisplay = document.getElementById('locationsFileDisplay');
+                    fileDisplay.classList.remove('has-file');
+                    fileDisplay.innerHTML = `
+                        <i class="fas fa-cloud-upload-alt"></i>
+                        <div>
+                            <strong>Click to select CSV or Excel file</strong><br>
+                            <span>or drag and drop your file here</span>
+                        </div>
+                    `;
+                    setLocationInputMode('manual');
+                    await loadLocations();
+                } else {
+                    alert('Error uploading locations: ' + (result.detail || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error uploading locations: ' + error.message);
             }
         });
 
@@ -1008,10 +1306,16 @@
         window.onclick = function(event) {
             const addModal = document.getElementById('addClientModal');
             const deleteModal = document.getElementById('deleteClientModal');
+            const addUserModal = document.getElementById('addUserModal');
+            const manageLocationsModal = document.getElementById('manageLocationsModal');
             if (event.target === addModal) {
                 closeAddClientModal();
             } else if (event.target === deleteModal) {
                 closeDeleteClientModal();
+            } else if (event.target === addUserModal) {
+                closeAddUserModal();
+            } else if (event.target === manageLocationsModal) {
+                closeManageLocationsModal();
             }
         }
 
